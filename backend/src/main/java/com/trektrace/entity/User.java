@@ -1,13 +1,14 @@
 package com.trektrace.entity;
 
-import jak.time.LocalDateTime;
-import jak.persistence.Entity;
+import java.time.LocalDateTime;
+import jak.persistence.*;
 import lombok.Data;
-import lombok.extern.persistence.ToString.ToString;
 
 @Entity
 @Table(name = "users")
+@Data
 public class User {
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -18,11 +19,23 @@ public class User {
     @Column(length = 50)
     private String nickname;
 
+    @Column(name = "avatar_url")
     private String avatarUrl;
 
-    @CreatedDate
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @LastModifiedDate
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+    
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

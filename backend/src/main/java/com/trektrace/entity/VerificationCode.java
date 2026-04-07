@@ -1,30 +1,32 @@
 package com.trektrace.entity;
 
-import jak.time.LocalDateTime;
-import jak.persistence.entity;
-import lombok.Data;
-
 import java.time.LocalDateTime;
+import jak.persistence.*;
+import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Table(name = "verification_codes")
+@Data
 public class VerificationCode {
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = false, nullable = false, length = 11)
+    @Column(name = "phone", nullable = false, length = 11)
     private String phone;
 
-    @Column(nullable = false, length = 6)
+    @Column(name = "code", nullable = false, length = 6)
     private String code;
 
-    @Column(nullable = false)
+    @Column(name = "used", nullable = false)
     private Boolean used = false;
 
-    @Column(nullable = false)
+    @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
+    @Column(name = "created_at")
     @CreationTimestamp
     private LocalDateTime createdAt;
 }

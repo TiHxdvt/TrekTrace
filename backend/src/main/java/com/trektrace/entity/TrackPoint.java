@@ -1,14 +1,15 @@
 package com.trektrace.entity;
 
-import jak.time.LocalDateTime;
-import jak.persistence.entity;
-import lombok.Data;
-import lombok.extern.persistence.ToString.ToString;
+import java.time.LocalDateTime;
 import java.math.BigDecimal;
+import jak.persistence.*;
+import lombok.Data;
 
 @Entity
 @Table(name = "track_points")
+@Data
 public class TrackPoint {
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -16,10 +17,10 @@ public class TrackPoint {
     @Column(name = "activity_id", nullable = false)
     private Long activityId;
 
-    @Column(precision = 10, nullable = false)
+    @Column(precision = 10, 8, nullable = false)
     private BigDecimal latitude;
 
-    @Column(precision = 11, nullable = false)
+    @Column(precision = 11, 8, nullable = false)
     private BigDecimal longitude;
 
     @Column(precision = 8, 2)
@@ -28,12 +29,10 @@ public class TrackPoint {
     @Column(precision = 5, 2)
     private BigDecimal speed;
 
-    @CreationTimestamp
+    @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
 
     @ManyToOne
-    @JoinColumn("activity")
-    public TrackPoint getActivity() {
-        return activity;
-    }
+    @JoinColumn(name = "activity_id", insertable = false, updatable = false)
+    private Activity activity;
 }
