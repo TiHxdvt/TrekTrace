@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.ArrayList;
-import jak.persistence.*;
+import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity

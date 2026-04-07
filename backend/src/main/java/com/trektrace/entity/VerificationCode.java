@@ -1,7 +1,7 @@
 package com.trektrace.entity;
 
 import java.time.LocalDateTime;
-import jak.persistence.*;
+import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 

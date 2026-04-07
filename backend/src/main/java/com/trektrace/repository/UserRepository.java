@@ -4,8 +4,9 @@ import com.trektrace.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 public interface UserRepository extends JpaRepository<User, Long> {
-    User findByPhone(String phone);
-    Optional<User> findById(Long id);
+    Optional<User> findByPhone(String phone);
     boolean existsByPhone(String phone);
 }
