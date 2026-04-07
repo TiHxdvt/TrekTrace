@@ -1,6 +1,6 @@
 /**
- * 登录页面
- * 实现手机号 + 验证码登录功能
+ * 登录页面 - 玻璃拟态设计
+ * 参考 /Users/ti/trektrace/resources 中的设计风格
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -13,9 +13,9 @@ import {
   Platform,
   ScrollView,
   Alert,
+  StatusBar,
 } from 'react-native';
 import { Button } from '../components/Button';
-import { PhoneInput } from '../components/PhoneInput';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
 
@@ -60,10 +60,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   // 发送验证码
   const handleSendCode = async () => {
-    // 清除错误
     setPhoneError('');
 
-    // 验证手机号
     if (!phone) {
       setPhoneError('请输入手机号');
       return;
@@ -78,10 +76,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       setSendingCode(true);
       await authService.sendVerificationCode(phone);
 
-      // 开始倒计时
       setCountdown(60);
 
-      // 提示用户
       Alert.alert(
         '提示',
         '验证码已发送，请查看后端控制台',
@@ -97,11 +93,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   // 登录
   const handleLogin = async () => {
-    // 清除错误
     setPhoneError('');
     setCodeError('');
 
-    // 验证
     if (!phone) {
       setPhoneError('请输入手机号');
       return;
@@ -126,11 +120,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       setLoading(true);
       const response = await authService.login(phone, code);
 
-      // 保存 token 和用户信息
       await storageService.saveToken(response.token);
       await storageService.saveUser(response.user);
 
-      // 登录成功
       onLoginSuccess();
     } catch (error: any) {
       console.error('Login error:', error);
@@ -141,65 +133,104 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1c1e26" />
+
+      {/* Background Glow Effects */}
+      <View style={styles.backgroundGlow}>
+        <View style={[styles.glowCircle, styles.glowBlue]} />
+        <View style={[styles.glowCircle, styles.glowPurple]} />
+        <View style={[styles.glowCircle, styles.glowPink]} />
+      </View>
+
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>途迹</Text>
-          <Text style={styles.subtitle}>户外运动记录</Text>
-        </View>
-
-        <View style={styles.form}>
-          <PhoneInput
-            value={phone}
-            onChangeText={setPhone}
-            error={phoneError}
-          />
-
-          <View style={styles.codeContainer}>
-            <TextInput
-              style={styles.codeInput}
-              value={code}
-              onChangeText={setCode}
-              placeholder="请输入验证码"
-              placeholderTextColor="rgba(255, 255, 255, 0.3)"
-              keyboardType="number-pad"
-              maxLength={6}
-              selectionColor="#3b82f6"
-            />
-            <Button
-              title={countdown > 0 ? `${countdown}s` : '获取验证码'}
-              onPress={handleSendCode}
-              variant="secondary"
-              size="small"
-              disabled={countdown > 0 || sendingCode}
-              loading={sendingCode}
-              style={styles.codeButton}
-            />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Logo and Title */}
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              <Text style={styles.logoIcon}>🏔️</Text>
+            </View>
+            <Text style={styles.title}>途迹</Text>
+            <Text style={styles.subtitle}>记录你的每一步精彩</Text>
           </View>
-          {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
 
-          <Button
-            title="登录"
-            onPress={handleLogin}
-            loading={loading}
-            disabled={loading}
-            style={styles.loginButton}
-          />
-        </View>
+          {/* Login Form */}
+          <View style={styles.form}>
+            {/* Phone Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>手机号</Text>
+              <View style={[styles.inputWrapper, phoneError && styles.inputError]}>
+                <Text style={styles.inputPrefix}>+86</Text>
+                <TextInput
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="请输入手机号"
+                  placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  selectionColor="#3b82f6"
+                />
+              </View>
+              {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
+            </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            登录即表示同意用户协议和隐私政策
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            {/* Code Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>验证码</Text>
+              <View style={styles.codeRow}>
+                <View style={[styles.inputWrapper, styles.codeInputWrapper, codeError && styles.inputError]}>
+                  <TextInput
+                    style={styles.input}
+                    value={code}
+                    onChangeText={setCode}
+                    placeholder="请输入验证码"
+                    placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    selectionColor="#3b82f6"
+                  />
+                </View>
+                <Button
+                  title={countdown > 0 ? `${countdown}s` : '获取验证码'}
+                  onPress={handleSendCode}
+                  variant="secondary"
+                  size="small"
+                  disabled={countdown > 0 || sendingCode}
+                  loading={sendingCode}
+                  style={styles.codeButton}
+                />
+              </View>
+              {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
+            </View>
+
+            {/* Login Button */}
+            <Button
+              title="登录"
+              onPress={handleLogin}
+              loading={loading}
+              disabled={loading}
+              style={styles.loginButton}
+            />
+
+            {/* Terms */}
+            <Text style={styles.terms}>
+              登录即表示同意{' '}
+              <Text style={styles.termsLink}>用户协议</Text>
+              {' '}和{' '}
+              <Text style={styles.termsLink}>隐私政策</Text>
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -208,65 +239,145 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1c1e26',
   },
+  backgroundGlow: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  glowCircle: {
+    position: 'absolute',
+    borderRadius: 500,
+  },
+  glowBlue: {
+    top: -100,
+    left: 50,
+    width: 300,
+    height: 300,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    opacity: 0.8,
+  },
+  glowPurple: {
+    bottom: -50,
+    right: -50,
+    width: 350,
+    height: 350,
+    backgroundColor: 'rgba(147, 51, 234, 0.15)',
+  },
+  glowPink: {
+    top: '40%',
+    left: '50%',
+    marginLeft: -150,
+    width: 300,
+    height: 300,
+    backgroundColor: 'rgba(236, 72, 153, 0.1)',
+  },
+  keyboardView: {
+    flex: 1,
+    zIndex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 32,
+    paddingVertical: 40,
   },
   header: {
+    alignItems: 'center',
     marginBottom: 60,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  logoIcon: {
+    fontSize: 40,
   },
   title: {
     fontSize: 48,
     fontWeight: '700',
     color: '#fff',
-    textAlign: 'center',
     marginBottom: 8,
+    letterSpacing: -1,
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.5)',
-    textAlign: 'center',
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: '400',
   },
   form: {
-    marginBottom: 40,
+    width: '100%',
   },
-  codeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  inputContainer: {
     marginBottom: 24,
   },
-  codeInput: {
-    flex: 1,
-    height: 56,
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 12,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
     paddingHorizontal: 16,
+    height: 56,
+  },
+  inputError: {
+    borderColor: 'rgba(239, 68, 68, 0.5)',
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+  },
+  inputPrefix: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginRight: 12,
+    fontWeight: '500',
+  },
+  input: {
+    flex: 1,
     fontSize: 16,
     color: '#fff',
     fontWeight: '500',
+  },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  codeInputWrapper: {
+    flex: 1,
     marginRight: 12,
   },
   codeButton: {
     minWidth: 110,
-  },
-  loginButton: {
-    marginTop: 16,
+    height: 56,
   },
   errorText: {
     fontSize: 12,
     color: '#ef4444',
-    marginBottom: 12,
+    marginTop: 8,
     marginLeft: 4,
   },
-  footer: {
-    alignItems: 'center',
+  loginButton: {
+    marginTop: 8,
+    height: 56,
   },
-  footerText: {
+  terms: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.4)',
     textAlign: 'center',
+    marginTop: 24,
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: 'rgba(59, 130, 246, 0.8)',
   },
 });
