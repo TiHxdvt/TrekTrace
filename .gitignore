@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build
+**/dist/
+**/build/
+**/target/
+**/*.class
+
+# Android
+**/.gradle/
+**/gradlew
+**/gradlew.bat
+**/local.properties
+**/*.iml
+**/.idea/
+**/captures/
+**/externalNativeBuild/
+**/.cxx/
+
+# iOS
+**/Pods/
+**/*.xcworkspace
+**/*.xcuserdata
+**/*.pbxuser
+**/*.mode1v3
+**/*.mode2v3
+**/*.perspectivev3
+**/*.perspectivev3
+
+# Environment
+.env
+.env.local
+.env.*.local
+**/.env
+
+# Logs
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+**/coverage/
+**/.nyc_output/
+
+# Misc
+*.bak
+*.tmp
+*.temp

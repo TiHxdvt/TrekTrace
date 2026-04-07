@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UI控件圆角系统 - G2 移动端版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            user-select: none;
+        }
+
+        :root {
+            --radius-g2: 2rem;
+            --safe-area-top: env(safe-area-inset-top);
+            --safe-area-bottom: env(safe-area-inset-bottom);
+        }
+
+        body {
+            padding-top: var(--safe-area-top);
+            padding-bottom: var(--safe-area-bottom);
+        }
+
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .gradient-bg {
+            background: linear-gradient(-45deg, #1c1e26, #2d3748, #1a202c, #2d3748);
+            background-size: 400% 400%;
+            animation: gradient-shift 15s ease infinite;
+        }
+
+        .component-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .usage-tag {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+
+        .scenario-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 52px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: rgba(59, 130, 246, 0.4);
+        }
+
+        .toggle-dot {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 9999px;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active .toggle-dot {
+            transform: translateX(20px);
+            background: #3b82f6;
+        }
+
+        .custom-checkbox {
+            width: 24px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .custom-checkbox.checked {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 75%; }
+        }
+
+        .progress-animated {
+            animation: progress 2s ease-out forwards;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+
+        .pulse-ring {
+            animation: pulse-ring 1.5s ease-out infinite;
+        }
+
+        /* 优化触摸体验 */
+        button, input, textarea, select {
+            -webkit-appearance: none;
+            appearance: none;
+            border-radius: 2rem;
+        }
+
+        /* 隐藏滚动条 */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* 底部导航固定 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding-bottom: var(--safe-area-bottom);
+        }
+
+        /* 拉伸弹簧效果 */
+        .pull-indicator {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 134px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 9999px;
+            margin-top: 8px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-white pb-20">
+
+    <!-- 状态栏模拟 -->
+    <div class="pull-indicator"></div>
+
+    <!-- 主容器 -->
+    <div class="max-w-full mx-auto px-4 pt-12 pb-8">
+
+        <!-- 头部 -->
+        <header class="text-center mb-8">
+            <div class="inline-block mb-3">
+                <span class="px-4 py-2 rounded-[2rem] text-sm font-medium bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-white/10 backdrop-blur-md text-blue-300">
+                    Mobile UI
+                </span>
+            </div>
+            <h1 class="text-3xl font-bold mb-3 bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent">
+                圆角系统 G2
+            </h1>
+            <p class="text-base text-gray-300 px-4">
+                专为移动端设计的UI控件
+            </p>
+        </header>
+
+        <!-- 快速导航 -->
+        <div class="overflow-x-auto no-scrollbar mb-8 -mx-4 px-4">
+            <div class="flex gap-2 min-w-max">
+                <a href="#buttons" class="px-4 py-2 bg-white/5 hover:bg-white/10 active:bg-white/20 rounded-full text-sm font-medium transition-all whitespace-nowrap">按钮</a>
+                <a href="#inputs" class="px-4 py-2 bg-white/5 hover:bg-white/10 active:bg-white/20 rounded-full text-sm font-medium transition-all whitespace-nowrap">输入框</a>
+                <a href="#cards" class="px-4 py-2 bg-white/5 hover:bg-white/10 active:bg-white/20 rounded-full text-sm font-medium transition-all whitespace-nowrap">卡片</a>
+                <a href="#tags" class="px-4 py-2 bg-white/5 hover:bg-white/10 active:bg-white/20 rounded-full text-sm font-medium transition-all whitespace-nowrap">标签</a>
+                <a href="#avatars" class="px-4 py-2 bg-white/5 hover:bg-white/10 active:bg-white/20 rounded-full text-sm font-medium transition-all whitespace-nowrap">头像</a>
+                <a href="#toggles" class="px-4 py-2 bg-white/5 hover:bg-white/10 active:bg-white/20 rounded-full text-sm font-medium transition-all whitespace-nowrap">开关</a>
+            </div>
+        </div>
+
+        <!-- ==================== 按钮组件 ==================== -->
+        <section id="buttons" class="component-section rounded-[2rem] p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-11 h-11 rounded-[2rem] bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0">
+                    <iconify-icon icon="solar:cursor-bold" class="text-2xl"></iconify-icon>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">按钮</h2>
+                    <p class="text-xs text-gray-400">触摸友好的交互按钮</p>
+                </div>
+            </div>
+
+            <!-- 使用场景 -->
+            <div class="scenario-box rounded-[1.5rem] p-3 mb-5">
+                <div class="flex items-start gap-2">
+                    <iconify-icon icon="solar:info-circle-linear" class="text-blue-400 text-base mt-0.5 flex-shrink-0"></iconify-icon>
+                    <div>
+                        <h4 class="text-xs font-semibold text-white mb-1.5">适用场景</h4>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-blue-200">提交</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-blue-200">跳转</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-blue-200">操作</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-blue-200">下载</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主要按钮 - 移动端优化 -->
+            <div class="space-y-3">
+                <button class="w-full h-14 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.98] transition-all font-semibold rounded-[2rem] text-base">
+                    主要按钮
+                </button>
+
+                <button class="w-full h-14 bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 active:scale-[0.98] transition-all font-semibold rounded-[2rem] text-base">
+                    次要按钮
+                </button>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <button class="h-14 bg-green-600 hover:bg-green-500 active:bg-green-700 active:scale-[0.98] transition-all font-semibold rounded-[2rem] text-base">
+                        成功
+                    </button>
+                    <button class="h-14 bg-red-600 hover:bg-red-500 active:bg-red-700 active:scale-[0.98] transition-all font-semibold rounded-[2rem] text-base">
+                        删除
+                    </button>
+                </div>
+
+                <button class="w-full h-14 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 active:scale-[0.98] transition-all font-semibold rounded-[2rem] text-base flex items-center justify-center gap-2">
+                    <iconify-icon icon="solar:heart-bold" class="text-xl"></iconify-icon>
+                    收藏按钮
+                </button>
+
+                <button disabled class="w-full h-14 bg-white/5 text-white/30 font-semibold rounded-[2rem] text-base cursor-not-allowed">
+                    禁用状态
+                </button>
+            </div>
+
+            <!-- 圆形图标按钮 -->
+            <div class="mt-5">
+                <h3 class="text-sm font-medium text-gray-400 mb-3">快捷操作按钮</h3>
+                <div class="flex gap-3 justify-center">
+                    <button class="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-90 transition-all flex items-center justify-center">
+                        <iconify-icon icon="solar:add-circle-bold" class="text-2xl"></iconify-icon>
+                    </button>
+                    <button class="w-14 h-14 rounded-full bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 active:scale-90 transition-all flex items-center justify-center">
+                        <iconify-icon icon="solar:settings-linear" class="text-2xl"></iconify-icon>
+                    </button>
+                    <button class="w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 active:scale-90 transition-all flex items-center justify-center">
+                        <iconify-icon icon="solar:heart-bold" class="text-2xl"></iconify-icon>
+                    </button>
+                    <button class="w-14 h-14 rounded-full bg-green-500/20 text-green-400 active:bg-green-500/30 active:scale-90 transition-all flex items-center justify-center">
+                        <iconify-icon icon="solar:check-circle-bold" class="text-2xl"></iconify-icon>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 输入框组件 ==================== -->
+        <section id="inputs" class="component-section rounded-[2rem] p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-11 h-11 rounded-[2rem] bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center flex-shrink-0">
+                    <iconify-icon icon="solar:text-field-bold" class="text-2xl"></iconify-icon>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">输入框</h2>
+                    <p class="text-xs text-gray-400">易于点击的输入区域</p>
+                </div>
+            </div>
+
+            <!-- 使用场景 -->
+            <div class="scenario-box rounded-[1.5rem] p-3 mb-5">
+                <div class="flex items-start gap-2">
+                    <iconify-icon icon="solar:info-circle-linear" class="text-purple-400 text-base mt-0.5 flex-shrink-0"></iconify-icon>
+                    <div>
+                        <h4 class="text-xs font-semibold text-white mb-1.5">适用场景</h4>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-purple-200">登录</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-purple-200">搜索</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-purple-200">评论</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-purple-200">消息</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <input type="text" placeholder="文本输入框" class="w-full h-14 px-5 bg-white/5 border border-white/10 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all rounded-[2rem] text-base">
+
+                <div class="relative">
+                    <iconify-icon icon="solar:magnifer-linear" class="absolute left-5 top-1/2 -translate-y-1/2 text-white/50 text-xl"></iconify-icon>
+                    <input type="text" placeholder="搜索内容..." class="w-full h-14 pl-14 pr-5 bg-white/5 border border-white/10 focus:border-blue-500 outline-none transition-all rounded-[2rem] text-base">
+                </div>
+
+                <input type="email" placeholder="邮箱地址" class="w-full h-14 px-5 bg-white/5 border border-white/10 focus:border-purple-500 outline-none transition-all rounded-[2rem] text-base">
+
+                <input type="password" placeholder="密码" class="w-full h-14 px-5 bg-white/5 border border-white/10 focus:border-pink-500 outline-none transition-all rounded-[2rem] text-base">
+
+                <textarea placeholder="多行文本输入框，适合评论或消息..." rows="4" class="w-full p-5 bg-white/5 border border-white/10 focus:border-blue-500 outline-none transition-all resize-none rounded-[2rem] text-base"></textarea>
+
+                <!-- 聊天输入框 -->
+                <div class="flex gap-2">
+                    <button class="w-14 h-14 rounded-full bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <iconify-icon icon="solar:gallery-add-linear" class="text-xl"></iconify-icon>
+                    </button>
+                    <input type="text" placeholder="输入消息..." class="flex-1 h-14 px-5 bg-white/5 border border-white/10 focus:border-blue-500 outline-none transition-all rounded-[2rem] text-base">
+                    <button class="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center flex-shrink-0">
+                        <iconify-icon icon="solar:plain-bold" class="text-xl"></iconify-icon>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 卡片组件 ==================== -->
+        <section id="cards" class="component-section rounded-[2rem] p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-11 h-11 rounded-[2rem] bg-gradient-to-br from-pink-500 to-pink-700 flex items-center justify-center flex-shrink-0">
+                    <iconify-icon icon="solar:card-bold" class="text-2xl"></iconify-icon>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">卡片</h2>
+                    <p class="text-xs text-gray-400">内容展示容器</p>
+                </div>
+            </div>
+
+            <!-- 使用场景 -->
+            <div class="scenario-box rounded-[1.5rem] p-3 mb-5">
+                <div class="flex items-start gap-2">
+                    <iconify-icon icon="solar:info-circle-linear" class="text-pink-400 text-base mt-0.5 flex-shrink-0"></iconify-icon>
+                    <div>
+                        <h4 class="text-xs font-semibold text-white mb-1.5">适用场景</h4>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-pink-200">产品</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-pink-200">文章</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-pink-200">资料</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-pink-200">统计</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <!-- 水平卡片 -->
+                <div class="bg-gradient-to-r from-blue-500/20 to-purple-500/20 p-4 border border-white/10 active:border-white/30 active:scale-[0.98] transition-all rounded-[2rem] flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-[2rem] bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                        <iconify-icon icon="solar:star-bold" class="text-3xl text-blue-400"></iconify-icon>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-base font-semibold mb-1 truncate">水平卡片</h3>
+                        <p class="text-sm text-gray-300 line-clamp-2">适合列表项展示，左侧图标右侧内容</p>
+                    </div>
+                    <iconify-icon icon="solar:alt-arrow-right-linear" class="text-white/30 text-xl flex-shrink-0"></iconify-icon>
+                </div>
+
+                <!-- 垂直卡片 -->
+                <div class="bg-gradient-to-br from-purple-500/20 to-pink-500/20 p-5 border border-white/10 active:border-white/30 active:scale-[0.98] transition-all rounded-[2rem]">
+                    <div class="w-14 h-14 rounded-[2rem] bg-purple-500/20 flex items-center justify-center mb-4">
+                        <iconify-icon icon="solar:heart-bold" class="text-3xl text-purple-400"></iconify-icon>
+                    </div>
+                    <h3 class="text-base font-semibold mb-2">垂直卡片</h3>
+                    <p class="text-sm text-gray-300 mb-4">适合独立功能展示，内容更丰富详细</p>
+                    <button class="text-sm text-purple-400 active:text-purple-300 transition-colors flex items-center gap-1">
+                        查看详情 <iconify-icon icon="solar:arrow-right-linear"></iconify-icon>
+                    </button>
+                </div>
+
+                <!-- 媒体卡片 -->
+                <div class="overflow-hidden bg-white/5 border border-white/10 active:border-white/30 transition-all rounded-[2rem]">
+                    <div class="h-48 bg-gradient-to-br from-pink-500 to-rose-500 relative">
+                        <div class="absolute top-3 left-3 flex items-center gap-1 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full">
+                            <iconify-icon icon="solar:star-bold" class="text-yellow-400 text-sm"></iconify-icon>
+                            <span class="text-xs font-medium">4.8</span>
+                        </div>
+                        <div class="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+                            <iconify-icon icon="solar:heart-bold" class="text-pink-500"></iconify-icon>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <h4 class="font-semibold text-base mb-1">媒体卡片</h4>
+                        <p class="text-sm text-gray-300 mb-2">适合图片和文字组合展示</p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-lg font-bold">$99</span>
+                            <button class="px-5 py-2 bg-blue-600 active:bg-blue-700 rounded-full text-sm font-medium transition-all">
+                                购买
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 标签和徽章 ==================== -->
+        <section id="tags" class="component-section rounded-[2rem] p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-11 h-11 rounded-[2rem] bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center flex-shrink-0">
+                    <iconify-icon icon="solar:tag-bold" class="text-2xl"></iconify-icon>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">标签徽章</h2>
+                    <p class="text-xs text-gray-400">状态与分类标识</p>
+                </div>
+            </div>
+
+            <!-- 使用场景 -->
+            <div class="scenario-box rounded-[1.5rem] p-3 mb-5">
+                <div class="flex items-start gap-2">
+                    <iconify-icon icon="solar:info-circle-linear" class="text-green-400 text-base mt-0.5 flex-shrink-0"></iconify-icon>
+                    <div>
+                        <h4 class="text-xs font-semibold text-white mb-1.5">适用场景</h4>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-green-200">分类</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-green-200">状态</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-green-200">通知</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-green-200">认证</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-5">
+                <!-- 标签 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">标签样式</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-4 py-2 bg-blue-500/20 text-blue-300 text-sm font-medium rounded-[2rem]">热门</span>
+                        <span class="px-4 py-2 bg-purple-500/20 text-purple-300 text-sm font-medium rounded-[2rem]">推荐</span>
+                        <span class="px-4 py-2 bg-pink-500/20 text-pink-300 text-sm font-medium rounded-[2rem]">新品</span>
+                        <span class="px-4 py-2 bg-green-500/20 text-green-300 text-sm font-medium rounded-[2rem">已验证</span>
+                        <span class="px-4 py-2 bg-yellow-500/20 text-yellow-300 text-sm font-medium rounded-[2rem]">待审核</span>
+                        <span class="px-4 py-2 bg-red-500/20 text-red-300 text-sm font-medium rounded-[2rem]">紧急</span>
+                    </div>
+                </div>
+
+                <!-- 徽章 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">通知徽章</h3>
+                    <div class="flex flex-wrap gap-5 items-center">
+                        <div class="relative">
+                            <button class="w-14 h-14 rounded-full bg-white/10 active:bg-white/20 flex items-center justify-center">
+                                <iconify-icon icon="solar:bell-linear" class="text-2xl"></iconify-icon>
+                            </button>
+                            <span class="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-red-500 text-white text-xs font-bold flex items-center justify-center rounded-full px-1.5">99+</span>
+                        </div>
+
+                        <div class="relative">
+                            <button class="w-14 h-14 rounded-full bg-white/10 active:bg-white/20 flex items-center justify-center">
+                                <iconify-icon icon="solar:chat-round-line-linear" class="text-2xl"></iconify-icon>
+                            </button>
+                            <span class="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-blue-500 text-white text-xs font-bold flex items-center justify-center rounded-full px-1.5">5</span>
+                        </div>
+
+                        <div class="relative">
+                            <button class="w-14 h-14 rounded-full bg-white/10 active:bg-white/20 flex items-center justify-center">
+                                <iconify-icon icon="solar:cart-large-2-linear" class="text-2xl"></iconify-icon>
+                            </button>
+                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-[#1c1e26]"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 状态指示器 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">状态指示</h3>
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                            <span class="text-sm text-gray-300">在线</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                            <span class="text-sm text-gray-300">忙碌</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <span class="text-sm text-gray-300">离线</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-blue-500 rounded-full relative">
+                                <div class="absolute inset-0 bg-blue-500 rounded-full pulse-ring"></div>
+                            </div>
+                            <span class="text-sm text-gray-300">通话中</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 头像组件 ==================== -->
+        <section id="avatars" class="component-section rounded-[2rem] p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-11 h-11 rounded-[2rem] bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center flex-shrink-0">
+                    <iconify-icon icon="solar:user-bold" class="text-2xl"></iconify-icon>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">头像</h2>
+                    <p class="text-xs text-gray-400">用户身份展示</p>
+                </div>
+            </div>
+
+            <!-- 使用场景 -->
+            <div class="scenario-box rounded-[1.5rem] p-3 mb-5">
+                <div class="flex items-start gap-2">
+                    <iconify-icon icon="solar:info-circle-linear" class="text-yellow-400 text-base mt-0.5 flex-shrink-0"></iconify-icon>
+                    <div>
+                        <h4 class="text-xs font-semibold text-white mb-1.5">适用场景</h4>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-yellow-200">资料</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-yellow-200">评论</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-yellow-200">聊天</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-yellow-200">团队</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-5">
+                <!-- 不同尺寸 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">尺寸规格</h3>
+                    <div class="flex items-end gap-4 justify-center">
+                        <div class="text-center">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-sm font-bold mb-1">XS</div>
+                            <span class="text-xs text-gray-500">40px</span>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-base font-bold mb-1">SM</div>
+                            <span class="text-xs text-gray-500">48px</span>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-lg font-bold mb-1">MD</div>
+                            <span class="text-xs text-gray-500">64px</span>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-xl font-bold mb-1">LG</div>
+                            <span class="text-xs text-gray-500">80px</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 带状态 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">状态头像</h3>
+                    <div class="flex items-center gap-6 justify-center">
+                        <div class="relative">
+                            <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-lg font-bold">U</div>
+                            <div class="absolute bottom-0 right-0 w-5 h-5 bg-green-500 rounded-full border-3 border-[#1c1e26]"></div>
+                        </div>
+                        <div class="relative">
+                            <div class="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-lg font-bold">V</div>
+                            <div class="absolute bottom-0 right-0 w-5 h-5 bg-yellow-500 rounded-full border-3 border-[#1c1e26]"></div>
+                        </div>
+                        <div class="relative">
+                            <div class="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-lg font-bold">W</div>
+                            <div class="absolute bottom-0 right-0 w-5 h-5 bg-red-500 rounded-full border-3 border-[#1c1e26]"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 头像组 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">头像组</h3>
+                    <div class="flex items-center justify-center">
+                        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-base font-bold border-3 border-[#1c1e26] z-10">A</div>
+                        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-base font-bold border-3 border-[#1c1e26] -ml-4 z-20">B</div>
+                        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-base font-bold border-3 border-[#1c1e26] -ml-4 z-30">C</div>
+                        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-base font-bold border-3 border-[#1c1e26] -ml-4 z-40">D</div>
+                        <div class="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-base font-bold border-3 border-[#1c1e26] -ml-4 z-50">+5</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 开关和选择器 ==================== -->
+        <section id="toggles" class="component-section rounded-[2rem] p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-11 h-11 rounded-[2rem] bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                    <iconify-icon icon="solar:settings-bold" class="text-2xl"></iconify-icon>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">开关选择</h2>
+                    <p class="text-xs text-gray-400">偏好与设置</p>
+                </div>
+            </div>
+
+            <!-- 使用场景 -->
+            <div class="scenario-box rounded-[1.5rem] p-3 mb-5">
+                <div class="flex items-start gap-2">
+                    <iconify-icon icon="solar:info-circle-linear" class="text-cyan-400 text-base mt-0.5 flex-shrink-0"></iconify-icon>
+                    <div>
+                        <h4 class="text-xs font-semibold text-white mb-1.5">适用场景</h4>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-cyan-200">设置</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-cyan-200">权限</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-cyan-200">偏好</span>
+                            <span class="usage-tag px-2.5 py-1 rounded-full text-xs text-cyan-200">筛选</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <!-- 开关 -->
+                <div class="bg-white/5 rounded-[2rem] p-4">
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">开关设置</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between active:bg-white/5 p-2 -m-2 rounded-[2rem]">
+                            <div>
+                                <p class="text-base font-medium">推送通知</p>
+                                <p class="text-xs text-gray-500">接收消息推送</p>
+                            </div>
+                            <div class="toggle-switch active" onclick="this.classList.toggle('active')">
+                                <div class="toggle-dot"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between active:bg-white/5 p-2 -m-2 rounded-[2rem]">
+                            <div>
+                                <p class="text-base font-medium">深色模式</p>
+                                <p class="text-xs text-gray-500">切换应用主题</p>
+                            </div>
+                            <div class="toggle-switch" onclick="this.classList.toggle('active')">
+                                <div class="toggle-dot"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between active:bg-white/5 p-2 -m-2 rounded-[2rem] opacity-50">
+                            <div>
+                                <p class="text-base font-medium">自动更新</p>
+                                <p class="text-xs text-gray-500">仅在WiFi下更新</p>
+                            </div>
+                            <div class="toggle-switch" style="pointer-events: none;">
+                                <div class="toggle-dot"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 复选框 -->
+                <div class="bg-white/5 rounded-[2rem] p-4">
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">多选列表</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-3 active:bg-white/5 p-2 -m-2 rounded-[2rem] cursor-pointer" onclick="this.querySelector('.custom-checkbox').classList.toggle('checked')">
+                            <div class="custom-checkbox rounded-lg">
+                                <iconify-icon icon="solar:check-read-bold" class="text-white text-sm hidden"></iconify-icon>
+                            </div>
+                            <span class="text-base">选项一</span>
+                        </div>
+
+                        <div class="flex items-center gap-3 active:bg-white/5 p-2 -m-2 rounded-[2rem] cursor-pointer" onclick="this.querySelector('.custom-checkbox').classList.toggle('checked')">
+                            <div class="custom-checkbox rounded-full">
+                                <iconify-icon icon="solar:check-read-bold" class="text-white text-sm hidden"></iconify-icon>
+                            </div>
+                            <span class="text-base">选项二</span>
+                        </div>
+
+                        <div class="flex items-center gap-3 active:bg-white/5 p-2 -m-2 rounded-[2rem] cursor-pointer" onclick="this.querySelector('.custom-checkbox').classList.toggle('checked')">
+                            <div class="custom-checkbox checked rounded-lg">
+                                <iconify-icon icon="solar:check-read-bold" class="text-white text-sm"></iconify-icon>
+                            </div>
+                            <span class="text-base">已选中</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 单选框 -->
+                <div class="bg-white/5 rounded-[2rem] p-4">
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">单选列表</h3>
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 active:bg-white/5 p-2 -m-2 rounded-[2rem] cursor-pointer">
+                            <div class="w-6 h-6 rounded-full border-2 border-white/30 flex items-center justify-center">
+                                <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                            </div>
+                            <span class="text-base">选项 A</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 bg-blue-500/10 border border-blue-500/30 p-2 -m-2 rounded-[2rem] cursor-pointer">
+                            <div class="w-6 h-6 rounded-full border-2 border-blue-500 flex items-center justify-center">
+                                <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                            </div>
+                            <span class="text-base text-white">选项 B</span>
+                        </label>
+
+                        <label class="flex items-center gap-3 active:bg-white/5 p-2 -m-2 rounded-[2rem] cursor-pointer">
+                            <div class="w-6 h-6 rounded-full border-2 border-white/30 flex items-center justify-center"></div>
+                            <span class="text-base">选项 C</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 进度和加载 ==================== -->
+        <section class="component-section rounded-[2rem] p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-11 h-11 rounded-[2rem] bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center flex-shrink-0">
+                    <iconify-icon icon="solar:refresh-bold" class="text-2xl"></iconify-icon>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">进度加载</h2>
+                    <p class="text-xs text-gray-400">状态反馈</p>
+                </div>
+            </div>
+
+            <div class="space-y-5">
+                <!-- 进度条 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">进度指示</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm text-gray-300">下载中...</span>
+                                <span class="text-sm font-medium">75%</span>
+                            </div>
+                            <div class="h-3 bg-white/10 rounded-full overflow-hidden">
+                                <div class="h-full bg-blue-500 rounded-full progress-animated"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm text-gray-300">上传完成</span>
+                                <span class="text-sm font-medium text-green-400">100%</span>
+                            </div>
+                            <div class="h-3 bg-white/10 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 加载动画 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">加载状态</h3>
+                    <div class="flex items-center justify-around py-4">
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="w-12 h-12 border-3 border-white/10 border-t-blue-500 rounded-full animate-spin"></div>
+                            <span class="text-xs text-gray-500">加载</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="w-12 h-12 bg-blue-500 rounded-full animate-pulse"></div>
+                            <span class="text-xs text-gray-500">处理</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="flex gap-1.5">
+                                <div class="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0s;"></div>
+                                <div class="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.1s;"></div>
+                                <div class="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
+                            </div>
+                            <span class="text-xs text-gray-500">等待</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 骨架屏 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">内容加载</h3>
+                    <div class="bg-white/5 rounded-[2rem] p-4 space-y-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-14 h-14 bg-white/10 rounded-full animate-pulse"></div>
+                            <div class="flex-1 space-y-2">
+                                <div class="h-3 bg-white/10 rounded-full animate-pulse w-3/4"></div>
+                                <div class="h-2 bg-white/10 rounded-full animate-pulse w-1/2"></div>
+                            </div>
+                        </div>
+                        <div class="h-24 bg-white/10 rounded-[2rem] animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 列表和导航 ==================== -->
+        <section class="component-section rounded-[2rem] p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-11 h-11 rounded-[2rem] bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                    <iconify-icon icon="solar:list-bold" class="text-2xl"></iconify-icon>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">列表导航</h2>
+                    <p class="text-xs text-gray-400">内容组织</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <!-- 列表项 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">菜单列表</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-4 p-4 bg-white/5 active:bg-white/10 active:scale-[0.98] transition-all rounded-[2rem]">
+                            <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                                <iconify-icon icon="solar:home-linear" class="text-blue-400 text-xl"></iconify-icon>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-base font-medium">首页</p>
+                                <p class="text-xs text-gray-500">返回主页</p>
+                            </div>
+                            <iconify-icon icon="solar:alt-arrow-right-linear" class="text-white/30 text-xl flex-shrink-0"></iconify-icon>
+                        </div>
+
+                        <div class="flex items-center gap-4 p-4 bg-blue-500/20 border border-blue-500/30 rounded-[2rem]">
+                            <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                                <iconify-icon icon="solar:user-linear" class="text-white text-xl"></iconify-icon>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-base font-medium text-white">个人资料</p>
+                                <p class="text-xs text-blue-300">当前页面</p>
+                            </div>
+                            <iconify-icon icon="solar:alt-arrow-right-linear" class="text-blue-400 text-xl flex-shrink-0"></iconify-icon>
+                        </div>
+
+                        <div class="flex items-center gap-4 p-4 bg-white/5 active:bg-white/10 active:scale-[0.98] transition-all rounded-[2rem]">
+                            <div class="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                <iconify-icon icon="solar:settings-linear" class="text-purple-400 text-xl"></iconify-icon>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-base font-medium">设置</p>
+                                <p class="text-xs text-gray-500">应用配置</p>
+                            </div>
+                            <iconify-icon icon="solar:alt-arrow-right-linear" class="text-white/30 text-xl flex-shrink-0"></iconify-icon>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 标签页 -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-3">标签切换</h3>
+                    <div class="bg-white/5 rounded-[2rem] p-2">
+                        <div class="flex gap-1">
+                            <button class="flex-1 py-3 bg-blue-500 text-white text-sm font-medium rounded-[1.5rem] transition-all">全部</button>
+                            <button class="flex-1 py-3 text-white/60 active:text-white active:bg-white/5 text-sm font-medium rounded-[1.5rem] transition-all">热门</button>
+                            <button class="flex-1 py-3 text-white/60 active:text-white active:bg-white/5 text-sm font-medium rounded-[1.5rem] transition-all">最新</button>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 bg-white/5 rounded-full p-1">
+                        <div class="flex gap-1">
+                            <button class="flex-1 py-2.5 bg-blue-500 text-white text-sm font-medium rounded-full transition-all">日</button>
+                            <button class="flex-1 py-2.5 text-white/60 active:text-white text-sm font-medium rounded-full transition-all">周</button>
+                            <button class="flex-1 py-2.5 text-white/60 active:text-white text-sm font-medium rounded-full transition-all">月</button>
+                            <button class="flex-1 py-2.5 text-white/60 active:text-white text-sm font-medium rounded-full transition-all">年</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 模态框示例 ==================== -->
+        <section class="component-section rounded-[2rem] p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-11 h-11 rounded-[2rem] bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                    <iconify-icon icon="solar:window-frame-bold" class="text-2xl"></iconify-icon>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold">模态弹窗</h2>
+                    <p class="text-xs text-gray-400">操作反馈</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <!-- 确认对话框 -->
+                <div class="bg-[#1c1e26]/80 backdrop-blur-xl border border-white/10 p-6 rounded-[2rem]">
+                    <h4 class="text-lg font-semibold mb-2 text-center">确认删除？</h4>
+                    <p class="text-sm text-gray-300 text-center mb-6">此操作无法撤销，确定要删除吗？</p>
+                    <div class="flex gap-3">
+                        <button class="flex-1 h-12 bg-white/5 active:bg-white/10 border border-white/10 rounded-[2rem] text-sm font-medium transition-all">取消</button>
+                        <button class="flex-1 h-12 bg-red-600 active:bg-red-700 rounded-[2rem] text-sm font-medium transition-all">删除</button>
+                    </div>
+                </div>
+
+                <!-- 成功提示 -->
+                <div class="bg-[#1c1e26]/80 backdrop-blur-xl border border-white/10 p-6 rounded-[2rem] text-center">
+                    <div class="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
+                        <iconify-icon icon="solar:check-circle-bold" class="text-4xl text-green-400"></iconify-icon>
+                    </div>
+                    <h4 class="text-lg font-semibold mb-2">操作成功</h4>
+                    <p class="text-sm text-gray-300 mb-6">您的更改已成功保存</p>
+                    <button class="w-full h-12 bg-green-600 active:bg-green-700 rounded-[2rem] text-sm font-medium transition-all">完成</button>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="bottom-nav bg-[#181a22]/95 backdrop-blur-xl border-t border-white/10">
+        <div class="flex items-center justify-around py-2">
+            <button class="flex flex-col items-center gap-1 py-2 px-4">
+                <iconify-icon icon="solar:home-bold" class="text-2xl text-blue-500"></iconify-icon>
+                <span class="text-xs text-blue-500 font-medium">首页</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 py-2 px-4">
+                <iconify-icon icon="solar:heart-linear" class="text-2xl text-white/50"></iconify-icon>
+                <span class="text-xs text-white/50">收藏</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 py-2 px-4">
+                <iconify-icon icon="solar:chat-round-line-linear" class="text-2xl text-white/50"></iconify-icon>
+                <span class="text-xs text-white/50">消息</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 py-2 px-4">
+                <iconify-icon icon="solar:user-linear" class="text-2xl text-white/50"></iconify-icon>
+                <span class="text-xs text-white/50">我的</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 复选框交互
+        document.querySelectorAll('.custom-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('click', function(e) {
+                e.stopPropagation();
+                this.classList.toggle('checked');
+                const icon = this.querySelector('iconify-icon');
+                if (icon) {
+                    icon.classList.toggle('hidden');
+                }
+            });
+        });
+
+        // 开关交互
+        document.querySelectorAll('.toggle-switch').forEach(toggle => {
+            toggle.addEventListener('click', function(e) {
+                e.stopPropagation();
+                this.classList.toggle('active');
+            });
+        });
+
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
