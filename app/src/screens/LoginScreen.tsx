@@ -60,18 +60,39 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   // 发送验证码
   const handleSendCode = async () => {
+    // 清除错误
     setPhoneError('');
+
+    // 验证手机号
     if (!phone) {
       setPhoneError('请输入手机号');
       return;
     }
+
     if (!validatePhone(phone)) {
       setPhoneError('请输入正确的手机号');
       return;
     }
-    // 测试模式：直接提示
-    setCountdown(60);
-    Alert.alert('提示', '验证码: 123456（测试模式）', [{ text: '确定' }]);
+
+    try {
+      setSendingCode(true);
+      await authService.sendVerificationCode(phone);
+
+      // 开始倒计时
+      setCountdown(60);
+
+      // 提示用户
+      Alert.alert(
+        '提示',
+        '验证码已发送，请查看后端控制台',
+        [{ text: '确定' }]
+      );
+    } catch (error: any) {
+      console.error('Send code error:', error);
+      Alert.alert('错误', '验证码发送失败，请稍后重试');
+    } finally {
+      setSendingCode(false);
+    }
   };
 
   // 登录
