@@ -74,13 +74,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // 临时：模拟发送成功（测试模式）
-    setCountdown(60);
-    Alert.alert(
-      '测试模式',
-      '输入任意 6 位数字即可登录',
-      [{ text: '确定' }]
-    );
+    try {
+      setSendingCode(true);
+      await authService.sendVerificationCode(phone);
+
+      // 开始倒计时
+      setCountdown(60);
+
+      // 提示用户（开发环境）
+      Alert.alert(
+        '提示',
+        '验证码已发送（开发环境请查看后端控制台）',
+        [{ text: '确定' }]
+      );
+    } catch (error: any) {
+      console.error('Send code error:', error);
+      Alert.alert('错误', '验证码发送失败，请稍后重试');
+    } finally {
+      setSendingCode(false);
+    }
   };
 
   // 登录
@@ -112,21 +124,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     try {
       setLoading(true);
+      const response = await authService.login(phone, code);
 
-      // 临时：测试模式，直接登录成功
-      await storageService.saveToken('test-token-12345');
-      await storageService.saveUser({
-        id: 1,
-        phone: phone,
-        nickname: '测试用户',
-        createdAt: new Date().toISOString(),
-      });
+      // 保存 token 和用户信息
+      await storageService.saveToken(response.token);
+      await storageService.saveUser(response.user);
 
       // 登录成功
       onLoginSuccess();
     } catch (error: any) {
       console.error('Login error:', error);
-      Alert.alert('登录失败', '登录失败，请重试');
+      Alert.alert('登录失败', '验证码错误或已过期，请重新获取');
     } finally {
       setLoading(false);
     }
