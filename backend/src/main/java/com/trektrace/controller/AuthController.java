@@ -32,8 +32,8 @@ public class AuthController {
     public ResponseEntity<Void> sendVerificationCode(@RequestBody LoginRequest request) {
         String phone = request.getPhone();
         
-        // 验证手机号格式
-        if (phone == null || !phone.matches("^1[3-9]\\d{11}$")) {
+        // 验证手机号格式（11位）
+        if (phone == null || !phone.matches("^1[3-9]\\d{9}$")) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
         
@@ -44,11 +44,11 @@ public class AuthController {
         vc.setCode(code);
         vc.setExpiresAt(LocalDateTime.now().plusMinutes(5));
         vc.setUsed(false);
-        
+
         verificationCodeRepository.save(vc);
-        
-        // 发送验证码
-        smsService.sendVerificationCode(phone);
+
+        // 发送验证码（传递生成的验证码）
+        smsService.sendVerificationCode(phone, code);
         
         return ResponseEntity.ok().build();
     }
