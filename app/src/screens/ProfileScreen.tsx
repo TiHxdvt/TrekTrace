@@ -11,7 +11,7 @@ export const ProfileScreen: React.FC = () => {
   const handleLogout = () => {
     Alert.alert(
       '退出登录',
-      '确定要退出登录吗？'
+      '确定要退出登录吗？',
       [
         {
           text: '取消',

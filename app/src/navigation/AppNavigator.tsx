@@ -61,11 +61,7 @@ export const AppNavigator: React.FC = () => {
   // 未认证 - 显示登录页
   if (!isAuthenticated) {
     return (
-      <AuthStack.Navigator
-        screenOptions={{ headerShown: false }}
-      >
-        <AuthStack.Screen name="Login" component={LoginScreen} />
-      </AuthStack.Navigator>
+      <LoginScreen onLoginSuccess={checkAuthStatus} />
     );
   }
 

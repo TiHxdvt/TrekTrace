@@ -113,7 +113,6 @@ dependencies {
 
     // 高德地图 SDK
     implementation 'com.amap.api:3dmap:latest.integration'
-    implementation 'com.amap.api:location:latest.integration'
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
