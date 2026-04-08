@@ -7,7 +7,7 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'ax
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API 基础 URL（真机测试使用局域网 IP）
-const API_BASE_URL = 'http://192.168.49.166:8080/api';
+const API_BASE_URL = 'http://172.16.96.63:8080/api';
 
 // 创建 axios 实例
 const api: AxiosInstance = axios.create({

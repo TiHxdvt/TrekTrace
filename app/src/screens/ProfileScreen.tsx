@@ -3,8 +3,10 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
-import { Button } from '../components/Button';
+import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { BlurView } from '@react-native-community/blur';
+import { COLORS, BORDER_RADIUS, SHADOWS } from '../theme';
+import { IconUser, IconLogout } from '../components/SolarIcons';
 import { storageService } from '../services/storageService';
 
 export const ProfileScreen: React.FC = () => {
@@ -13,15 +15,11 @@ export const ProfileScreen: React.FC = () => {
       '退出登录',
       '确定要退出登录吗？',
       [
-        {
-          text: '取消',
-          style: 'cancel',
-        },
+        { text: '取消', style: 'cancel' },
         {
           text: '确定',
           onPress: async () => {
             await storageService.clearAuthData();
-            // 导航会自动重置到登录页
           },
         },
       ]
@@ -30,23 +28,79 @@ export const ProfileScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* Background Glow */}
+      <View style={styles.ambientGlow} pointerEvents="none">
+        <View style={styles.glowOrb} />
+      </View>
+
+      {/* 全屏模糊层 */}
+      <View style={styles.fullScreenBlur} pointerEvents="none">
+        <BlurView
+          style={StyleSheet.absoluteFillObject}
+          blurRadius={24}
+          overlayColor="rgba(28, 30, 38, 0.6)"
+          blurType="dark"
+          blurAmount={24}
+          autoUpdate
+        />
+      </View>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>我的</Text>
+      </View>
+
+      {/* Profile Card */}
       <View style={styles.content}>
-        <Text style={styles.icon}>👤</Text>
-        <Text style={styles.title}>个人中心</Text>
-        <Text style={styles.subtitle}>管理你的账户</Text>
-
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>用户信息展示区域</Text>
-          <Text style={styles.infoSubtext}>功能开发中...</Text>
+        <View style={styles.profileCard}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatarRing}>
+              <View style={styles.avatar}>
+                <IconUser size={32} color="rgba(255,255,255,0.8)" />
+              </View>
+            </View>
+          </View>
+          <Text style={styles.userName}>用户</Text>
+          <Text style={styles.userHint}>点击查看个人资料</Text>
         </View>
 
-        <View style={styles.buttonContainer}>
-          <Button
-            title="退出登录"
-            onPress={handleLogout}
-            variant="outline"
-          />
+        {/* Menu Items */}
+        <View style={styles.menuSection}>
+          <Text style={styles.menuSectionTitle}>设置</Text>
+          <View style={styles.menuCard}>
+            {[
+              { label: '通知', badge: '3' },
+              { label: '隐私' },
+              { label: '通用' },
+            ].map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.menuItem,
+                  index < 2 && styles.menuItemBorder,
+                ]}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.menuItemLabel}>{item.label}</Text>
+                {item.badge && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{item.badge}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <IconLogout size={20} color="rgba(255,255,255,0.6)" />
+          <Text style={styles.logoutText}>退出登录</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -55,52 +109,145 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1e26',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: COLORS.BACKGROUND,
+  },
+  ambientGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  glowOrb: {
+    position: 'absolute',
+    top: -40,
+    left: '40%',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(236, 72, 153, 0.08)',
+  },
+  fullScreenBlur: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    zIndex: 20,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#fff',
+    letterSpacing: -0.5,
   },
   content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 140,
+    zIndex: 10,
+  },
+  profileCard: {
     alignItems: 'center',
-    padding: 40,
-    width: '100%',
-  },
-  icon: {
-    fontSize: 80,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 30,
-  },
-  infoCard: {
-    width: '100%',
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 30,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: BORDER_RADIUS.XXXL,
+    padding: 24,
+    marginBottom: 24,
   },
-  infoText: {
-    fontSize: 16,
+  avatarContainer: {
+    marginBottom: 16,
+  },
+  avatarRing: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    padding: 2,
+    backgroundColor: 'linear-gradient(135deg, #f472b6, #9333ea)',
+  },
+  avatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: COLORS.BACKGROUND,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: COLORS.BACKGROUND,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '600',
     color: '#fff',
-    textAlign: 'center',
+    marginBottom: 4,
+  },
+  userHint: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.4)',
+  },
+  menuSection: {
+    marginBottom: 24,
+  },
+  menuSectionTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.4)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    paddingHorizontal: 12,
     marginBottom: 8,
   },
-  infoSubtext: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.5)',
-    textAlign: 'center',
+  menuCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: BORDER_RADIUS.XXL,
+    overflow: 'hidden',
   },
-  buttonContainer: {
-    width: '100%',
-    maxWidth: 300,
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  menuItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  menuItemLabel: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '400',
+  },
+  badge: {
+    backgroundColor: COLORS.PRIMARY,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 52,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: BORDER_RADIUS.XXL,
+  },
+  logoutText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: '500',
   },
 });
