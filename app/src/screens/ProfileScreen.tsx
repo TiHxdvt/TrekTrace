@@ -5,6 +5,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
+import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { COLORS, BORDER_RADIUS, SHADOWS } from '../theme';
 import { IconUser, IconLogout } from '../components/SolarIcons';
 import { storageService } from '../services/storageService';
@@ -55,6 +56,15 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatarRing}>
+              <Svg width={72} height={72} style={StyleSheet.absoluteFillObject}>
+                <Defs>
+                  <LinearGradient id="avatarGrad" x1="0" y1="0" x2="1" y2="1">
+                    <Stop offset="0" stopColor="#f472b6" />
+                    <Stop offset="1" stopColor="#9333ea" />
+                  </LinearGradient>
+                </Defs>
+                <Circle cx={36} cy={36} r={35} stroke="url(#avatarGrad)" strokeWidth={2.5} fill="none" />
+              </Svg>
               <View style={styles.avatar}>
                 <IconUser size={32} color="rgba(255,255,255,0.8)" />
               </View>
@@ -165,18 +175,16 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    padding: 2,
-    backgroundColor: 'linear-gradient(135deg, #f472b6, #9333ea)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatar: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: COLORS.BACKGROUND,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: COLORS.BACKGROUND,
   },
   userName: {
     fontSize: 20,
