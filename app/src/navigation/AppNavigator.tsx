@@ -4,8 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from '@react-native-community/blur';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -13,7 +12,7 @@ import { ActivityScreen } from '../screens/ActivityScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { StatsScreen } from '../screens/StatsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { AuthStackParamList, MainTabParamList } from './types';
+import { MainTabParamList } from './types';
 import { storageService, authServiceEvents } from '../services/storageService';
 import { COLORS, SHADOWS } from '../theme';
 import {
@@ -22,9 +21,6 @@ import {
   IconHeart,
   IconChatRoundLine,
 } from '../components/SolarIcons';
-
-// 认证栈导航器
-const AuthStack = createStackNavigator<AuthStackParamList>();
 
 // 主 Tab 导航器
 const MainTab = createBottomTabNavigator<MainTabParamList>();
@@ -163,7 +159,9 @@ export const AppNavigator: React.FC = () => {
 
   if (isAuthenticated === null) {
     return (
-      <Text style={styles.loading}>加载中...</Text>
+      <View style={styles.loading}>
+        <ActivityIndicator color={COLORS.PRIMARY} />
+      </View>
     );
   }
 
@@ -193,8 +191,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    fontSize: 16,
-    color: '#fff',
     backgroundColor: COLORS.BACKGROUND,
   },
 });

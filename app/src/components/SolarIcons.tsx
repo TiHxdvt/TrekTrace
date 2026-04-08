@@ -7,12 +7,8 @@
 import React from 'react';
 import Svg, {
   Circle,
-  Ellipse,
-  G,
   Path,
   Rect,
-  Defs,
-  ClipPath,
 } from 'react-native-svg';
 
 type IconProps = {
