@@ -43,13 +43,13 @@ export const HistoryScreen: React.FC = () => {
         {['最近一次跑步', '周末骑行', '山间徒步'].map((item, index) => (
           <View key={index} style={styles.historyCard}>
             <View style={styles.historyCardIcon}>
-              <IconPlane size={20} color="rgba(255,255,255,0.7)" />
+              <IconPlane size={20} color={COLORS.TEXT.SECONDARY} />
             </View>
             <View style={styles.historyCardContent}>
               <Text style={styles.historyCardTitle}>{item}</Text>
               <Text style={styles.historyCardSubtext}>暂无数据</Text>
             </View>
-            <IconArrowRight size={16} color="rgba(255,255,255,0.3)" />
+            <IconArrowRight size={16} color={COLORS.TEXT.QUINARY} />
           </View>
         ))}
       </ScrollView>
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: 'rgba(147, 51, 234, 0.1)',
+    backgroundColor: COLORS.GRADIENT.PURPLE_LIGHT,
   },
   fullScreenBlur: {
     ...StyleSheet.absoluteFillObject,
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '600',
-    color: '#fff',
+    color: COLORS.TEXT.PRIMARY,
     letterSpacing: -0.5,
   },
   scrollView: {
@@ -105,9 +105,9 @@ const styles = StyleSheet.create({
   historyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.XXL,
     padding: 16,
     gap: 16,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -126,11 +126,11 @@ const styles = StyleSheet.create({
   historyCardTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#fff',
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: 4,
   },
   historyCardSubtext: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: COLORS.TEXT.QUATERNARY,
   },
 });

@@ -68,7 +68,7 @@ export const ProfileScreen: React.FC = () => {
                 <Circle cx={36} cy={36} r={35} stroke="url(#avatarGrad)" strokeWidth={2.5} fill="none" />
               </Svg>
               <View style={styles.avatar}>
-                <IconUser size={32} color="rgba(255,255,255,0.8)" />
+                <IconUser size={32} color={COLORS.TEXT.SECONDARY} />
               </View>
             </View>
           </View>
@@ -110,7 +110,7 @@ export const ProfileScreen: React.FC = () => {
           onPress={handleLogout}
           activeOpacity={0.7}
         >
-          <IconLogout size={20} color="rgba(255,255,255,0.6)" />
+          <IconLogout size={20} color={COLORS.TEXT.TERTIARY} />
           <Text style={styles.logoutText}>退出登录</Text>
         </TouchableOpacity>
       </View>
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: 'rgba(236, 72, 153, 0.08)',
+    backgroundColor: COLORS.GRADIENT.PINK,
   },
   fullScreenBlur: {
     ...StyleSheet.absoluteFillObject,
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '600',
-    color: '#fff',
+    color: COLORS.TEXT.PRIMARY,
     letterSpacing: -0.5,
   },
   content: {
@@ -162,9 +162,9 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.XXXL,
     padding: 24,
     marginBottom: 24,
@@ -190,12 +190,12 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#fff',
+    color: COLORS.TEXT.PRIMARY,
     marginBottom: 4,
   },
   userHint: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: COLORS.TEXT.QUATERNARY,
   },
   menuSection: {
     marginBottom: 24,
@@ -203,16 +203,16 @@ const styles = StyleSheet.create({
   menuSectionTitle: {
     fontSize: 12,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: COLORS.TEXT.QUATERNARY,
     textTransform: 'uppercase',
     letterSpacing: 1,
     paddingHorizontal: 12,
     marginBottom: 8,
   },
   menuCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.XXL,
     overflow: 'hidden',
   },
@@ -225,11 +225,11 @@ const styles = StyleSheet.create({
   },
   menuItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomColor: COLORS.BORDER.LIGHT,
   },
   menuItemLabel: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: COLORS.TEXT.SECONDARY,
     fontWeight: '400',
   },
   badge: {
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   badgeText: {
-    color: '#fff',
+    color: COLORS.TEXT.PRIMARY,
     fontSize: 10,
     fontWeight: '600',
   },
@@ -249,14 +249,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     height: 52,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: COLORS.BORDER.MEDIUM,
     borderRadius: BORDER_RADIUS.XXL,
   },
   logoutText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: COLORS.TEXT.TERTIARY,
     fontWeight: '500',
   },
 });

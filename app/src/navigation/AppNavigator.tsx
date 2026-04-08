@@ -42,7 +42,7 @@ const FloatingTabBar = ({ state, navigation }: any) => {
         <BlurView
           style={StyleSheet.absoluteFillObject}
           blurRadius={20}
-          overlayColor="rgba(24, 26, 34, 0.75)"
+          overlayColor={COLORS.OVERLAY.NAV}
           blurType="dark"
           blurAmount={20}
         />
@@ -76,7 +76,7 @@ const FloatingTabBar = ({ state, navigation }: any) => {
               >
                 <config.Icon
                   size={20}
-                  color={isFocused ? '#fff' : 'rgba(255, 255, 255, 0.5)'}
+                  color={isFocused ? COLORS.TEXT.PRIMARY : COLORS.TEXT.TERTIARY}
                 />
               </TouchableOpacity>
             );
@@ -103,7 +103,7 @@ const floatingStyles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: COLORS.BORDER.MEDIUM,
     overflow: 'hidden',
     ...SHADOWS.LARGE,
   },
@@ -137,7 +137,7 @@ const floatingStyles = StyleSheet.create({
     width: 128,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: COLORS.OVERLAY.HEAVY,
   },
 });
 

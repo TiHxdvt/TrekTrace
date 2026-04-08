@@ -39,7 +39,7 @@ export const StatsScreen: React.FC = () => {
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <View style={styles.statCardIcon}>
-              <IconGraphUp size={24} color="#3b82f6" />
+              <IconGraphUp size={24} color={COLORS.PRIMARY} />
             </View>
             <Text style={styles.statCardValue}>0</Text>
             <Text style={styles.statCardLabel}>总里程 (km)</Text>
@@ -47,7 +47,7 @@ export const StatsScreen: React.FC = () => {
 
           <View style={styles.statCard}>
             <View style={styles.statCardIcon}>
-              <IconBolt size={24} color="#3b82f6" />
+              <IconBolt size={24} color={COLORS.PRIMARY} />
             </View>
             <Text style={styles.statCardValue}>0</Text>
             <Text style={styles.statCardLabel}>总时长 (h)</Text>
@@ -55,7 +55,7 @@ export const StatsScreen: React.FC = () => {
 
           <View style={styles.statCard}>
             <View style={styles.statCardIcon}>
-              <IconFire size={24} color="#3b82f6" />
+              <IconFire size={24} color={COLORS.PRIMARY} />
             </View>
             <Text style={styles.statCardValue}>0</Text>
             <Text style={styles.statCardLabel}>总消耗 (kcal)</Text>
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderRadius: 125,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    backgroundColor: COLORS.GRADIENT.BLUE_LIGHT,
   },
   fullScreenBlur: {
     ...StyleSheet.absoluteFillObject,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '600',
-    color: '#fff',
+    color: COLORS.TEXT.PRIMARY,
     letterSpacing: -0.5,
   },
   content: {
@@ -119,9 +119,9 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.XXL,
     padding: 16,
     alignItems: 'center',
@@ -131,30 +131,30 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    backgroundColor: COLORS.GRADIENT.BLUE_LIGHT,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statCardValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#fff',
+    color: COLORS.TEXT.PRIMARY,
   },
   statCardLabel: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: COLORS.TEXT.QUATERNARY,
   },
   placeholderCard: {
     height: 200,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.XXXL,
     justifyContent: 'center',
     alignItems: 'center',
   },
   placeholderText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.3)',
+    color: COLORS.TEXT.QUINARY,
   },
 });

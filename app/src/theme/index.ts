@@ -16,12 +16,13 @@ export const COLORS = {
 
   // Text colors with opacity
   TEXT: {
-    PRIMARY: '#ffffff', // 100%
-    SECONDARY: 'rgba(255, 255, 255, 0.8)', // 80%
-    TERTIARY: 'rgba(255, 255, 255, 0.5)', // 50%
-    QUATERNARY: 'rgba(255, 255, 255, 0.4)', // 40%
-    QUINARY: 'rgba(255, 255, 255, 0.3)', // 30%
-    DISABLED: 'rgba(255, 255, 255, 0.2)', // 20%
+    PRIMARY: '#ffffff',
+    SECONDARY: 'rgba(255, 255, 255, 0.8)',
+    TERTIARY: 'rgba(255, 255, 255, 0.5)',
+    QUATERNARY: 'rgba(255, 255, 255, 0.4)',
+    QUINARY: 'rgba(255, 255, 255, 0.3)',
+    DISABLED: 'rgba(255, 255, 255, 0.2)',
+    PLACEHOLDER: 'rgba(255, 255, 255, 0.3)',
   },
 
   // Overlay & backgrounds
@@ -30,6 +31,7 @@ export const COLORS = {
     MEDIUM: 'rgba(255, 255, 255, 0.1)',
     HEAVY: 'rgba(255, 255, 255, 0.2)',
     CARD: 'rgba(28, 30, 38, 0.6)',
+    NAV: 'rgba(24, 26, 34, 0.75)',
   },
 
   // Borders
@@ -40,7 +42,7 @@ export const COLORS = {
   },
 
   // Status colors
-  SUCCESS: '#10b981',
+  SUCCESS: '#22c55e',
   ERROR: '#ef4444',
   WARNING: '#f59e0b',
   INFO: '#3b82f6',
@@ -48,8 +50,11 @@ export const COLORS = {
   // Gradient colors for background effects
   GRADIENT: {
     BLUE: 'rgba(59, 130, 246, 0.2)',
-    PURPLE: 'rgba(147, 51, 234, 0.2)',
-    PINK: 'rgba(236, 72, 153, 0.1)',
+    PURPLE: 'rgba(147, 51, 234, 0.15)',
+    PINK: 'rgba(236, 72, 153, 0.08)',
+    BLUE_LIGHT: 'rgba(59, 130, 246, 0.15)',
+    PINK_MID: 'rgba(236, 72, 153, 0.1)',
+    PURPLE_LIGHT: 'rgba(147, 51, 234, 0.1)',
   },
 } as const;
 

@@ -110,14 +110,14 @@ export const ActivityScreen: React.FC = () => {
       {/* Header */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 16 }]}>
         <TouchableOpacity style={styles.headerIconButton}>
-          <IconHamburgerMenu size={20} color="#fff" />
+          <IconHamburgerMenu size={20} color={COLORS.TEXT.PRIMARY} />
         </TouchableOpacity>
         <View style={styles.searchBar}>
-          <IconMagnifer size={18} color="rgba(255,255,255,0.5)" />
+          <IconMagnifer size={18} color={COLORS.TEXT.TERTIARY} />
           <Text style={styles.searchPlaceholder}>搜索路线...</Text>
         </View>
         <TouchableOpacity style={styles.headerIconButton}>
-          <IconMicrophone size={20} color="#fff" />
+          <IconMicrophone size={20} color={COLORS.TEXT.PRIMARY} />
         </TouchableOpacity>
       </View>
 
@@ -239,7 +239,7 @@ export const ActivityScreen: React.FC = () => {
                 ]}
               >
                 {isIdle ? (
-                  <ActiveIcon size={22} color="rgba(255,255,255,0.7)" />
+                  <ActiveIcon size={22} color={COLORS.TEXT.SECONDARY} />
                 ) : isRecording ? (
                   <Text style={styles.pauseIcon}>❚❚</Text>
                 ) : (
@@ -286,16 +286,16 @@ const styles = StyleSheet.create({
   glowOrb: { position: 'absolute', borderRadius: 9999 },
   glowOrbTop: {
     top: -80, right: -40, width: 300, height: 300,
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: COLORS.GRADIENT.BLUE,
   },
   glowOrbCenter: {
     top: '40%', left: '50%', transform: [{ translateX: -150 }],
     width: 400, height: 400,
-    backgroundColor: 'rgba(236, 72, 153, 0.08)',
+    backgroundColor: COLORS.GRADIENT.PINK,
   },
   glowOrbBottom: {
     bottom: -80, left: -60, width: 500, height: 500,
-    backgroundColor: 'rgba(147, 51, 234, 0.15)',
+    backgroundColor: COLORS.GRADIENT.PURPLE,
   },
   fullScreenBlur: {
     ...StyleSheet.absoluteFillObject,
@@ -313,21 +313,21 @@ const styles = StyleSheet.create({
   },
   headerIconButton: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
+    borderWidth: 1, borderColor: COLORS.BORDER.LIGHT,
     justifyContent: 'center', alignItems: 'center',
   },
   searchBar: {
     flex: 1, height: 40,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderRadius: 20,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: COLORS.BORDER.LIGHT,
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, gap: 12,
   },
   searchPlaceholder: {
     fontSize: 15,
-    color: 'rgba(255,255,255,0.5)',
+    color: COLORS.TEXT.TERTIARY,
   },
 
   // Map Card
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   mapHeartWrapper: {
     position: 'absolute', top: 16, left: 16,
     width: 36, height: 36, borderRadius: 18,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
     overflow: 'hidden',
   },
   mapHeartContent: {
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: COLORS.BORDER.MEDIUM,
     borderBottomLeftRadius: BORDER_RADIUS.XXXL,
     borderBottomRightRadius: BORDER_RADIUS.XXXL,
     overflow: 'hidden',
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   },
   cornerLabel: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.4)',
+    color: COLORS.TEXT.QUATERNARY,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontWeight: '600',
@@ -396,14 +396,14 @@ const styles = StyleSheet.create({
   cornerValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#fff',
+    color: COLORS.TEXT.PRIMARY,
   },
   cornerValueDim: {
-    color: 'rgba(255,255,255,0.2)',
+    color: COLORS.TEXT.DISABLED,
   },
   cornerUnit: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.3)',
+    color: COLORS.TEXT.QUINARY,
     fontWeight: '400',
     marginLeft: 3,
   },
@@ -431,8 +431,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   resumeBtnBg: {
-    backgroundColor: '#22c55e',
-    shadowColor: '#22c55e',
+    backgroundColor: COLORS.SUCCESS,
+    shadowColor: COLORS.SUCCESS,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
@@ -456,15 +456,15 @@ const styles = StyleSheet.create({
 
   // 图标样式
   startIcon: {
-    fontSize: 18, color: '#fff', marginLeft: 2,
+    fontSize: 18, color: COLORS.TEXT.PRIMARY, marginLeft: 2,
   },
   stopIcon: {
-    fontSize: 14, color: '#ef4444',
+    fontSize: 14, color: COLORS.ERROR,
   },
   pauseIcon: {
-    fontSize: 12, color: '#fff', letterSpacing: -2,
+    fontSize: 12, color: COLORS.TEXT.PRIMARY, letterSpacing: -2,
   },
   resumeIcon: {
-    fontSize: 16, color: '#fff', marginLeft: 2,
+    fontSize: 16, color: COLORS.TEXT.PRIMARY, marginLeft: 2,
   },
 });
