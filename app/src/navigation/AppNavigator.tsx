@@ -49,7 +49,6 @@ const FloatingTabBar = ({ state, navigation }: any) => {
           overlayColor="rgba(24, 26, 34, 0.75)"
           blurType="dark"
           blurAmount={20}
-          autoUpdate
         />
         <View style={floatingStyles.barContent}>
           {state.routes.map((route: any, index: number) => {
