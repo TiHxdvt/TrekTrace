@@ -194,7 +194,7 @@ export const ActivityScreen: React.FC = () => {
                     styles.cornerValue,
                     isIdle && styles.cornerValueDim,
                   ]}>
-                    {isIdle ? '--' : '--'}
+                    {isIdle ? '--' : "0'00\""}
                   </Text>
                   <Text style={styles.cornerUnit}>min/km</Text>
                 </View>
