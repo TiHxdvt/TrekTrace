@@ -9,6 +9,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { MapView, AMapSdk } from 'react-native-amap3d';
@@ -40,9 +42,16 @@ export const ActivityScreen: React.FC = () => {
   const [activityIndex, setActivityIndex] = useState(1); // 默认跑步
   const insets = useSafeAreaInsets();
 
-  // 初始化高德地图 SDK
+  // 初始化高德地图 SDK + 请求定位权限
   useEffect(() => {
     AMapSdk.init(APP_CONFIG.AMAP_API_KEY);
+
+    if (Platform.OS === 'android') {
+      PermissionsAndroid.requestMultiple([
+        'android.permission.ACCESS_FINE_LOCATION',
+        'android.permission.ACCESS_COARSE_LOCATION',
+      ]).catch(() => {});
+    }
   }, []);
   const [recordState, setRecordState] = useState<RecordState>('idle');
 
