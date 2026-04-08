@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { MapView, AMapSdk } from 'react-native-amap3d';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS } from '../theme';
 import { APP_CONFIG } from '../config';
 import {
@@ -37,6 +38,7 @@ const ACTIVITY_ICONS: Record<ActivityType, React.FC<{ size?: number; color?: str
 
 export const ActivityScreen: React.FC = () => {
   const [activityIndex, setActivityIndex] = useState(1); // 默认跑步
+  const insets = useSafeAreaInsets();
 
   // 初始化高德地图 SDK
   useEffect(() => {
@@ -97,7 +99,7 @@ export const ActivityScreen: React.FC = () => {
       </View>
 
       {/* Header */}
-      <View style={styles.headerBar}>
+      <View style={[styles.headerBar, { paddingTop: insets.top + 16 }]}>
         <TouchableOpacity style={styles.headerIconButton}>
           <IconHamburgerMenu size={20} color="#fff" />
         </TouchableOpacity>
@@ -296,7 +298,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
     paddingBottom: 16,
     gap: 12,
     zIndex: 20,

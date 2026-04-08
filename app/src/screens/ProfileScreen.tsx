@@ -6,11 +6,14 @@ import React from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS, SHADOWS } from '../theme';
 import { IconUser, IconLogout } from '../components/SolarIcons';
 import { storageService } from '../services/storageService';
 
 export const ProfileScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+
   const handleLogout = () => {
     Alert.alert(
       '退出登录',
@@ -46,7 +49,7 @@ export const ProfileScreen: React.FC = () => {
       </View>
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.headerTitle}>我的</Text>
       </View>
 
@@ -142,7 +145,6 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 60,
     paddingBottom: 20,
     zIndex: 20,
   },

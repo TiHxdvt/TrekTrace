@@ -5,10 +5,12 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS } from '../theme';
 import { IconGraphUp, IconBolt, IconFire } from '../components/SolarIcons';
 
 export const StatsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   return (
     <View style={styles.container}>
       {/* Background Glow */}
@@ -28,7 +30,7 @@ export const StatsScreen: React.FC = () => {
       </View>
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.headerTitle}>数据统计</Text>
       </View>
 
@@ -95,7 +97,6 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 60,
     paddingBottom: 20,
     zIndex: 20,
   },
