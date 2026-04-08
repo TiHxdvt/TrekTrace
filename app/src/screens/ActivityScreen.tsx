@@ -13,6 +13,7 @@ import {
 import { BlurView } from '@react-native-community/blur';
 import { MapView, AMapSdk } from 'react-native-amap3d';
 import { COLORS, BORDER_RADIUS } from '../theme';
+import { APP_CONFIG } from '../config';
 import {
   IconHamburgerMenu,
   IconMagnifer,
@@ -39,7 +40,7 @@ export const ActivityScreen: React.FC = () => {
 
   // 初始化高德地图 SDK
   useEffect(() => {
-    AMapSdk.init('6518a83abe3771f3a920bf329cbdefb0');
+    AMapSdk.init(APP_CONFIG.AMAP_API_KEY);
   }, []);
   const [recordState, setRecordState] = useState<RecordState>('idle');
 
