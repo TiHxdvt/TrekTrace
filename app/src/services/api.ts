@@ -5,6 +5,7 @@
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authServiceEvents } from './storageService';
 
 // API 基础 URL（真机测试使用局域网 IP）
 const API_BASE_URL = 'http://172.16.96.63:8080/api';
@@ -50,8 +51,7 @@ api.interceptors.response.use(
       if (status === 401) {
         await AsyncStorage.removeItem('token');
         await AsyncStorage.removeItem('user');
-        // 这里可以触发全局登出事件
-        console.warn('Token expired or invalid, please login again');
+        authServiceEvents.notify();
       }
 
       // 403 禁止访问

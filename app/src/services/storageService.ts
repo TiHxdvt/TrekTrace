@@ -14,6 +14,20 @@ const STORAGE_KEYS = {
   SETTINGS: 'settings',
 } as const;
 
+// 轻量认证事件系统
+type AuthListener = () => void;
+const authListeners = new Set<AuthListener>();
+
+export const authServiceEvents = {
+  subscribe: (listener: AuthListener) => {
+    authListeners.add(listener);
+    return () => authListeners.delete(listener);
+  },
+  notify: () => {
+    authListeners.forEach(fn => fn());
+  },
+};
+
 export const storageService = {
   /**
    * 保存 JWT token
@@ -71,6 +85,7 @@ export const storageService = {
       STORAGE_KEYS.TOKEN,
       STORAGE_KEYS.USER,
     ]);
+    authServiceEvents.notify();
   },
 
   /**

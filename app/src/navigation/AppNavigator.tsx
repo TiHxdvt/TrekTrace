@@ -14,7 +14,7 @@ import { HistoryScreen } from '../screens/HistoryScreen';
 import { StatsScreen } from '../screens/StatsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { AuthStackParamList, MainTabParamList } from './types';
-import { storageService } from '../services/storageService';
+import { storageService, authServiceEvents } from '../services/storageService';
 import { COLORS, SHADOWS } from '../theme';
 import {
   IconMapPoint,
@@ -149,14 +149,18 @@ const floatingStyles = StyleSheet.create({
 export const AppNavigator: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
 
-  React.useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
   const checkAuthStatus = async () => {
     const auth = await storageService.isAuthenticated();
     setIsAuthenticated(auth);
   };
+
+  React.useEffect(() => {
+    checkAuthStatus();
+    const unsubscribe = authServiceEvents.subscribe(() => {
+      checkAuthStatus();
+    });
+    return unsubscribe;
+  }, []);
 
   if (isAuthenticated === null) {
     return (
