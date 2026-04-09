@@ -46,6 +46,7 @@ export const ActivityScreen: React.FC = () => {
   const mapViewRef = useRef<MapView>(null);
   const hasMovedToLocation = useRef(false);
   const latestLocation = useRef<{ latitude: number; longitude: number } | null>(null);
+  const [hasGps, setHasGps] = useState(false);
 
   // 初始化高德地图 SDK + 请求定位权限
   useEffect(() => {
@@ -64,6 +65,7 @@ export const ActivityScreen: React.FC = () => {
     const { latitude, longitude } = event.nativeEvent;
     if (latitude && longitude) {
       latestLocation.current = { latitude, longitude };
+      if (!hasGps) setHasGps(true);
       if (!hasMovedToLocation.current) {
         hasMovedToLocation.current = true;
         mapViewRef.current?.moveCamera(
@@ -189,7 +191,7 @@ export const ActivityScreen: React.FC = () => {
         </View>
 
         {/* Locate Button - 右下角 */}
-        <View style={styles.mapLocateWrapper}>
+        <View style={[styles.mapLocateWrapper, !hasGps && styles.mapLocateDisabled]}>
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={12}
@@ -198,8 +200,8 @@ export const ActivityScreen: React.FC = () => {
             blurAmount={12}
             autoUpdate
           />
-          <TouchableOpacity style={styles.mapLocateContent} onPress={handleLocate}>
-            <IconGps size={18} color={COLORS.TEXT.SECONDARY} />
+          <TouchableOpacity style={styles.mapLocateContent} onPress={handleLocate} disabled={!hasGps}>
+            <IconGps size={18} color={hasGps ? COLORS.TEXT.SECONDARY : COLORS.TEXT.DISABLED} />
           </TouchableOpacity>
         </View>
 
@@ -390,6 +392,9 @@ const styles = StyleSheet.create({
   mapLocateContent: {
     width: 36, height: 36,
     justifyContent: 'center', alignItems: 'center',
+  },
+  mapLocateDisabled: {
+    opacity: 0.4,
   },
 
   // ========== Control Panel ==========
