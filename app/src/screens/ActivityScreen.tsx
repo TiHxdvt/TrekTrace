@@ -32,6 +32,7 @@ type ActivityType = 'running' | 'cycling' | 'hiking';
 type RecordState = 'idle' | 'recording' | 'paused';
 
 const ACTIVITY_CYCLE: ActivityType[] = ['hiking', 'running', 'cycling'];
+const PANEL_HEIGHT = 105;
 
 const ACTIVITY_ICONS: Record<ActivityType, React.FC<{ size?: number; color?: string }>> = {
   running: IconRunning,
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
 
   // Locate Button
   mapLocateWrapper: {
-    position: 'absolute', bottom: 130, right: 12,
+    position: 'absolute', bottom: PANEL_HEIGHT + 12, right: 12,
     width: 36, height: 36, borderRadius: 18,
     borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
     overflow: 'hidden',
