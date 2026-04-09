@@ -154,7 +154,7 @@ export const ActivityScreen: React.FC = () => {
       if (!hasMovedToLocation.current) {
         hasMovedToLocation.current = true;
         mapViewRef.current?.moveCamera(
-          { target: { latitude, longitude }, zoom: 15 },
+          { target: { latitude, longitude }, zoom: 16 },
           500,
         );
       }
@@ -166,7 +166,7 @@ export const ActivityScreen: React.FC = () => {
     const loc = latestLocation.current;
     if (loc) {
       mapViewRef.current?.moveCamera(
-        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: 15 },
+        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: 16 },
         500,
       );
     }
@@ -247,16 +247,21 @@ export const ActivityScreen: React.FC = () => {
           style={StyleSheet.absoluteFillObject}
           mapType={MapType.Night}
           initialCameraPosition={{
-            target: { latitude: 39.9042, longitude: 116.4074 },
-            zoom: 12,
+            target: { latitude: 35.86, longitude: 104.19 },
+            zoom: 4,
           }}
+          minZoom={3}
+          maxZoom={20}
           myLocationEnabled={locationEnabled}
-          scaleControlsEnabled
+          scaleControlsEnabled={false}
           zoomControlsEnabled={false}
           compassEnabled={false}
+          rotateGesturesEnabled={false}
+          tiltGesturesEnabled={false}
           labelsEnabled
-          buildingsEnabled
+          buildingsEnabled={false}
           trafficEnabled={false}
+          distanceFilter={10}
           onLocation={handleLocation}
         />
 
@@ -354,6 +359,7 @@ export const ActivityScreen: React.FC = () => {
                 activeOpacity={0.7}
                 style={[
                   styles.actionBtn,
+                  isIdle ? styles.idleBtnBg : null,
                   isRecording ? styles.pauseBtnBg : null,
                   isPaused ? styles.resumeBtnBg : null,
                 ]}
@@ -544,6 +550,11 @@ const styles = StyleSheet.create({
   },
 
   // 左按钮背景
+  idleBtnBg: {
+    backgroundColor: COLORS.OVERLAY.MEDIUM,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.MEDIUM,
+  },
   pauseBtnBg: {
     backgroundColor: COLORS.PRIMARY,
     shadowColor: COLORS.PRIMARY,
