@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   PermissionsAndroid,
   Platform,
+  Animated,
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { MapView, AMapSdk, MapType } from 'react-native-amap3d';
@@ -25,7 +26,7 @@ import {
   IconRunning,
   IconBicycle,
   IconBonfire,
-  IconHeartBold,
+  IconCompass,
   IconGps,
   IconPlay,
   IconPause,
@@ -34,6 +35,14 @@ import {
 
 type ActivityType = 'running' | 'cycling' | 'hiking';
 type RecordState = 'idle' | 'recording' | 'paused';
+type GpsStrength = 'none' | 'weak' | 'medium' | 'strong';
+
+const GPS_COLORS: Record<GpsStrength, string> = {
+  none: COLORS.TEXT.DISABLED,
+  weak: COLORS.ERROR,
+  medium: COLORS.WARNING,
+  strong: COLORS.SUCCESS,
+};
 
 const ACTIVITY_CYCLE: ActivityType[] = ['hiking', 'running', 'cycling'];
 const PANEL_HEIGHT = 105;
@@ -51,7 +60,33 @@ export const ActivityScreen: React.FC = () => {
   const hasMovedToLocation = useRef(false);
   const latestLocation = useRef<{ latitude: number; longitude: number } | null>(null);
   const [hasGps, setHasGps] = useState(false);
+  const [gpsStrength, setGpsStrength] = useState<GpsStrength>('none');
   const [locationEnabled, setLocationEnabled] = useState(false);
+  const pulseAnim = useRef<Animated.Value>(new Animated.Value(1)).current;
+
+  // GPS 定位中脉冲动画
+  useEffect(() => {
+    if (gpsStrength === 'none') {
+      pulseAnim.setValue(1);
+      return;
+    }
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [gpsStrength]);
 
   // 初始化高德地图 SDK + 请求定位权限
   useEffect(() => {
@@ -74,11 +109,25 @@ export const ActivityScreen: React.FC = () => {
   }, []);
 
   // 首次获取定位后，移动相机到当前位置
-  const handleLocation = (event: NativeSyntheticEvent<{ latitude: number; longitude: number }>) => {
-    const { latitude, longitude } = event.nativeEvent;
+  const handleLocation = (event: NativeSyntheticEvent<{
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+  }>) => {
+    const { latitude, longitude, accuracy } = event.nativeEvent;
     if (latitude && longitude) {
       latestLocation.current = { latitude, longitude };
       if (!hasGps) setHasGps(true);
+
+      // 根据 GPS 精度判断信号强度
+      if (accuracy != null) {
+        if (accuracy <= 10) setGpsStrength('strong');
+        else if (accuracy <= 30) setGpsStrength('medium');
+        else setGpsStrength('weak');
+      } else {
+        setGpsStrength('medium');
+      }
+
       if (!hasMovedToLocation.current) {
         hasMovedToLocation.current = true;
         mapViewRef.current?.moveCamera(
@@ -188,8 +237,8 @@ export const ActivityScreen: React.FC = () => {
           onLocation={handleLocation}
         />
 
-        {/* Heart Button - 左上角 */}
-        <View style={styles.mapHeartWrapper}>
+        {/* GPS Status Indicator - 左上角 */}
+        <View style={styles.mapGpsStatusWrapper}>
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={12}
@@ -199,13 +248,17 @@ export const ActivityScreen: React.FC = () => {
             autoUpdate
             pointerEvents="none"
           />
-          <TouchableOpacity style={styles.mapHeartContent}>
-            <IconHeartBold size={16} color="#ef4444" />
-          </TouchableOpacity>
+          <Animated.View style={{ opacity: pulseAnim }}>
+            <IconCompass size={18} color={GPS_COLORS[gpsStrength]} />
+          </Animated.View>
         </View>
 
         {/* Locate Button - 右下角 */}
-        <View style={[styles.mapLocateWrapper, !hasGps && styles.mapLocateDisabled]}>
+        <TouchableOpacity
+          style={[styles.mapLocateWrapper, !hasGps && styles.mapLocateDisabled]}
+          onPress={handleLocate}
+          disabled={!hasGps}
+        >
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={12}
@@ -215,10 +268,8 @@ export const ActivityScreen: React.FC = () => {
             autoUpdate
             pointerEvents="none"
           />
-          <TouchableOpacity style={styles.mapLocateContent} onPress={handleLocate} disabled={!hasGps}>
-            <IconGps size={18} color={hasGps ? COLORS.TEXT.SECONDARY : COLORS.TEXT.DISABLED} />
-          </TouchableOpacity>
-        </View>
+          <IconGps size={18} color={hasGps ? COLORS.TEXT.SECONDARY : COLORS.TEXT.DISABLED} />
+        </TouchableOpacity>
 
         {/* ========== Control Panel ========== */}
         <View style={styles.panelWrapper}>
@@ -385,16 +436,14 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
-  // Heart
-  mapHeartWrapper: {
+  // GPS Status Indicator
+  mapGpsStatusWrapper: {
     position: 'absolute', top: 16, left: 16,
     width: 36, height: 36, borderRadius: 18,
     borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
     overflow: 'hidden',
-  },
-  mapHeartContent: {
-    width: 36, height: 36,
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Locate Button
@@ -403,10 +452,8 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
     overflow: 'hidden',
-  },
-  mapLocateContent: {
-    width: 36, height: 36,
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   mapLocateDisabled: {
     opacity: 0.4,
