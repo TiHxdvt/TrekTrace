@@ -21,7 +21,7 @@ import SvgRunning from '../icons/solar-running-2-linear.svg';
 import SvgBicycle from '../icons/solar-bicycling-linear.svg';
 import SvgBonfire from '../icons/solar-hiking-linear.svg';
 import SvgStar from '../icons/solar-star-bold.svg';
-import SvgHeartBold from '../icons/solar-heart-bold.svg';
+import SvgCompass from '../icons/solar-compass-bold.svg';
 import SvgBolt from '../icons/solar-bolt-linear.svg';
 import SvgGraphUp from '../icons/solar-graph-up-linear.svg';
 import SvgFire from '../icons/solar-fire-linear.svg';
@@ -56,7 +56,7 @@ export const IconBonfire = createIcon(SvgBonfire);
 
 // ==================== 地图卡片图标 ====================
 export const IconStar = createIcon(SvgStar);
-export const IconHeartBold = createIcon(SvgHeartBold);
+export const IconCompass = createIcon(SvgCompass);
 
 // ==================== 统计卡片图标 ====================
 export const IconBolt = createIcon(SvgBolt);
