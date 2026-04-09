@@ -246,7 +246,7 @@ export const ActivityScreen: React.FC = () => {
         />
 
         {/* GPS Status Indicator - 左上角 */}
-        <View style={styles.mapGpsStatusWrapper}>
+        <TouchableOpacity style={styles.mapGpsStatusWrapper} activeOpacity={0.7}>
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={12}
@@ -259,7 +259,7 @@ export const ActivityScreen: React.FC = () => {
           <Animated.View style={{ opacity: pulseAnim }}>
             <IconCompass size={18} color={GPS_COLORS[gpsStrength]} />
           </Animated.View>
-        </View>
+        </TouchableOpacity>
 
         {/* Locate Button - 右下角 */}
         <TouchableOpacity
