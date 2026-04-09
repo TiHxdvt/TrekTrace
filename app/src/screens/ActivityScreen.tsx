@@ -200,7 +200,7 @@ export const ActivityScreen: React.FC = () => {
             pointerEvents="none"
           />
           <TouchableOpacity style={styles.mapHeartContent}>
-            <IconHeartBold size={16} />
+            <IconHeartBold size={16} color="#ef4444" />
           </TouchableOpacity>
         </View>
 
