@@ -48,17 +48,26 @@ export const ActivityScreen: React.FC = () => {
   const hasMovedToLocation = useRef(false);
   const latestLocation = useRef<{ latitude: number; longitude: number } | null>(null);
   const [hasGps, setHasGps] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(false);
 
   // 初始化高德地图 SDK + 请求定位权限
   useEffect(() => {
     AMapSdk.init(APP_CONFIG.AMAP_API_KEY);
 
-    if (Platform.OS === 'android') {
-      PermissionsAndroid.requestMultiple([
-        'android.permission.ACCESS_FINE_LOCATION',
-        'android.permission.ACCESS_COARSE_LOCATION',
-      ]).catch(() => {});
-    }
+    const enableLocation = async () => {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.requestMultiple([
+          'android.permission.ACCESS_FINE_LOCATION',
+          'android.permission.ACCESS_COARSE_LOCATION',
+        ]).catch(() => null as any);
+        if (granted) {
+          setLocationEnabled(true);
+        }
+      } else {
+        setLocationEnabled(true);
+      }
+    };
+    enableLocation();
   }, []);
 
   // 首次获取定位后，移动相机到当前位置
@@ -166,7 +175,7 @@ export const ActivityScreen: React.FC = () => {
             target: { latitude: 39.9042, longitude: 116.4074 },
             zoom: 15,
           }}
-          myLocationEnabled
+          myLocationEnabled={locationEnabled}
           scaleControlsEnabled
           zoomControlsEnabled={false}
           compassEnabled={false}
