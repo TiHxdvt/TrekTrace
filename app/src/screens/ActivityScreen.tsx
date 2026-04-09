@@ -3,7 +3,7 @@
  * 地图卡片底部控制面板：四角数据 + 中间双按钮
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
-import { MapView, AMapSdk } from 'react-native-amap3d';
+import { MapView, AMapSdk, MapType } from 'react-native-amap3d';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS } from '../theme';
 import { APP_CONFIG } from '../config';
@@ -25,6 +25,7 @@ import {
   IconBicycle,
   IconBonfire,
   IconHeartBold,
+  IconGps,
 } from '../components/SolarIcons';
 
 type ActivityType = 'running' | 'cycling' | 'hiking';
@@ -41,6 +42,9 @@ const ACTIVITY_ICONS: Record<ActivityType, React.FC<{ size?: number; color?: str
 export const ActivityScreen: React.FC = () => {
   const [activityIndex, setActivityIndex] = useState(1); // 默认跑步
   const insets = useSafeAreaInsets();
+  const mapViewRef = useRef<MapView>(null);
+  const hasMovedToLocation = useRef(false);
+  const latestLocation = useRef<{ latitude: number; longitude: number } | null>(null);
 
   // 初始化高德地图 SDK + 请求定位权限
   useEffect(() => {
@@ -53,6 +57,32 @@ export const ActivityScreen: React.FC = () => {
       ]).catch(() => {});
     }
   }, []);
+
+  // 首次获取定位后，移动相机到当前位置
+  const handleLocation = (event: any) => {
+    const { latitude, longitude } = event.nativeEvent;
+    if (latitude && longitude) {
+      latestLocation.current = { latitude, longitude };
+      if (!hasMovedToLocation.current) {
+        hasMovedToLocation.current = true;
+        mapViewRef.current?.moveCamera(
+          { target: { latitude, longitude }, zoom: 15 },
+          500,
+        );
+      }
+    }
+  };
+
+  // 自定义定位按钮：移动到当前位置
+  const handleLocate = () => {
+    const loc = latestLocation.current;
+    if (loc) {
+      mapViewRef.current?.moveCamera(
+        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: 15 },
+        500,
+      );
+    }
+  };
   const [recordState, setRecordState] = useState<RecordState>('idle');
 
   const selectedType = ACTIVITY_CYCLE[activityIndex];
@@ -125,19 +155,21 @@ export const ActivityScreen: React.FC = () => {
       <View style={styles.mapCard}>
         {/* 高德地图 */}
         <MapView
+          ref={mapViewRef}
           style={StyleSheet.absoluteFillObject}
+          mapType={MapType.Night}
           initialCameraPosition={{
-            target: { latitude: 39.9042, longitude: 116.4074 }, // 默认北京
+            target: { latitude: 39.9042, longitude: 116.4074 },
             zoom: 15,
           }}
           myLocationEnabled
-          myLocationButtonEnabled
           scaleControlsEnabled
           zoomControlsEnabled={false}
           compassEnabled={false}
           labelsEnabled
           buildingsEnabled
           trafficEnabled={false}
+          onLocation={handleLocation}
         />
 
         {/* Heart Button - 左上角 */}
@@ -155,80 +187,76 @@ export const ActivityScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* ========== Control Panel ========== */}
-        <View style={styles.panelWrapper}>
+        {/* Locate Button - 右下角 */}
+        <View style={styles.mapLocateWrapper}>
           <BlurView
             style={StyleSheet.absoluteFillObject}
-            blurRadius={20}
-            overlayColor="rgba(28, 30, 38, 0.65)"
+            blurRadius={12}
+            overlayColor="rgba(28, 30, 38, 0.7)"
             blurType="dark"
-            blurAmount={20}
+            blurAmount={12}
             autoUpdate
           />
+          <TouchableOpacity style={styles.mapLocateContent} onPress={handleLocate}>
+            <IconGps size={18} color={COLORS.TEXT.SECONDARY} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ========== Control Panel ========== */}
+        <View style={styles.panelWrapper}>
           <View style={styles.panelContent}>
 
-            {/* 四角数据 */}
-            <View style={styles.cornersGrid}>
-              {/* 左上：距离 */}
-              <View style={styles.cornerItem}>
-                <Text style={styles.cornerLabel}>距离</Text>
-                <View style={styles.cornerValueRow}>
-                  <Text style={[
-                    styles.cornerValue,
-                    isIdle && styles.cornerValueDim,
-                  ]}>
+            {/* 一行数据 */}
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>距离</Text>
+                <View style={styles.statValueRow}>
+                  <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
                     {isIdle ? '--' : '0.00'}
                   </Text>
-                  <Text style={styles.cornerUnit}>km</Text>
+                  <Text style={styles.statUnit}>km</Text>
                 </View>
               </View>
 
-              {/* 右上：时长 */}
-              <View style={[styles.cornerItem, styles.cornerItemRight]}>
-                <Text style={styles.cornerLabel}>时长</Text>
-                <View style={styles.cornerValueRow}>
-                  <Text style={[
-                    styles.cornerValue,
-                    isIdle && styles.cornerValueDim,
-                  ]}>
+              <View style={styles.statDivider} />
+
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>时长</Text>
+                <View style={styles.statValueRow}>
+                  <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
                     {isIdle ? '--' : '00:00'}
                   </Text>
-                  <Text style={styles.cornerUnit}>{isIdle ? '' : ' '}</Text>
+                  <Text style={styles.statUnit}> </Text>
                 </View>
               </View>
 
-              {/* 左下：配速 */}
-              <View style={styles.cornerItem}>
-                <Text style={styles.cornerLabel}>配速</Text>
-                <View style={styles.cornerValueRow}>
-                  <Text style={[
-                    styles.cornerValue,
-                    isIdle && styles.cornerValueDim,
-                  ]}>
+              <View style={styles.statDivider} />
+
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>配速</Text>
+                <View style={styles.statValueRow}>
+                  <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
                     {isIdle ? '--' : "0'00\""}
                   </Text>
-                  <Text style={styles.cornerUnit}>min/km</Text>
+                  <Text style={styles.statUnit}>min/km</Text>
                 </View>
               </View>
 
-              {/* 右下：海拔 */}
-              <View style={[styles.cornerItem, styles.cornerItemRight]}>
-                <Text style={styles.cornerLabel}>海拔</Text>
-                <View style={styles.cornerValueRow}>
-                  <Text style={[
-                    styles.cornerValue,
-                    isIdle && styles.cornerValueDim,
-                  ]}>
+              <View style={styles.statDivider} />
+
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>海拔</Text>
+                <View style={styles.statValueRow}>
+                  <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
                     {isIdle ? '--' : '0'}
                   </Text>
-                  <Text style={styles.cornerUnit}>m</Text>
+                  <Text style={styles.statUnit}>m</Text>
                 </View>
               </View>
             </View>
 
-            {/* 中间双按钮 */}
+            {/* 按钮行 */}
             <View style={styles.centerButtons}>
-              {/* 左按钮 */}
               <TouchableOpacity
                 onPress={handleLeftButton}
                 activeOpacity={0.7}
@@ -239,7 +267,7 @@ export const ActivityScreen: React.FC = () => {
                 ]}
               >
                 {isIdle ? (
-                  <ActiveIcon size={22} color={COLORS.TEXT.SECONDARY} />
+                  <ActiveIcon size={20} color={COLORS.TEXT.SECONDARY} />
                 ) : isRecording ? (
                   <Text style={styles.pauseIcon}>❚❚</Text>
                 ) : (
@@ -247,7 +275,6 @@ export const ActivityScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
 
-              {/* 右按钮 */}
               <TouchableOpacity
                 onPress={handleRightButton}
                 activeOpacity={0.7}
@@ -334,7 +361,7 @@ const styles = StyleSheet.create({
   mapCard: {
     flex: 1,
     marginHorizontal: 20,
-    marginBottom: 140,
+    marginBottom: 120,
     borderRadius: BORDER_RADIUS.XXXL,
     overflow: 'hidden',
     zIndex: 10,
@@ -352,71 +379,84 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
 
+  // Locate Button
+  mapLocateWrapper: {
+    position: 'absolute', bottom: 130, right: 12,
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
+    overflow: 'hidden',
+  },
+  mapLocateContent: {
+    width: 36, height: 36,
+    justifyContent: 'center', alignItems: 'center',
+  },
+
   // ========== Control Panel ==========
   panelWrapper: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
+    backgroundColor: COLORS.OVERLAY.NAV,
     borderTopWidth: 1,
     borderTopColor: COLORS.BORDER.MEDIUM,
     borderBottomLeftRadius: BORDER_RADIUS.XXXL,
     borderBottomRightRadius: BORDER_RADIUS.XXXL,
-    overflow: 'hidden',
   },
   panelContent: {
-    paddingVertical: 20,
-    paddingHorizontal: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
 
-  // 四角数据网格
-  cornersGrid: {
+  // 一行数据
+  statsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  cornerItem: {
-    width: '45%',
-    marginBottom: 12,
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
   },
-  cornerItemRight: {
-    alignItems: 'flex-end',
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: COLORS.BORDER.MEDIUM,
   },
-  cornerLabel: {
-    fontSize: 10,
+  statLabel: {
+    fontSize: 9,
     color: COLORS.TEXT.QUATERNARY,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 1,
   },
-  cornerValueRow: {
+  statValueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
-  cornerValue: {
-    fontSize: 20,
+  statValue: {
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.TEXT.PRIMARY,
   },
-  cornerValueDim: {
+  statValueDim: {
     color: COLORS.TEXT.DISABLED,
   },
-  cornerUnit: {
-    fontSize: 10,
+  statUnit: {
+    fontSize: 9,
     color: COLORS.TEXT.QUINARY,
     fontWeight: '400',
-    marginLeft: 3,
+    marginLeft: 2,
   },
 
   // 中间双按钮
   centerButtons: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 24,
+    gap: 20,
   },
   actionBtn: {
-    width: 52, height: 52,
-    borderRadius: 26,
+    width: 44, height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
