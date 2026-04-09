@@ -3,10 +3,11 @@
  * 使用浮空导航栏代替系统底部 Tab
  */
 
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from '@react-native-community/blur';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { LoginScreen } from '../screens/LoginScreen';
 import { ActivityScreen } from '../screens/ActivityScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
@@ -22,9 +23,6 @@ import {
   IconChatRoundLine,
 } from '../components/SolarIcons';
 
-// 主 Tab 导航器
-const MainTab = createBottomTabNavigator<MainTabParamList>();
-
 // 浮空导航栏配置
 const TAB_CONFIG = [
   { name: 'ActivityTab' as const, Icon: IconMapPoint },
@@ -33,56 +31,97 @@ const TAB_CONFIG = [
   { name: 'ProfileTab' as const, Icon: IconChatRoundLine },
 ];
 
-// 自定义浮空 Tab Bar - 使用 BlurView 实现 backdrop-blur-xl
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TAB_COUNT = TAB_CONFIG.length;
+
+// 主 Tab 导航器
+const MainTab = createBottomTabNavigator<MainTabParamList>();
+
+// 自定义浮空 Tab Bar - 使用 BlurView 实现 backdrop-blur-xl + 滑动切换
 const FloatingTabBar = ({ state, navigation }: any) => {
+  const [isDragging, setIsDragging] = useState(false);
+
+  // 根据手指 X 坐标计算对应的 tab 索引
+  const calculateIndexFromX = (absoluteX: number) => {
+    // 导航栏占 85% 宽度，居中，左右各 7.5% 边距
+    const barMargin = SCREEN_WIDTH * 0.075;
+    const barPadding = 8;
+    const barWidth = SCREEN_WIDTH - barMargin * 2;
+    const effectiveTabWidth = (barWidth - barPadding * 2) / TAB_COUNT;
+    const relativeX = absoluteX - barMargin - barPadding;
+    return Math.max(0, Math.min(TAB_COUNT - 1, Math.floor(relativeX / effectiveTabWidth)));
+  };
+
+  // 拖动手势：手指滑到哪个 tab 就选中哪个
+  const panGesture = Gesture.Pan()
+    .onStart((event) => {
+      setIsDragging(true);
+      const index = calculateIndexFromX(event.absoluteX);
+      const targetRoute = state.routes[index];
+      if (targetRoute && state.index !== index) {
+        navigation.navigate(targetRoute.name);
+      }
+    })
+    .onUpdate((event) => {
+      const index = calculateIndexFromX(event.absoluteX);
+      const targetRoute = state.routes[index];
+      if (targetRoute && state.index !== index) {
+        navigation.navigate(targetRoute.name);
+      }
+    })
+    .onEnd(() => {
+      setIsDragging(false);
+    });
+
   return (
     <View style={floatingStyles.container}>
-      {/* Bar with blur background */}
-      <View style={floatingStyles.barOuter}>
-        <BlurView
-          style={StyleSheet.absoluteFillObject}
-          blurRadius={20}
-          overlayColor={COLORS.OVERLAY.NAV}
-          blurType="dark"
-          blurAmount={20}
-        />
-        <View style={floatingStyles.barContent}>
-          {state.routes.map((route: any, index: number) => {
-            const isFocused = state.index === index;
-            const config = TAB_CONFIG.find(t => t.name === route.name);
-            if (!config) return null;
+      <GestureDetector gesture={panGesture}>
+        <View style={floatingStyles.barOuter} collapsable={false}>
+          <BlurView
+            style={StyleSheet.absoluteFillObject}
+            blurRadius={20}
+            overlayColor={COLORS.OVERLAY.NAV}
+            blurType="dark"
+            blurAmount={20}
+          />
+          <View style={floatingStyles.barContent}>
+            {state.routes.map((route: any, index: number) => {
+              const isFocused = state.index === index;
+              const config = TAB_CONFIG.find(t => t.name === route.name);
+              if (!config) return null;
 
-            const onPress = () => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
+              const onPress = () => {
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
 
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
-              }
-            };
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              };
 
-            return (
-              <TouchableOpacity
-                key={route.key}
-                onPress={onPress}
-                activeOpacity={0.7}
-                style={[
-                  floatingStyles.button,
-                  isFocused && floatingStyles.buttonActive,
-                ]}
-              >
-                <config.Icon
-                  size={20}
-                  color={isFocused ? COLORS.TEXT.PRIMARY : COLORS.TEXT.TERTIARY}
-                />
-              </TouchableOpacity>
-            );
-          })}
+              return (
+                <TouchableOpacity
+                  key={route.key}
+                  onPress={onPress}
+                  activeOpacity={0.7}
+                  style={[
+                    floatingStyles.button,
+                    isFocused && floatingStyles.buttonActive,
+                  ]}
+                >
+                  <config.Icon
+                    size={20}
+                    color={isFocused ? COLORS.TEXT.PRIMARY : COLORS.TEXT.TERTIARY}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
-      </View>
+      </GestureDetector>
     </View>
   );
 };
