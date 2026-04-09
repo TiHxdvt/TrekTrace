@@ -111,26 +111,28 @@ export const ActivityScreen: React.FC = () => {
 
   // 首次获取定位后，移动相机到当前位置
   const handleLocation = (event: NativeSyntheticEvent<{
-    latitude: number;
-    longitude: number;
-    accuracy?: number;
+    timestamp: number;
+    coords: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      altitude: number;
+      speed: number;
+      heading: number;
+    };
   }>) => {
-    const { latitude, longitude, accuracy } = event.nativeEvent;
+    const { coords } = event.nativeEvent;
+    const { latitude, longitude, accuracy } = coords;
     if (latitude && longitude) {
       latestLocation.current = { latitude, longitude };
       if (!hasGps) setHasGps(true);
 
       // 根据 GPS 精度判断信号强度，仅在变化时更新避免高频重渲染
       let newStrength: GpsStrength;
-      if (accuracy != null) {
-        if (accuracy <= 10) newStrength = 'strong';
-        else if (accuracy <= 30) newStrength = 'medium';
-        else newStrength = 'weak';
-      } else {
-        // accuracy 字段不可用时默认 medium
-        console.warn('[GPS] accuracy not available in onLocation event');
-        newStrength = 'medium';
-      }
+      if (accuracy <= 10) newStrength = 'strong';
+      else if (accuracy <= 30) newStrength = 'medium';
+      else newStrength = 'weak';
+
       if (newStrength !== gpsStrengthRef.current) {
         gpsStrengthRef.current = newStrength;
         setGpsStrength(newStrength);
