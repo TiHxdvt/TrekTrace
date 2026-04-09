@@ -61,6 +61,7 @@ export const ActivityScreen: React.FC = () => {
   const latestLocation = useRef<{ latitude: number; longitude: number } | null>(null);
   const [hasGps, setHasGps] = useState(false);
   const [gpsStrength, setGpsStrength] = useState<GpsStrength>('none');
+  const gpsStrengthRef = useRef<GpsStrength>('none');
   const [locationEnabled, setLocationEnabled] = useState(false);
   const pulseAnim = useRef<Animated.Value>(new Animated.Value(1)).current;
 
@@ -119,13 +120,20 @@ export const ActivityScreen: React.FC = () => {
       latestLocation.current = { latitude, longitude };
       if (!hasGps) setHasGps(true);
 
-      // 根据 GPS 精度判断信号强度
+      // 根据 GPS 精度判断信号强度，仅在变化时更新避免高频重渲染
+      let newStrength: GpsStrength;
       if (accuracy != null) {
-        if (accuracy <= 10) setGpsStrength('strong');
-        else if (accuracy <= 30) setGpsStrength('medium');
-        else setGpsStrength('weak');
+        if (accuracy <= 10) newStrength = 'strong';
+        else if (accuracy <= 30) newStrength = 'medium';
+        else newStrength = 'weak';
       } else {
-        setGpsStrength('medium');
+        // accuracy 字段不可用时默认 medium
+        console.warn('[GPS] accuracy not available in onLocation event');
+        newStrength = 'medium';
+      }
+      if (newStrength !== gpsStrengthRef.current) {
+        gpsStrengthRef.current = newStrength;
+        setGpsStrength(newStrength);
       }
 
       if (!hasMovedToLocation.current) {
