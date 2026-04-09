@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { MapView, AMapSdk, MapType } from 'react-native-amap3d';
+import type { NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS } from '../theme';
 import { APP_CONFIG } from '../config';
@@ -61,7 +62,7 @@ export const ActivityScreen: React.FC = () => {
   }, []);
 
   // 首次获取定位后，移动相机到当前位置
-  const handleLocation = (event: any) => {
+  const handleLocation = (event: NativeSyntheticEvent<{ latitude: number; longitude: number }>) => {
     const { latitude, longitude } = event.nativeEvent;
     if (latitude && longitude) {
       latestLocation.current = { latitude, longitude };
