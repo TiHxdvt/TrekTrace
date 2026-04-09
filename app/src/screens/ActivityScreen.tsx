@@ -185,6 +185,7 @@ export const ActivityScreen: React.FC = () => {
             blurType="dark"
             blurAmount={12}
             autoUpdate
+            pointerEvents="none"
           />
           <TouchableOpacity style={styles.mapHeartContent}>
             <IconHeartBold size={16} />
@@ -200,6 +201,7 @@ export const ActivityScreen: React.FC = () => {
             blurType="dark"
             blurAmount={12}
             autoUpdate
+            pointerEvents="none"
           />
           <TouchableOpacity style={styles.mapLocateContent} onPress={handleLocate} disabled={!hasGps}>
             <IconGps size={18} color={hasGps ? COLORS.TEXT.SECONDARY : COLORS.TEXT.DISABLED} />
