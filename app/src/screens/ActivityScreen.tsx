@@ -62,6 +62,7 @@ export const ActivityScreen: React.FC = () => {
   const [hasGps, setHasGps] = useState(false);
   const [gpsStrength, setGpsStrength] = useState<GpsStrength>('none');
   const gpsStrengthRef = useRef<GpsStrength>('none');
+  const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const pulseAnim = useRef<Animated.Value>(new Animated.Value(1)).current;
 
@@ -107,6 +108,9 @@ export const ActivityScreen: React.FC = () => {
       }
     };
     enableLocation();
+    return () => {
+      if (gpsTimeoutRef.current) clearTimeout(gpsTimeoutRef.current);
+    };
   }, []);
 
   // 首次获取定位后，移动相机到当前位置
@@ -137,6 +141,15 @@ export const ActivityScreen: React.FC = () => {
         gpsStrengthRef.current = newStrength;
         setGpsStrength(newStrength);
       }
+
+      // 重置 GPS 超时计时器，10s 无更新则降级为 weak
+      if (gpsTimeoutRef.current) clearTimeout(gpsTimeoutRef.current);
+      gpsTimeoutRef.current = setTimeout(() => {
+        if (gpsStrengthRef.current !== 'none') {
+          gpsStrengthRef.current = 'weak';
+          setGpsStrength('weak');
+        }
+      }, 10000);
 
       if (!hasMovedToLocation.current) {
         hasMovedToLocation.current = true;
