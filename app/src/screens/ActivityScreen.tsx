@@ -27,6 +27,9 @@ import {
   IconBonfire,
   IconHeartBold,
   IconGps,
+  IconPlay,
+  IconPause,
+  IconStop,
 } from '../components/SolarIcons';
 
 type ActivityType = 'running' | 'cycling' | 'hiking';
@@ -173,7 +176,7 @@ export const ActivityScreen: React.FC = () => {
           mapType={MapType.Night}
           initialCameraPosition={{
             target: { latitude: 39.9042, longitude: 116.4074 },
-            zoom: 15,
+            zoom: 12,
           }}
           myLocationEnabled={locationEnabled}
           scaleControlsEnabled
@@ -284,9 +287,9 @@ export const ActivityScreen: React.FC = () => {
                 {isIdle ? (
                   <ActiveIcon size={20} color={COLORS.TEXT.SECONDARY} />
                 ) : isRecording ? (
-                  <Text style={styles.pauseIcon}>❚❚</Text>
+                  <IconPause size={18} color={COLORS.TEXT.PRIMARY} />
                 ) : (
-                  <Text style={styles.resumeIcon}>▶</Text>
+                  <IconPlay size={18} color={COLORS.TEXT.PRIMARY} />
                 )}
               </TouchableOpacity>
 
@@ -299,9 +302,9 @@ export const ActivityScreen: React.FC = () => {
                 ]}
               >
                 {isIdle ? (
-                  <Text style={styles.startIcon}>▶</Text>
+                  <IconPlay size={18} color={COLORS.TEXT.PRIMARY} />
                 ) : (
-                  <Text style={styles.stopIcon}>■</Text>
+                  <IconStop size={18} color={COLORS.ERROR} />
                 )}
               </TouchableOpacity>
             </View>
@@ -377,7 +380,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 20,
     marginBottom: 120,
-    borderRadius: BORDER_RADIUS.XXXL,
+    borderRadius: BORDER_RADIUS.G2.LG,
     overflow: 'hidden',
     zIndex: 10,
   },
@@ -413,11 +416,7 @@ const styles = StyleSheet.create({
   panelWrapper: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    backgroundColor: COLORS.OVERLAY.NAV,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER.MEDIUM,
-    borderBottomLeftRadius: BORDER_RADIUS.XXXL,
-    borderBottomRightRadius: BORDER_RADIUS.XXXL,
+    backgroundColor: '#1c1e26',
   },
   panelContent: {
     paddingVertical: 12,
@@ -428,16 +427,11 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: COLORS.BORDER.MEDIUM,
   },
   statLabel: {
     fontSize: 9,
@@ -510,19 +504,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239,68,68,0.2)',
     borderWidth: 1,
     borderColor: 'rgba(239,68,68,0.3)',
-  },
-
-  // 图标样式
-  startIcon: {
-    fontSize: 18, color: COLORS.TEXT.PRIMARY, marginLeft: 2,
-  },
-  stopIcon: {
-    fontSize: 14, color: COLORS.ERROR,
-  },
-  pauseIcon: {
-    fontSize: 12, color: COLORS.TEXT.PRIMARY, letterSpacing: -2,
-  },
-  resumeIcon: {
-    fontSize: 16, color: COLORS.TEXT.PRIMARY, marginLeft: 2,
   },
 });
