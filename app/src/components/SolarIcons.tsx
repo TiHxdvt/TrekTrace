@@ -31,6 +31,15 @@ export const IconMapPoint = ({ size = 24, color = 'currentColor', strokeWidth = 
   </Svg>
 );
 
+/** solar:target-linear - 定位按钮 */
+export const IconGps = ({ size = 24, color = 'currentColor', strokeWidth = 1.5 }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="3" stroke={color} strokeWidth={strokeWidth} />
+    <Path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth={strokeWidth} />
+  </Svg>
+);
+
 /** lucide:plane - 历史 Tab */
 export const IconPlane = ({ size = 24, color = 'currentColor', strokeWidth = 2 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

@@ -83,8 +83,6 @@ const FloatingTabBar = ({ state, navigation }: any) => {
           })}
         </View>
       </View>
-      {/* Home Indicator */}
-      <View style={floatingStyles.homeIndicator} pointerEvents="none" />
     </View>
   );
 };
@@ -128,16 +126,6 @@ const floatingStyles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-  homeIndicator: {
-    position: 'absolute',
-    bottom: -20,
-    left: '50%',
-    transform: [{ translateX: -64 }],
-    width: 128,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.OVERLAY.HEAVY,
   },
 });
 

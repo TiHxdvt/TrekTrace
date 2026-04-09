@@ -49,7 +49,8 @@ api.interceptors.response.use(
       if (status === 401) {
         await AsyncStorage.removeItem('token');
         await AsyncStorage.removeItem('user');
-        authServiceEvents.notify();
+        // 这里可以触发全局登出事件
+        console.warn('Token expired or invalid, please login again');
       }
 
       // 403 禁止访问
