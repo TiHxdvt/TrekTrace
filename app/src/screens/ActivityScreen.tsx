@@ -114,10 +114,19 @@ export const ActivityScreen: React.FC = () => {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
 
+  // Use ref for isRecording to avoid handleLocation re-creation
+  const isRecordingRef = useRef(false);
+
   // Derived state
-  const isIdle = !session || session.status === 'idle';
+  const isIdle = !session || session.status === 'idle' || session.status === 'stopped';
   const isRecording = session?.status === 'recording';
   const isPaused = session?.status === 'paused';
+  const isStopped = session?.status === 'stopped';
+
+  // Keep ref in sync
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
 
   // Subscribe to recording service
   useEffect(() => {
@@ -134,14 +143,25 @@ export const ActivityScreen: React.FC = () => {
     const checkRecovery = async () => {
       const recovered = await trackRecordingService.recoverSession();
       if (recovered) {
-        Alert.alert(
-          '恢复记录',
-          '检测到未完成的运动记录，是否恢复？',
-          [
-            { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
-            { text: '恢复', style: 'default' },
-          ],
-        );
+        if (recovered.status === 'stopped') {
+          Alert.alert(
+            '上传未完成',
+            '上次运动的记录上传失败，是否重试？',
+            [
+              { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
+              { text: '重试上传', onPress: () => trackRecordingService.retryUpload() },
+            ],
+          );
+        } else {
+          Alert.alert(
+            '恢复记录',
+            '检测到未完成的运动记录，是否恢复？',
+            [
+              { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
+              { text: '恢复', style: 'default' },
+            ],
+          );
+        }
       }
     };
     checkRecovery();
@@ -241,7 +261,7 @@ export const ActivityScreen: React.FC = () => {
       }
 
       // Feed GPS data to recording service
-      if (isRecording) {
+      if (isRecordingRef.current) {
         const rawPoint: RawLocationPoint = {
           latitude,
           longitude,
@@ -262,7 +282,7 @@ export const ActivityScreen: React.FC = () => {
         }
       }
     }
-  }, [hasGps, isRecording]);
+  }, [hasGps]);
 
   // 自定义定位按钮：移动到当前位置
   const handleLocate = () => {
@@ -306,9 +326,19 @@ export const ActivityScreen: React.FC = () => {
       useNativeDriver: false,
     }).start();
 
-    longPressTimer.current = setTimeout(() => {
-      trackRecordingService.stopRecording();
+    longPressTimer.current = setTimeout(async () => {
+      const success = await trackRecordingService.stopRecording();
       longPressProgress.setValue(0);
+      if (!success) {
+        Alert.alert(
+          '上传失败',
+          '运动记录已保存到本地，请检查网络后重试。',
+          [
+            { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
+            { text: '重试', onPress: () => trackRecordingService.retryUpload() },
+          ],
+        );
+      }
     }, LONG_PRESS_DURATION);
   };
 

@@ -5,8 +5,8 @@
  */
 
 export const APP_CONFIG = {
-  /** API 基础 URL */
-  API_BASE_URL: 'http://172.16.96.62:8080/api',
+  /** API 基础 URL - 通过 adb reverse tcp:8080 tcp:8080 转发 */
+  API_BASE_URL: 'http://localhost:8080/api',
 
   /** 高德地图 SDK Key */
   AMAP_API_KEY: '6518a83abe3771f3a920bf329cbdefb0',

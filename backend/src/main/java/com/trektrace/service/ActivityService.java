@@ -105,8 +105,6 @@ public class ActivityService {
         if (!activity.getUserId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问");
         }
-        trackPointRepository.deleteAll(
-                trackPointRepository.findByActivityIdOrderByTimestampAsc(id));
         activityRepository.delete(activity);
     }
 

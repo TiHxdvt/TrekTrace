@@ -12,9 +12,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.logging.Logger;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
+
+    private static final Logger log = Logger.getLogger(JwtAuthFilter.class.getName());
 
     private final JwtUtil jwtUtil;
 
@@ -36,7 +39,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     UsernamePasswordAuthenticationToken auth =
                             new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
                     SecurityContextHolder.getContext().setAuthentication(auth);
+                    log.fine("Authenticated userId=" + userId);
                 }
+            } else {
+                log.fine("Invalid JWT token");
             }
         }
 

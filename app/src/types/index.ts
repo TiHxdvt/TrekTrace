@@ -113,7 +113,7 @@ export interface TrackData {
 // ========== 轨迹记录相关类型 ==========
 
 // 记录会话状态
-export type RecordingStatus = 'idle' | 'recording' | 'paused';
+export type RecordingStatus = 'idle' | 'recording' | 'paused' | 'stopped';
 
 export interface RecordingSession {
   id: string;

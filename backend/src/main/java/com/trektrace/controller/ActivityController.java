@@ -4,6 +4,7 @@ import com.trektrace.dto.ActivityResponse;
 import com.trektrace.dto.ActivityUploadRequest;
 import com.trektrace.dto.TrackPointDTO;
 import com.trektrace.service.ActivityService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -27,7 +28,7 @@ public class ActivityController {
 
     @PostMapping
     public ResponseEntity<ActivityResponse> uploadActivity(
-            @RequestBody ActivityUploadRequest request,
+            @Valid @RequestBody ActivityUploadRequest request,
             Authentication auth) {
         ActivityResponse response = activityService.uploadActivity(request, getUserId(auth));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

@@ -7,7 +7,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   RecordingSession,
-  RecordingStatus,
   RecordingStats,
   TrackSegment,
   ProcessedPoint,
@@ -23,6 +22,7 @@ const SPEED_FILTER = 1; // m/s - 最小有效速度
 const ACCURACY_FILTER = 30; // 米 - 最大允许精度
 const ELEVATION_BUFFER_SIZE = 5; // 滑动平均窗口
 const ELEVATION_MIN_DIFF = 3; // 米 - 海拔累计阈值
+const NOTIFY_THROTTLE_MS = 500; // notify 节流间隔
 
 // ======================== Storage Keys ========================
 const SESSION_KEY = '@trektrace:recording_session';
@@ -50,6 +50,13 @@ function uid(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// ======================== Timestamp ========================
+function normalizeTimestamp(ts: number): string {
+  // Android GPS timestamp 通常是毫秒，某些设备可能返回秒
+  const ms = ts > 1e12 ? ts : ts * 1000;
+  return new Date(ms).toISOString();
+}
+
 // ======================== Callbacks ========================
 type StateCallback = (session: RecordingSession | null, stats: RecordingStats) => void;
 
@@ -62,6 +69,8 @@ class TrackRecordingServiceImpl {
   private elevationGainAccum = 0;
   private lastSmoothedAltitude: number | null = null;
   private listeners: Set<StateCallback> = new Set();
+  private lastNotifyTime = 0;
+  private notifyPending = false;
 
   // ---------- Subscribe ----------
   subscribe(cb: StateCallback): () => void {
@@ -70,6 +79,23 @@ class TrackRecordingServiceImpl {
   }
 
   private notify(): void {
+    const now = Date.now();
+    const elapsed = now - this.lastNotifyTime;
+
+    if (elapsed >= NOTIFY_THROTTLE_MS) {
+      this.lastNotifyTime = now;
+      this.doNotify();
+    } else if (!this.notifyPending) {
+      this.notifyPending = true;
+      setTimeout(() => {
+        this.notifyPending = false;
+        this.lastNotifyTime = Date.now();
+        this.doNotify();
+      }, NOTIFY_THROTTLE_MS - elapsed);
+    }
+  }
+
+  private doNotify(): void {
     const stats = this.getStats();
     for (const cb of this.listeners) {
       cb(this.session, stats);
@@ -84,12 +110,11 @@ class TrackRecordingServiceImpl {
       const saved: RecordingSession = JSON.parse(raw);
       if (saved && saved.status !== 'idle' && !saved.uploadedToServer) {
         this.session = saved;
-        // Restore last point from segments
         const allPoints = this.getAllPoints();
         if (allPoints.length > 0) {
           this.lastAcceptedPoint = allPoints[allPoints.length - 1];
         }
-        this.notify();
+        this.doNotify();
         return saved;
       }
     } catch {
@@ -126,7 +151,7 @@ class TrackRecordingServiceImpl {
 
     this.startTimer();
     await this.persist();
-    this.notify();
+    this.doNotify();
   }
 
   // ---------- Process Location ----------
@@ -139,9 +164,10 @@ class TrackRecordingServiceImpl {
     // Filter 2: speed (skip for first point)
     if (this.lastAcceptedPoint !== null && raw.speed < SPEED_FILTER) return false;
 
-    // Filter 3: distance
+    // Filter 3: distance (reuse computed distance)
+    let dist = 0;
     if (this.lastAcceptedPoint) {
-      const dist = haversineDistance(
+      dist = haversineDistance(
         this.lastAcceptedPoint.latitude,
         this.lastAcceptedPoint.longitude,
         raw.latitude,
@@ -158,18 +184,12 @@ class TrackRecordingServiceImpl {
       latitude: raw.latitude,
       longitude: raw.longitude,
       altitude,
-      timestamp: new Date(raw.timestamp).toISOString(),
+      timestamp: normalizeTimestamp(raw.timestamp),
       speed: raw.speed,
     };
 
-    // Update distance
-    if (this.lastAcceptedPoint) {
-      const dist = haversineDistance(
-        this.lastAcceptedPoint.latitude,
-        this.lastAcceptedPoint.longitude,
-        point.latitude,
-        point.longitude,
-      );
+    // Accumulate distance (reuse already computed value)
+    if (dist > 0) {
       this.session.totalDistance += dist;
     }
 
@@ -194,7 +214,7 @@ class TrackRecordingServiceImpl {
     this.session.status = 'paused';
     this.stopTimer();
     await this.persist();
-    this.notify();
+    this.doNotify();
   }
 
   // ---------- Resume ----------
@@ -208,32 +228,50 @@ class TrackRecordingServiceImpl {
     };
     this.session.segments.push(newSegment);
     this.session.status = 'recording';
-    this.lastAcceptedPoint = null; // Allow first point regardless of distance
+    this.lastAcceptedPoint = null;
     this.startTimer();
     await this.persist();
-    this.notify();
+    this.doNotify();
   }
 
   // ---------- Stop ----------
-  async stopRecording(): Promise<void> {
-    if (!this.session) return;
-    this.session.status = 'idle';
-    this.session.endTime = new Date().toISOString();
+  async stopRecording(): Promise<boolean> {
+    if (!this.session) return false;
     this.stopTimer();
+    this.session.endTime = new Date().toISOString();
 
     try {
       await this.uploadToServer();
+      this.session.status = 'idle';
       this.session.uploadedToServer = true;
-      await this.persist();
-    } catch (err) {
-      console.error('Upload failed, data preserved locally:', err);
-      await this.persist();
-    }
-
-    this.notify();
-    // Clear local data after successful upload
-    if (this.session.uploadedToServer) {
       await this.clearStorage();
+      this.doNotify();
+      return true;
+    } catch (err) {
+      // Upload failed — keep as 'stopped' (recoverable) so user can retry
+      this.session.status = 'stopped';
+      await this.persist();
+      this.doNotify();
+      console.error('Upload failed, data preserved locally:', err);
+      return false;
+    }
+  }
+
+  // ---------- Retry upload (for failed uploads) ----------
+  async retryUpload(): Promise<boolean> {
+    if (!this.session || this.session.status !== 'stopped') return false;
+    this.session.endTime = this.session.endTime ?? new Date().toISOString();
+
+    try {
+      await this.uploadToServer();
+      this.session.status = 'idle';
+      this.session.uploadedToServer = true;
+      await this.clearStorage();
+      this.doNotify();
+      return true;
+    } catch (err) {
+      console.error('Retry upload failed:', err);
+      return false;
     }
   }
 
@@ -246,7 +284,7 @@ class TrackRecordingServiceImpl {
     this.lastSmoothedAltitude = null;
     this.stopTimer();
     await this.clearStorage();
-    this.notify();
+    this.doNotify();
   }
 
   // ---------- Get Polyline Segments ----------
@@ -300,7 +338,7 @@ class TrackRecordingServiceImpl {
     this.timerInterval = setInterval(() => {
       if (this.session && this.session.status === 'recording') {
         this.session.totalDuration += 1;
-        this.notify();
+        this.doNotify();
       }
     }, 1000);
   }
