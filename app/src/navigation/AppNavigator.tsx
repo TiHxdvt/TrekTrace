@@ -60,14 +60,19 @@ const FloatingTabBar = ({ state, navigation }: any) => {
   };
 
   // 拖动手势：手指滑到哪个 tab 就选中哪个
-  const panGesture = Gesture.Pan()
-    .activeOffsetX([-10, 10])
-    .onStart((event) => {
-      navigateToTabAt(event.absoluteX);
-    })
-    .onUpdate((event) => {
-      navigateToTabAt(event.absoluteX);
-    });
+  const panGesture = useMemo(() =>
+    Gesture.Pan()
+      .activeOffsetX([-10, 10])
+      .onStart((event) => {
+        navigateToTabAt(event.absoluteX);
+      })
+      .onUpdate((event) => {
+        navigateToTabAt(event.absoluteX);
+      }),
+    // navigateToTabAt 通过闭包引用 state/navigation，需要包含在依赖中
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.index, state.routes, navigation],
+  );
 
   return (
     <View style={floatingStyles.container}>
