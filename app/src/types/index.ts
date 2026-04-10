@@ -60,6 +60,12 @@ export interface LoginResponse {
   user: User;
 }
 
+// 密码登录请求
+export interface PasswordLoginRequest {
+  phone: string;
+  password: string;
+}
+
 // 发送验证码请求
 export interface SendCodeRequest {
   phone: string;

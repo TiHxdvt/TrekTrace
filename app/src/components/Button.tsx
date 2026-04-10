@@ -12,6 +12,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline';
 type ButtonSize = 'small' | 'medium' | 'large';
@@ -84,7 +85,7 @@ export const Button: React.FC<ButtonProps> = ({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? '#fff' : '#3b82f6'}
+          color={variant === 'primary' ? COLORS.TEXT.PRIMARY : COLORS.PRIMARY}
           size="small"
         />
       ) : (
@@ -97,49 +98,45 @@ export const Button: React.FC<ButtonProps> = ({
 const styles = StyleSheet.create({
   // 基础按钮样式
   button: {
-    borderRadius: 16,
+    borderRadius: BORDER_RADIUS.LG,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
   },
   button_small: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: BORDER_RADIUS.LG,
     minHeight: 32,
   },
   button_medium: {
-    paddingVertical: 12,
+    paddingVertical: BORDER_RADIUS.MD,
     paddingHorizontal: 32,
     minHeight: 48,
   },
   button_large: {
-    paddingVertical: 16,
+    paddingVertical: BORDER_RADIUS.LG,
     paddingHorizontal: 40,
     minHeight: 56,
   },
 
   // 主按钮（蓝色渐变）
   buttonPrimary: {
-    backgroundColor: '#3b82f6',
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 5,
+    backgroundColor: COLORS.PRIMARY,
+    ...SHADOWS.PRIMARY,
   },
 
   // 次要按钮（半透明）
   buttonSecondary: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: COLORS.BORDER.LIGHT,
   },
 
   // 轮廓按钮
   buttonOutline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: COLORS.BORDER.HEAVY,
   },
 
   // 禁用状态
@@ -152,18 +149,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   text_small: {
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
   },
   text_medium: {
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
   },
   text_large: {
-    fontSize: 18,
+    fontSize: TYPOGRAPHY.FONT_SIZE.LG,
   },
   textPrimary: {
-    color: '#fff',
+    color: COLORS.TEXT.PRIMARY,
   },
   textSecondary: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: COLORS.TEXT.TERTIARY,
   },
 });

@@ -6,7 +6,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BORDER_RADIUS } from '../theme';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
 import { IconPlane, IconArrowRight } from '../components/SolarIcons';
 
 export const HistoryScreen: React.FC = () => {
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
     letterSpacing: -0.5,
@@ -124,13 +124,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   historyCardTitle: {
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '500',
     color: COLORS.TEXT.PRIMARY,
     marginBottom: 4,
   },
   historyCardSubtext: {
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.TEXT.QUATERNARY,
   },
 });

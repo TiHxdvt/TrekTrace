@@ -7,7 +7,7 @@ import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BORDER_RADIUS } from '../theme';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
 import { IconUser, IconLogout } from '../components/SolarIcons';
 import { storageService } from '../services/storageService';
 
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
     letterSpacing: -0.5,
@@ -188,20 +188,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   userName: {
-    fontSize: 20,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XL,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
     marginBottom: 4,
   },
   userHint: {
-    fontSize: 13,
+    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     color: COLORS.TEXT.QUATERNARY,
   },
   menuSection: {
     marginBottom: 24,
   },
   menuSectionTitle: {
-    fontSize: 12,
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     fontWeight: '500',
     color: COLORS.TEXT.QUATERNARY,
     textTransform: 'uppercase',
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.BORDER.LIGHT,
   },
   menuItemLabel: {
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     color: COLORS.TEXT.SECONDARY,
     fontWeight: '400',
   },
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: COLORS.TEXT.PRIMARY,
-    fontSize: 10,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
     fontWeight: '600',
   },
   logoutButton: {
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.XXL,
   },
   logoutText: {
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     color: COLORS.TEXT.TERTIARY,
     fontWeight: '500',
   },

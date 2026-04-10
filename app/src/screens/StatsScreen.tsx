@@ -6,7 +6,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BORDER_RADIUS } from '../theme';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
 import { IconGraphUp, IconBolt, IconFire } from '../components/SolarIcons';
 
 export const StatsScreen: React.FC = () => {
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
     letterSpacing: -0.5,
@@ -136,12 +136,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statCardValue: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: TYPOGRAPHY.FONT_SIZE.XXL,
+    fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
   },
   statCardLabel: {
-    fontSize: 11,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
     color: COLORS.TEXT.QUATERNARY,
   },
   placeholderCard: {
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   placeholderText: {
-    fontSize: 14,
+    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     color: COLORS.TEXT.QUINARY,
   },
 });

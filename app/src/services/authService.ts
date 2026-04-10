@@ -4,7 +4,7 @@
  */
 
 import api from './api';
-import { LoginRequest, LoginResponse, SendCodeRequest, User } from '../types';
+import { LoginRequest, LoginResponse, PasswordLoginRequest, SendCodeRequest, User } from '../types';
 
 export const authService = {
   /**
@@ -25,6 +25,18 @@ export const authService = {
   login: async (phone: string, code: string): Promise<LoginResponse> => {
     const data: LoginRequest = { phone, code };
     const response = await api.post<LoginResponse>('/auth/login', data);
+    return response.data;
+  },
+
+  /**
+   * 密码登录
+   * @param phone 手机号
+   * @param password 密码
+   * @returns 登录响应（token + 用户信息）
+   */
+  loginWithPassword: async (phone: string, password: string): Promise<LoginResponse> => {
+    const data: PasswordLoginRequest = { phone, password };
+    const response = await api.post<LoginResponse>('/auth/login-password', data);
     return response.data;
   },
 

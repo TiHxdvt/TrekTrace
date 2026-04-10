@@ -22,7 +22,7 @@ import { MapView, AMapSdk, MapType, Polyline } from 'react-native-amap3d';
 import type { NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { COLORS, BORDER_RADIUS } from '../theme';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
 import { APP_CONFIG } from '../config';
 import {
   IconHamburgerMenu,
@@ -361,8 +361,9 @@ export const ActivityScreen: React.FC = () => {
     const loc = latestLocation.current;
     if (loc) {
       shouldFollowRef.current = true;
+      currentZoomRef.current = 16;
       mapViewRef.current?.moveCamera(
-        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: currentZoomRef.current },
+        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: 16 },
         500,
       );
     }
@@ -910,7 +911,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, gap: 12,
   },
   searchPlaceholder: {
-    fontSize: 15,
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     color: COLORS.TEXT.TERTIARY,
   },
 
@@ -961,8 +962,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(239, 68, 68, 0.7)',
   },
   simText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+    fontWeight: '600',
     color: COLORS.TEXT.SECONDARY,
     letterSpacing: 0.5,
   },
@@ -974,7 +975,7 @@ const styles = StyleSheet.create({
   panelWrapper: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    backgroundColor: '#1c1e26',
+    backgroundColor: COLORS.BACKGROUND,
   },
   panelContent: {
     paddingVertical: 12,
@@ -997,7 +998,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statLabel: {
-    fontSize: 9,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
     color: COLORS.TEXT.QUATERNARY,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1009,15 +1010,15 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   statValue: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+    fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
   },
   statValueDim: {
     color: COLORS.TEXT.DISABLED,
   },
   statUnit: {
-    fontSize: 9,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
     color: COLORS.TEXT.QUINARY,
     fontWeight: '400',
     marginLeft: 2,
@@ -1115,7 +1116,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryStatLabel: {
-    fontSize: 10,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
     color: COLORS.TEXT.QUATERNARY,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1123,8 +1124,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   summaryStatValue: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+    fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
   },
   summaryBottomBar: {
@@ -1148,7 +1149,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   summaryDoneText: {
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
   },
