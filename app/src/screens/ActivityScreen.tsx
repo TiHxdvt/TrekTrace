@@ -4,7 +4,7 @@
  * 集成 TrackRecordingService 实现实时轨迹记录
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -44,6 +44,9 @@ import type {
 
 type ActivityTypeLocal = 'running' | 'cycling' | 'hiking';
 type GpsStrength = 'none' | 'weak' | 'medium' | 'strong';
+
+// Same as SPEED_FILTER in trackRecordingService — points below this are rejected
+const SPEED_FILTER = 1; // m/s
 
 const GPS_COLORS: Record<GpsStrength, string> = {
   none: COLORS.TEXT.DISABLED,
@@ -92,6 +95,7 @@ export const ActivityScreen: React.FC = () => {
   const hasMovedToLocation = useRef(false);
   const latestLocation = useRef<{ latitude: number; longitude: number } | null>(null);
   const shouldFollowRef = useRef(true);
+  const currentZoomRef = useRef(16);
   const [hasGps, setHasGps] = useState(false);
   const [gpsStrength, setGpsStrength] = useState<GpsStrength>('none');
   const gpsStrengthRef = useRef<GpsStrength>('none');
@@ -137,6 +141,57 @@ export const ActivityScreen: React.FC = () => {
     });
     return unsubscribe;
   }, []);
+
+  // Derive colored segments from polyline data + session type (computed only when data changes)
+  const coloredSegments = useMemo(() => {
+    if (!session || polylineSegments.length === 0) return [];
+
+    const activityType = session.activityType;
+
+    const SPEED_THRESHOLDS: Record<ActivityType, { slow: number; fast: number }> = {
+      HIKING: { slow: 1.0, fast: 2.0 },
+      RUNNING: { slow: 2.0, fast: 4.0 },
+      CYCLING: { slow: 5.0, fast: 10.0 },
+    };
+
+    const { slow, fast } = SPEED_THRESHOLDS[activityType];
+
+    // Colors: green(#22c55e) → yellow(#f59e0b) → red(#ef4444)
+    const GREEN = { r: 34, g: 197, b: 94 };
+    const YELLOW = { r: 245, g: 158, b: 11 };
+    const RED = { r: 239, g: 68, b: 68 };
+
+    const lerpColor = (
+      c1: { r: number; g: number; b: number },
+      c2: { r: number; g: number; b: number },
+      t: number,
+    ): string => {
+      const r = Math.round(c1.r + (c2.r - c1.r) * t);
+      const g = Math.round(c1.g + (c2.g - c1.g) * t);
+      const b = Math.round(c1.b + (c2.b - c1.b) * t);
+      return `rgb(${r},${g},${b})`;
+    };
+
+    // Map speed to color, accounting for SPEED_FILTER so green range is reachable
+    const speedToColor = (speed: number): string => {
+      if (speed <= slow) {
+        const t = Math.max(0, (speed - SPEED_FILTER)) / Math.max(0.01, slow - SPEED_FILTER);
+        return lerpColor(GREEN, YELLOW, Math.min(1, t));
+      } else if (speed <= fast) {
+        const t = (speed - slow) / (fast - slow);
+        return lerpColor(YELLOW, RED, t);
+      }
+      return `rgb(${RED.r},${RED.g},${RED.b})`;
+    };
+
+    return session.segments
+      .filter(s => s.points.length >= 2)
+      .map(s => {
+        const coords = s.points.map(p => ({ latitude: p.latitude, longitude: p.longitude }));
+        const colors = s.points.map(p => speedToColor(p.speed ?? 0));
+        return { coords, colors };
+      });
+  }, [polylineSegments, session?.activityType]);
 
   // Crash recovery on mount
   useEffect(() => {
@@ -255,7 +310,7 @@ export const ActivityScreen: React.FC = () => {
       if (!hasMovedToLocation.current) {
         hasMovedToLocation.current = true;
         mapViewRef.current?.moveCamera(
-          { target: { latitude, longitude }, zoom: 16 },
+          { target: { latitude, longitude }, zoom: currentZoomRef.current },
           500,
         );
       }
@@ -276,7 +331,7 @@ export const ActivityScreen: React.FC = () => {
         // Follow user on map
         if (shouldFollowRef.current) {
           mapViewRef.current?.moveCamera(
-            { target: { latitude, longitude }, zoom: 16 },
+            { target: { latitude, longitude }, zoom: currentZoomRef.current },
             300,
           );
         }
@@ -290,7 +345,7 @@ export const ActivityScreen: React.FC = () => {
     if (loc) {
       shouldFollowRef.current = true;
       mapViewRef.current?.moveCamera(
-        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: 16 },
+        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: currentZoomRef.current },
         500,
       );
     }
@@ -419,14 +474,18 @@ export const ActivityScreen: React.FC = () => {
           trafficEnabled={false}
           distanceFilter={5}
           onLocation={handleLocation}
+          onCameraMove={(e) => {
+            currentZoomRef.current = e.nativeEvent.cameraPosition.zoom ?? currentZoomRef.current;
+          }}
         >
-          {/* Real-time Track Polylines */}
-          {polylineSegments.map((coords, idx) => (
+          {/* Speed-colored Track Polylines */}
+          {coloredSegments.map((seg, idx) => (
             <Polyline
               key={`segment-${idx}`}
-              points={coords}
-              width={4}
-              color={COLORS.PRIMARY}
+              points={seg.coords}
+              colors={seg.colors}
+              gradient
+              width={8}
               zIndex={10}
             />
           ))}
