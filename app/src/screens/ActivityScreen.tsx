@@ -38,6 +38,7 @@ import {
   IconStop,
 } from '../components/SolarIcons';
 import { trackRecordingService } from '../services/trackRecordingService';
+import { mockLocationService, MOCK_ROUTES } from '../services/mockLocationService';
 import type {
   ActivityType,
   RecordingSession,
@@ -132,6 +133,9 @@ export const ActivityScreen: React.FC = () => {
 
   // Use ref for isRecording to avoid handleLocation re-creation
   const isRecordingRef = useRef(false);
+
+  // Mock GPS simulation state (__DEV__ only)
+  const [isSimulating, setIsSimulating] = useState(false);
 
   // Derived state
   const isIdle = !session || session.status === 'idle' || session.status === 'stopped';
@@ -363,6 +367,99 @@ export const ActivityScreen: React.FC = () => {
     }
   };
 
+  // ======================== Mock GPS Simulation (__DEV__) ========================
+
+  const handleStartSim = () => {
+    const routeKeys = Object.keys(MOCK_ROUTES);
+    const routeOptions = routeKeys.map(key => MOCK_ROUTES[key].name);
+
+    Alert.alert(
+      'GPS 模拟',
+      '选择模拟路线：',
+      [
+        ...routeOptions.map((name, idx) => ({
+          text: name,
+          onPress: () => startSimWithRoute(routeKeys[idx]),
+        })),
+        { text: '取消', style: 'cancel' },
+      ],
+    );
+  };
+
+  const startSimWithRoute = (routeKey: string) => {
+    const route = MOCK_ROUTES[routeKey];
+    setIsSimulating(true);
+
+    // Simulate GPS being acquired
+    setHasGps(true);
+    gpsStrengthRef.current = 'strong';
+    setGpsStrength('strong');
+
+    mockLocationService.start(routeKey, route.defaultSpeed, (point: RawLocationPoint) => {
+      // Update latestLocation
+      latestLocation.current = { latitude: point.latitude, longitude: point.longitude };
+
+      // Move camera on first point
+      if (!hasMovedToLocation.current) {
+        hasMovedToLocation.current = true;
+        mapViewRef.current?.moveCamera(
+          { target: { latitude: point.latitude, longitude: point.longitude }, zoom: 16 },
+          500,
+        );
+      }
+
+      // Feed to recording service if recording
+      if (isRecordingRef.current) {
+        trackRecordingService.processLocation(point);
+
+        if (shouldFollowRef.current) {
+          mapViewRef.current?.moveCamera(
+            { target: { latitude: point.latitude, longitude: point.longitude }, zoom: currentZoomRef.current },
+            300,
+          );
+        }
+      } else {
+        // Still move camera to follow simulated position even when not recording
+        mapViewRef.current?.moveCamera(
+          { target: { latitude: point.latitude, longitude: point.longitude }, zoom: currentZoomRef.current },
+          300,
+        );
+      }
+    });
+  };
+
+  const handleStopSim = () => {
+    mockLocationService.stop();
+    setIsSimulating(false);
+  };
+
+  const handleSimButton = () => {
+    if (isSimulating) {
+      handleStopSim();
+    } else {
+      handleStartSim();
+    }
+  };
+
+  // Sync mock pause/resume with recording state
+  useEffect(() => {
+    if (!isSimulating) return;
+    if (isPaused) {
+      mockLocationService.pause();
+    } else if (isRecording) {
+      mockLocationService.resume();
+    }
+  }, [isSimulating, isPaused, isRecording]);
+
+  // Cleanup mock on unmount
+  useEffect(() => {
+    return () => {
+      if (mockLocationService.isRunning) {
+        mockLocationService.stop();
+      }
+    };
+  }, []);
+
   const selectedType = ACTIVITY_CYCLE[activityIndex];
 
   // 循环切换运动模式
@@ -459,7 +556,7 @@ export const ActivityScreen: React.FC = () => {
       },
       500,
     );
-  }, [summarySegments]);
+  }, []);
 
   // 左按钮：空闲=模式选择，记录中=暂停，暂停中=继续
   const handleLeftButton = () => {
@@ -518,7 +615,7 @@ export const ActivityScreen: React.FC = () => {
           }}
           minZoom={3}
           maxZoom={20}
-          myLocationEnabled={locationEnabled}
+          myLocationEnabled={locationEnabled && !isSimulating}
           scaleControlsEnabled={false}
           zoomControlsEnabled={false}
           compassEnabled={false}
@@ -561,6 +658,20 @@ export const ActivityScreen: React.FC = () => {
             <IconCompass size={18} color={GPS_COLORS[gpsStrength]} />
           </Animated.View>
         </TouchableOpacity>
+
+        {/* Mock GPS Button - 左下角 (__DEV__ only) */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={[
+              styles.mapSimWrapper,
+              isSimulating && styles.mapSimActive,
+            ]}
+            onPress={handleSimButton}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.simText, isSimulating && styles.simTextActive]}>SIM</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Locate Button - 右下角 */}
         <TouchableOpacity
@@ -861,6 +972,29 @@ const styles = StyleSheet.create({
   },
   mapLocateDisabled: {
     opacity: 0.4,
+  },
+
+  // Mock GPS Button
+  mapSimWrapper: {
+    position: 'absolute', bottom: PANEL_HEIGHT + 12, left: 12,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapSimActive: {
+    backgroundColor: 'rgba(239, 68, 68, 0.5)',
+    borderColor: 'rgba(239, 68, 68, 0.7)',
+  },
+  simText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.TEXT.SECONDARY,
+    letterSpacing: 0.5,
+  },
+  simTextActive: {
+    color: COLORS.TEXT.PRIMARY,
   },
 
   // ========== Control Panel ==========
