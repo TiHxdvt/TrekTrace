@@ -1,8 +1,16 @@
 diff --git a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt
-index cc717fd..dc3ff7c 100644
+index cc717fd..4127490 100644
 --- a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt
 +++ b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt
-@@ -33,9 +33,15 @@ class MapView(context: ThemedReactContext) : TextureMapView(context) {
+@@ -26,16 +26,22 @@ class MapView(context: ThemedReactContext) : TextureMapView(context) {
+   private val markerMap = HashMap<String, qiuxiang.amap3d.map_view.Marker>()
+   private val polylineMap = HashMap<String, Polyline>()
+   private var initialCameraPosition: ReadableMap? = null
+-  private var locationStyle: MyLocationStyle
++  internal var locationStyle: MyLocationStyle
+ 
+   init {
+     super.onCreate(null)
  
      locationStyle = MyLocationStyle()
      locationStyle.myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER)
@@ -20,3 +28,17 @@ index cc717fd..dc3ff7c 100644
      map.setOnMapClickListener { latLng -> emit(id, "onPress", latLng.toJson()) }
      map.setOnPOIClickListener { poi -> emit(id, "onPressPoi", poi.toJson()) }
      map.setOnMapLongClickListener { latLng -> emit(id, "onLongPress", latLng.toJson()) }
+diff --git a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt
+index 3e8ce69..a9910ad 100644
+--- a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt
++++ b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt
+@@ -69,6 +69,9 @@ internal class MapViewManager : ViewGroupManager<MapView>() {
+   @ReactProp(name = "myLocationEnabled")
+   fun setMyLocationEnabled(view: MapView, enabled: Boolean) {
+     view.map.isMyLocationEnabled = enabled
++    if (enabled) {
++      view.map.myLocationStyle = view.locationStyle
++    }
+   }
+ 
+   @ReactProp(name = "indoorViewEnabled")

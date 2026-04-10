@@ -3,7 +3,7 @@
  * 使用浮空导航栏代替系统底部 Tab
  */
 
-import React, { useRef, useMemo, useCallback } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from '@react-native-community/blur';
@@ -38,7 +38,7 @@ const BAR_PADDING = 8;
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 
 // 自定义浮空 Tab Bar - 使用 BlurView 实现 backdrop-blur-xl + 滑动切换
-const FloatingTabBar = ({ state, navigation }: any) => {
+const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
   // 通过 onLayout 获取导航栏的实际位置，避免硬编码计算
   const barLayoutRef = useRef({ x: 0, width: 0 });
 
@@ -71,6 +71,13 @@ const FloatingTabBar = ({ state, navigation }: any) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state.index, state.routes, navigation],
   );
+
+  // Check if current tab wants to hide the bar
+  const currentRoute = state.routes[state.index];
+  const currentDescriptor = descriptors[currentRoute.key];
+  const tabBarVisible = currentDescriptor?.options?.tabBarVisible !== false;
+
+  if (!tabBarVisible) return null;
 
   return (
     <View style={floatingStyles.container}>

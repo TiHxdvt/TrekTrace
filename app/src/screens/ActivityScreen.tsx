@@ -14,7 +14,6 @@ import {
   Platform,
   Animated,
   Alert,
-  Modal,
   StatusBar,
   Dimensions,
 } from 'react-native';
@@ -22,6 +21,7 @@ import { BlurView } from '@react-native-community/blur';
 import { MapView, AMapSdk, MapType, Polyline } from 'react-native-amap3d';
 import type { NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { COLORS, BORDER_RADIUS } from '../theme';
 import { APP_CONFIG } from '../config';
 import {
@@ -93,6 +93,7 @@ function formatPace(secondsPerKm: number): string {
 }
 
 export const ActivityScreen: React.FC = () => {
+  const navigation = useNavigation();
   const [activityIndex, setActivityIndex] = useState(1); // 默认跑步
   const insets = useSafeAreaInsets();
   const mapViewRef = useRef<MapView>(null);
@@ -118,14 +119,9 @@ export const ActivityScreen: React.FC = () => {
   });
   const [polylineSegments, setPolylineSegments] = useState<Array<Array<{ latitude: number; longitude: number }>>>([]);
 
-  // Summary modal state
+  // Summary overlay state — reuses main map, no second MapView
   const [showSummary, setShowSummary] = useState(false);
-  const summaryMapRef = useRef<MapView>(null);
-  // Snapshot of colored segments at the moment summary was shown
-  const [summarySegments, setSummarySegments] = useState<Array<{
-    coords: Array<{ latitude: number; longitude: number }>;
-    colors: string[];
-  }>>([]);
+  const showSummaryRef = useRef(false);
 
   // Long press stop state
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,7 +137,6 @@ export const ActivityScreen: React.FC = () => {
   const isIdle = !session || session.status === 'idle' || session.status === 'stopped';
   const isRecording = session?.status === 'recording';
   const isPaused = session?.status === 'paused';
-  const isStopped = session?.status === 'stopped';
 
   // Keep ref in sync
   useEffect(() => {
@@ -157,6 +152,11 @@ export const ActivityScreen: React.FC = () => {
     });
     return unsubscribe;
   }, []);
+
+  // Hide/show floating tab bar when summary is visible
+  useEffect(() => {
+    navigation.setOptions({ tabBarVisible: !showSummary });
+  }, [navigation, showSummary]);
 
   // Derive colored segments from polyline data + session type (computed only when data changes)
   const coloredSegments = useMemo(() => {
@@ -207,7 +207,7 @@ export const ActivityScreen: React.FC = () => {
         const colors = s.points.map(p => speedToColor(p.speed ?? 0));
         return { coords, colors };
       });
-  }, [polylineSegments, session?.activityType]);
+  }, [polylineSegments, session]);
 
   // Crash recovery on mount
   useEffect(() => {
@@ -260,7 +260,7 @@ export const ActivityScreen: React.FC = () => {
     );
     animation.start();
     return () => animation.stop();
-  }, [gpsStrength]);
+  }, [gpsStrength, pulseAnim]);
 
   // 初始化高德地图 SDK + 请求定位权限
   useEffect(() => {
@@ -418,8 +418,8 @@ export const ActivityScreen: React.FC = () => {
             300,
           );
         }
-      } else {
-        // Still move camera to follow simulated position even when not recording
+      } else if (!showSummaryRef.current) {
+        // Follow simulated position only when not showing summary
         mapViewRef.current?.moveCamera(
           { target: { latitude: point.latitude, longitude: point.longitude }, zoom: currentZoomRef.current },
           300,
@@ -503,8 +503,8 @@ export const ActivityScreen: React.FC = () => {
           ],
         );
       } else {
-        // Show summary modal on success — snapshot current colored segments
-        setSummarySegments(coloredSegments);
+        // Show summary overlay — reuse main map with same colored segments
+        showSummaryRef.current = true;
         setShowSummary(true);
       }
     }, LONG_PRESS_DURATION);
@@ -519,44 +519,45 @@ export const ActivityScreen: React.FC = () => {
     longPressProgress.setValue(0);
   };
 
-  // Close summary modal and clear polyline data
+  // Close summary overlay and discard recording data
   const handleCloseSummary = () => {
+    showSummaryRef.current = false;
     setShowSummary(false);
-    setPolylineSegments([]);
-    setSummarySegments([]);
+    trackRecordingService.discardRecording();
   };
 
-  // Fit summary map camera to show full track
-  const fitSummaryMap = useCallback(() => {
-    const allPoints = summarySegments.flatMap(s => s.coords);
-    if (allPoints.length === 0) return;
+  // When summary overlay opens, fit main map camera to show full track
+  useEffect(() => {
+    if (!showSummary || coloredSegments.length === 0) return;
+    const timer = setTimeout(() => {
+      const allPoints = coloredSegments.flatMap(s => s.coords);
+      if (allPoints.length === 0) return;
 
-    const lats = allPoints.map(p => p.latitude);
-    const lons = allPoints.map(p => p.longitude);
-    const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-    const centerLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+      const lats = allPoints.map(p => p.latitude);
+      const lons = allPoints.map(p => p.longitude);
+      const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+      const centerLon = (Math.min(...lons) + Math.max(...lons)) / 2;
 
-    // Compute zoom from lat/lon span and viewport dimensions
-    const { width, height } = Dimensions.get('window');
-    const latSpan = Math.max(...lats) - Math.min(...lats);
-    const lonSpan = Math.max(...lons) - Math.min(...lons);
-    // Add 30% padding
-    const paddedLatSpan = latSpan * 1.3 || 0.01;
-    const paddedLonSpan = lonSpan * 1.3 || 0.01;
-    // At zoom Z, ~360 / 2^Z degrees fit in the viewport
-    const zoomByLat = Math.log2(360 * (height / width) / paddedLatSpan);
-    const zoomByLon = Math.log2(360 / paddedLonSpan);
-    const zoom = Math.min(zoomByLat, zoomByLon);
-    const clampedZoom = Math.max(3, Math.min(20, Math.round(zoom)));
+      const { width, height } = Dimensions.get('window');
+      const latSpan = Math.max(...lats) - Math.min(...lats);
+      const lonSpan = Math.max(...lons) - Math.min(...lons);
+      const paddedLatSpan = latSpan * 1.3 || 0.01;
+      const paddedLonSpan = lonSpan * 1.3 || 0.01;
+      const zoomByLat = Math.log2(360 * (height / width) / paddedLatSpan);
+      const zoomByLon = Math.log2(360 / paddedLonSpan);
+      const zoom = Math.min(zoomByLat, zoomByLon);
+      const clampedZoom = Math.max(3, Math.min(20, Math.round(zoom)));
 
-    summaryMapRef.current?.moveCamera(
-      {
-        target: { latitude: centerLat, longitude: centerLon },
-        zoom: clampedZoom,
-      },
-      500,
-    );
-  }, []);
+      mapViewRef.current?.moveCamera(
+        {
+          target: { latitude: centerLat, longitude: centerLon },
+          zoom: clampedZoom,
+        },
+        500,
+      );
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [showSummary, coloredSegments]);
 
   // 左按钮：空闲=模式选择，记录中=暂停，暂停中=继续
   const handleLeftButton = () => {
@@ -588,7 +589,8 @@ export const ActivityScreen: React.FC = () => {
         />
       </View>
 
-      {/* Header */}
+      {/* Header — hidden during summary */}
+      {!showSummary && (
       <View style={[styles.headerBar, { paddingTop: insets.top + 16 }]}>
         <TouchableOpacity style={styles.headerIconButton}>
           <IconHamburgerMenu size={20} color={COLORS.TEXT.PRIMARY} />
@@ -601,9 +603,10 @@ export const ActivityScreen: React.FC = () => {
           <IconMicrophone size={20} color={COLORS.TEXT.PRIMARY} />
         </TouchableOpacity>
       </View>
+      )}
 
-      {/* Map Card */}
-      <View style={styles.mapCard}>
+      {/* Map Card — expands to full screen during summary */}
+      <View style={[styles.mapCard, showSummary && styles.mapCardSummary]}>
         {/* 高德地图 */}
         <MapView
           ref={mapViewRef}
@@ -611,11 +614,11 @@ export const ActivityScreen: React.FC = () => {
           mapType={MapType.Night}
           initialCameraPosition={{
             target: { latitude: 35.86, longitude: 104.19 },
-            zoom: 4,
+            zoom: 16,
           }}
           minZoom={3}
           maxZoom={20}
-          myLocationEnabled={locationEnabled && !isSimulating}
+          myLocationEnabled={locationEnabled && !isSimulating && !showSummary}
           scaleControlsEnabled={false}
           zoomControlsEnabled={false}
           compassEnabled={false}
@@ -644,6 +647,7 @@ export const ActivityScreen: React.FC = () => {
         </MapView>
 
         {/* GPS Status Indicator - 左上角 */}
+        {!showSummary && (
         <TouchableOpacity style={styles.mapGpsStatusWrapper} activeOpacity={0.7}>
           <BlurView
             style={StyleSheet.absoluteFillObject}
@@ -658,9 +662,10 @@ export const ActivityScreen: React.FC = () => {
             <IconCompass size={18} color={GPS_COLORS[gpsStrength]} />
           </Animated.View>
         </TouchableOpacity>
+        )}
 
         {/* Mock GPS Button - 左下角 (__DEV__ only) */}
-        {__DEV__ && (
+        {__DEV__ && !showSummary && (
           <TouchableOpacity
             style={[
               styles.mapSimWrapper,
@@ -674,6 +679,7 @@ export const ActivityScreen: React.FC = () => {
         )}
 
         {/* Locate Button - 右下角 */}
+        {!showSummary && (
         <TouchableOpacity
           style={[styles.mapLocateWrapper, !hasGps && styles.mapLocateDisabled]}
           onPress={handleLocate}
@@ -690,8 +696,50 @@ export const ActivityScreen: React.FC = () => {
           />
           <IconGps size={18} color={hasGps ? COLORS.TEXT.SECONDARY : COLORS.TEXT.DISABLED} />
         </TouchableOpacity>
+        )}
 
-        {/* ========== Control Panel ========== */}
+        {/* ========== Summary Overlay ========== */}
+        {showSummary && (
+          <>
+            <StatusBar barStyle="light-content" />
+            {/* Top stats overlay */}
+            <View style={[styles.summaryStatsOverlay, { paddingTop: insets.top + 16 }]}>
+              <View style={styles.summaryStatsCard}>
+                <View style={styles.summaryStatsRow}>
+                  <View style={styles.summaryStatItem}>
+                    <Text style={styles.summaryStatLabel}>距离</Text>
+                    <Text style={styles.summaryStatValue}>{(stats.distance / 1000).toFixed(2)} km</Text>
+                  </View>
+                  <View style={styles.summaryStatItem}>
+                    <Text style={styles.summaryStatLabel}>时长</Text>
+                    <Text style={styles.summaryStatValue}>{formatDuration(stats.duration)}</Text>
+                  </View>
+                  <View style={styles.summaryStatItem}>
+                    <Text style={styles.summaryStatLabel}>配速</Text>
+                    <Text style={styles.summaryStatValue}>{formatPace(stats.currentPace)}</Text>
+                  </View>
+                  <View style={styles.summaryStatItem}>
+                    <Text style={styles.summaryStatLabel}>爬升</Text>
+                    <Text style={styles.summaryStatValue}>{Math.round(stats.elevationGain)} m</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+            {/* Bottom done button */}
+            <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
+              <TouchableOpacity
+                style={styles.summaryDoneBtn}
+                onPress={handleCloseSummary}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.summaryDoneText}>完成</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {/* ========== Control Panel — hidden during summary ========== */}
+        {!showSummary && (
         <View style={styles.panelWrapper}>
           <View style={styles.panelContent}>
 
@@ -800,84 +848,8 @@ export const ActivityScreen: React.FC = () => {
 
           </View>
         </View>
+        )}
       </View>
-
-      {/* ========== Summary Modal ========== */}
-      <Modal
-        visible={showSummary}
-        animationType="fade"
-        statusBarTranslucent
-      >
-        <View style={styles.summaryContainer}>
-          <StatusBar barStyle="light-content" />
-          <MapView
-            ref={summaryMapRef}
-            style={StyleSheet.absoluteFillObject}
-            mapType={MapType.Night}
-            initialCameraPosition={{
-              target: { latitude: 35.86, longitude: 104.19 },
-              zoom: 4,
-            }}
-            myLocationEnabled={false}
-            scaleControlsEnabled={false}
-            zoomControlsEnabled={false}
-            compassEnabled={false}
-            rotateGesturesEnabled={false}
-            tiltGesturesEnabled={false}
-            labelsEnabled
-            buildingsEnabled={false}
-            trafficEnabled={false}
-            // @ts-ignore — onMapLoaded exists at runtime but not in type definitions
-            onMapLoaded={fitSummaryMap}
-          >
-            {summarySegments.map((seg, idx) => (
-              <Polyline
-                key={`summary-segment-${idx}`}
-                points={seg.coords}
-                colors={seg.colors}
-                gradient
-                width={8}
-                zIndex={10}
-              />
-            ))}
-          </MapView>
-
-          {/* Top stats overlay */}
-          <View style={[styles.summaryStatsOverlay, { paddingTop: insets.top + 16 }]}>
-            <View style={styles.summaryStatsCard}>
-              <View style={styles.summaryStatsRow}>
-                <View style={styles.summaryStatItem}>
-                  <Text style={styles.summaryStatLabel}>距离</Text>
-                  <Text style={styles.summaryStatValue}>{(stats.distance / 1000).toFixed(2)} km</Text>
-                </View>
-                <View style={styles.summaryStatItem}>
-                  <Text style={styles.summaryStatLabel}>时长</Text>
-                  <Text style={styles.summaryStatValue}>{formatDuration(stats.duration)}</Text>
-                </View>
-                <View style={styles.summaryStatItem}>
-                  <Text style={styles.summaryStatLabel}>配速</Text>
-                  <Text style={styles.summaryStatValue}>{formatPace(stats.currentPace)}</Text>
-                </View>
-                <View style={styles.summaryStatItem}>
-                  <Text style={styles.summaryStatLabel}>爬升</Text>
-                  <Text style={styles.summaryStatValue}>{Math.round(stats.elevationGain)} m</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Bottom done button */}
-          <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
-            <TouchableOpacity
-              style={styles.summaryDoneBtn}
-              onPress={handleCloseSummary}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.summaryDoneText}>完成</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -1114,10 +1086,11 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
 
-  // ========== Summary Modal ==========
-  summaryContainer: {
-    flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
+  // ========== Summary Overlay ==========
+  mapCardSummary: {
+    marginHorizontal: 0,
+    marginBottom: 0,
+    borderRadius: 0,
   },
   summaryStatsOverlay: {
     position: 'absolute',
