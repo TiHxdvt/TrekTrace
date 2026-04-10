@@ -1,9 +1,10 @@
 /**
  * 运动记录页面
  * 地图卡片底部控制面板：四角数据 + 中间双按钮
+ * 集成 TrackRecordingService 实现实时轨迹记录
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,9 +13,10 @@ import {
   PermissionsAndroid,
   Platform,
   Animated,
+  Alert,
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
-import { MapView, AMapSdk, MapType } from 'react-native-amap3d';
+import { MapView, AMapSdk, MapType, Polyline } from 'react-native-amap3d';
 import type { NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS } from '../theme';
@@ -32,9 +34,15 @@ import {
   IconPause,
   IconStop,
 } from '../components/SolarIcons';
+import { trackRecordingService } from '../services/trackRecordingService';
+import type {
+  ActivityType,
+  RecordingSession,
+  RecordingStats,
+  RawLocationPoint,
+} from '../types';
 
-type ActivityType = 'running' | 'cycling' | 'hiking';
-type RecordState = 'idle' | 'recording' | 'paused';
+type ActivityTypeLocal = 'running' | 'cycling' | 'hiking';
 type GpsStrength = 'none' | 'weak' | 'medium' | 'strong';
 
 const GPS_COLORS: Record<GpsStrength, string> = {
@@ -44,14 +52,38 @@ const GPS_COLORS: Record<GpsStrength, string> = {
   strong: COLORS.SUCCESS,
 };
 
-const ACTIVITY_CYCLE: ActivityType[] = ['hiking', 'running', 'cycling'];
+const ACTIVITY_CYCLE: ActivityTypeLocal[] = ['hiking', 'running', 'cycling'];
 const PANEL_HEIGHT = 105;
+const LONG_PRESS_DURATION = 1500;
 
-const ACTIVITY_ICONS: Record<ActivityType, React.FC<{ size?: number; color?: string }>> = {
+const ACTIVITY_ICONS: Record<ActivityTypeLocal, React.FC<{ size?: number; color?: string }>> = {
   running: IconRunning,
   cycling: IconBicycle,
   hiking: IconBonfire,
 };
+
+const ACTIVITY_TYPE_MAP: Record<ActivityTypeLocal, ActivityType> = {
+  hiking: 'HIKING',
+  running: 'RUNNING',
+  cycling: 'CYCLING',
+};
+
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function formatPace(secondsPerKm: number): string {
+  if (secondsPerKm <= 0 || !isFinite(secondsPerKm)) return "--'--\"";
+  const m = Math.floor(secondsPerKm / 60);
+  const s = Math.floor(secondsPerKm % 60);
+  return `${m}'${String(s).padStart(2, '0')}"`;
+}
 
 export const ActivityScreen: React.FC = () => {
   const [activityIndex, setActivityIndex] = useState(1); // 默认跑步
@@ -59,12 +91,61 @@ export const ActivityScreen: React.FC = () => {
   const mapViewRef = useRef<MapView>(null);
   const hasMovedToLocation = useRef(false);
   const latestLocation = useRef<{ latitude: number; longitude: number } | null>(null);
+  const shouldFollowRef = useRef(true);
   const [hasGps, setHasGps] = useState(false);
   const [gpsStrength, setGpsStrength] = useState<GpsStrength>('none');
   const gpsStrengthRef = useRef<GpsStrength>('none');
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const pulseAnim = useRef<Animated.Value>(new Animated.Value(1)).current;
+
+  // Recording state from service
+  const [session, setSession] = useState<RecordingSession | null>(null);
+  const [stats, setStats] = useState<RecordingStats>({
+    distance: 0,
+    duration: 0,
+    currentPace: 0,
+    elevationGain: 0,
+    currentSpeed: 0,
+  });
+  const [polylineSegments, setPolylineSegments] = useState<Array<Array<{ latitude: number; longitude: number }>>>([]);
+
+  // Long press stop state
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
+
+  // Derived state
+  const isIdle = !session || session.status === 'idle';
+  const isRecording = session?.status === 'recording';
+  const isPaused = session?.status === 'paused';
+
+  // Subscribe to recording service
+  useEffect(() => {
+    const unsubscribe = trackRecordingService.subscribe((s, st) => {
+      setSession(s);
+      setStats(st);
+      setPolylineSegments(trackRecordingService.getPolylineSegments());
+    });
+    return unsubscribe;
+  }, []);
+
+  // Crash recovery on mount
+  useEffect(() => {
+    const checkRecovery = async () => {
+      const recovered = await trackRecordingService.recoverSession();
+      if (recovered) {
+        Alert.alert(
+          '恢复记录',
+          '检测到未完成的运动记录，是否恢复？',
+          [
+            { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
+            { text: '恢复', style: 'default' },
+          ],
+        );
+      }
+    };
+    checkRecovery();
+  }, []);
 
   // GPS 定位中脉冲动画
   useEffect(() => {
@@ -114,7 +195,7 @@ export const ActivityScreen: React.FC = () => {
   }, []);
 
   // 首次获取定位后，移动相机到当前位置
-  const handleLocation = (event: NativeSyntheticEvent<{
+  const handleLocation = useCallback((event: NativeSyntheticEvent<{
     timestamp: number;
     coords: {
       latitude: number;
@@ -126,7 +207,7 @@ export const ActivityScreen: React.FC = () => {
     };
   }>) => {
     const { coords } = event.nativeEvent;
-    const { latitude, longitude, accuracy } = coords;
+    const { latitude, longitude, accuracy, altitude, speed, heading } = coords;
     if (latitude && longitude) {
       latestLocation.current = { latitude, longitude };
       if (!hasGps) setHasGps(true);
@@ -158,25 +239,44 @@ export const ActivityScreen: React.FC = () => {
           500,
         );
       }
+
+      // Feed GPS data to recording service
+      if (isRecording) {
+        const rawPoint: RawLocationPoint = {
+          latitude,
+          longitude,
+          altitude: altitude ?? 0,
+          accuracy,
+          speed: speed ?? 0,
+          heading: heading ?? 0,
+          timestamp: event.nativeEvent.timestamp,
+        };
+        trackRecordingService.processLocation(rawPoint);
+
+        // Follow user on map
+        if (shouldFollowRef.current) {
+          mapViewRef.current?.moveCamera(
+            { target: { latitude, longitude }, zoom: 16 },
+            300,
+          );
+        }
+      }
     }
-  };
+  }, [hasGps, isRecording]);
 
   // 自定义定位按钮：移动到当前位置
   const handleLocate = () => {
     const loc = latestLocation.current;
     if (loc) {
+      shouldFollowRef.current = true;
       mapViewRef.current?.moveCamera(
         { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: 16 },
         500,
       );
     }
   };
-  const [recordState, setRecordState] = useState<RecordState>('idle');
 
   const selectedType = ACTIVITY_CYCLE[activityIndex];
-  const isIdle = recordState === 'idle';
-  const isRecording = recordState === 'recording';
-  const isPaused = recordState === 'paused';
 
   // 循环切换运动模式
   const cycleType = () => {
@@ -184,22 +284,48 @@ export const ActivityScreen: React.FC = () => {
     setActivityIndex(prev => (prev + 1) % ACTIVITY_CYCLE.length);
   };
 
-  const handleStart = () => setRecordState('recording');
-  const handlePause = () => setRecordState('paused');
-  const handleResume = () => setRecordState('recording');
-  const handleStop = () => setRecordState('idle');
+  const handleStart = () => {
+    const activityType = ACTIVITY_TYPE_MAP[selectedType];
+    trackRecordingService.startRecording(activityType);
+  };
+
+  const handlePause = () => {
+    trackRecordingService.pauseRecording();
+  };
+
+  const handleResume = () => {
+    trackRecordingService.resumeRecording();
+  };
+
+  // Long press stop (1.5s)
+  const handleStopPressIn = () => {
+    longPressProgress.setValue(0);
+    Animated.timing(longPressProgress, {
+      toValue: 1,
+      duration: LONG_PRESS_DURATION,
+      useNativeDriver: false,
+    }).start();
+
+    longPressTimer.current = setTimeout(() => {
+      trackRecordingService.stopRecording();
+      longPressProgress.setValue(0);
+    }, LONG_PRESS_DURATION);
+  };
+
+  const handleStopPressOut = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    longPressProgress.stopAnimation();
+    longPressProgress.setValue(0);
+  };
 
   // 左按钮：空闲=模式选择，记录中=暂停，暂停中=继续
   const handleLeftButton = () => {
     if (isIdle) cycleType();
     else if (isRecording) handlePause();
     else if (isPaused) handleResume();
-  };
-
-  // 右按钮：空闲=开始，记录中/暂停中=停止
-  const handleRightButton = () => {
-    if (isIdle) handleStart();
-    else handleStop();
   };
 
   const ActiveIcon = ACTIVITY_ICONS[selectedType];
@@ -261,9 +387,20 @@ export const ActivityScreen: React.FC = () => {
           labelsEnabled
           buildingsEnabled={false}
           trafficEnabled={false}
-          distanceFilter={10}
+          distanceFilter={5}
           onLocation={handleLocation}
-        />
+        >
+          {/* Real-time Track Polylines */}
+          {polylineSegments.map((coords, idx) => (
+            <Polyline
+              key={`segment-${idx}`}
+              points={coords}
+              width={4}
+              color={COLORS.PRIMARY}
+              zIndex={10}
+            />
+          ))}
+        </MapView>
 
         {/* GPS Status Indicator - 左上角 */}
         <TouchableOpacity style={styles.mapGpsStatusWrapper} activeOpacity={0.7}>
@@ -309,7 +446,7 @@ export const ActivityScreen: React.FC = () => {
                 <Text style={styles.statLabel}>距离</Text>
                 <View style={styles.statValueRow}>
                   <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
-                    {isIdle ? '--' : '0.00'}
+                    {isIdle ? '--' : (stats.distance / 1000).toFixed(2)}
                   </Text>
                   <Text style={styles.statUnit}>km</Text>
                 </View>
@@ -321,7 +458,7 @@ export const ActivityScreen: React.FC = () => {
                 <Text style={styles.statLabel}>时长</Text>
                 <View style={styles.statValueRow}>
                   <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
-                    {isIdle ? '--' : '00:00'}
+                    {isIdle ? '--' : formatDuration(stats.duration)}
                   </Text>
                   <Text style={styles.statUnit}> </Text>
                 </View>
@@ -333,7 +470,7 @@ export const ActivityScreen: React.FC = () => {
                 <Text style={styles.statLabel}>配速</Text>
                 <View style={styles.statValueRow}>
                   <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
-                    {isIdle ? '--' : "0'00\""}
+                    {isIdle ? '--' : formatPace(stats.currentPace)}
                   </Text>
                   <Text style={styles.statUnit}>min/km</Text>
                 </View>
@@ -345,7 +482,7 @@ export const ActivityScreen: React.FC = () => {
                 <Text style={styles.statLabel}>海拔</Text>
                 <View style={styles.statValueRow}>
                   <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
-                    {isIdle ? '--' : '0'}
+                    {isIdle ? '--' : Math.round(stats.elevationGain)}
                   </Text>
                   <Text style={styles.statUnit}>m</Text>
                 </View>
@@ -373,20 +510,37 @@ export const ActivityScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={handleRightButton}
-                activeOpacity={0.7}
-                style={[
-                  styles.actionBtn,
-                  isIdle ? styles.startBtnBg : styles.stopBtnBg,
-                ]}
-              >
-                {isIdle ? (
+              {isIdle ? (
+                <TouchableOpacity
+                  onPress={handleStart}
+                  activeOpacity={0.7}
+                  style={[styles.actionBtn, styles.startBtnBg]}
+                >
                   <IconPlay size={18} color={COLORS.TEXT.PRIMARY} />
-                ) : (
-                  <IconStop size={18} color={COLORS.ERROR} />
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPressIn={handleStopPressIn}
+                  onPressOut={handleStopPressOut}
+                  activeOpacity={0.7}
+                  style={[styles.actionBtn, styles.stopBtnBg]}
+                >
+                  <View style={styles.stopBtnInner}>
+                    <IconStop size={18} color={COLORS.ERROR} />
+                    <Animated.View
+                      style={[
+                        styles.stopProgressRing,
+                        {
+                          width: longPressProgress.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0%', '100%'],
+                          }),
+                        },
+                      ]}
+                    />
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
 
           </View>
@@ -505,6 +659,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  statDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: COLORS.BORDER.LIGHT,
+  },
   statItem: {
     flex: 1,
     alignItems: 'center',
@@ -585,5 +744,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239,68,68,0.2)',
     borderWidth: 1,
     borderColor: 'rgba(239,68,68,0.3)',
+    overflow: 'hidden',
+  },
+  stopBtnInner: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stopProgressRing: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    height: 2,
+    backgroundColor: COLORS.ERROR,
+    borderRadius: 1,
   },
 });

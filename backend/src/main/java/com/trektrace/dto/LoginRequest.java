@@ -6,7 +6,7 @@ import lombok.Data;
 @Data
 public class LoginRequest {
     
-    @Pattern(regexp = "^1[3-9]\\d{11}$")
+    @Pattern(regexp = "^1[3-9]\\d{9}$")
     private String phone;
     
     @Pattern(regexp = "^\\d{6}$")

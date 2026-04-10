@@ -109,3 +109,90 @@ export interface TrackData {
   distance: number;
   duration: number;
 }
+
+// ========== 轨迹记录相关类型 ==========
+
+// 记录会话状态
+export type RecordingStatus = 'idle' | 'recording' | 'paused';
+
+export interface RecordingSession {
+  id: string;
+  activityType: ActivityType;
+  startTime: string;
+  endTime?: string;
+  status: RecordingStatus;
+  totalDistance: number; // 米
+  totalDuration: number; // 秒
+  elevationGain: number; // 米
+  segments: TrackSegment[];
+  uploadedToServer: boolean;
+}
+
+// 按暂停分段的轨迹段
+export interface TrackSegment {
+  id: string;
+  points: ProcessedPoint[];
+  startTime: string;
+  endTime?: string;
+}
+
+// 经过过滤处理后的轨迹点
+export interface ProcessedPoint {
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  timestamp: string;
+  speed?: number;
+}
+
+// 原始 GPS 数据
+export interface RawLocationPoint {
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  accuracy: number;
+  speed: number;
+  heading: number;
+  timestamp: number;
+}
+
+// 实时统计数据
+export interface RecordingStats {
+  distance: number; // 米
+  duration: number; // 秒
+  currentPace: number; // 秒/公里
+  elevationGain: number; // 米
+  currentSpeed: number; // m/s
+}
+
+// 活动上传请求
+export interface ActivityUploadRequest {
+  type: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  distance: number;
+  elevationGain: number;
+  trackPoints: TrackPointUploadDTO[];
+}
+
+export interface TrackPointUploadDTO {
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  speed: number;
+  timestamp: string;
+}
+
+// 活动响应
+export interface ActivityResponseDTO {
+  id: number;
+  type: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  distance: number;
+  elevationGain: number;
+  status: string;
+  createdAt: string;
+}
