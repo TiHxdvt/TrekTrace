@@ -31,6 +31,8 @@ import SvgArrowRight from '../icons/solar-arrow-right-linear.svg';
 import SvgUser from '../icons/solar-user-rounded-linear.svg';
 import SvgCalendar from '../icons/solar-calendar-linear.svg';
 import SvgLogout from '../icons/solar-logout-linear.svg';
+import SvgEyeClosed from '../icons/solar-eye-closed-linear.svg';
+import SvgEyeScan from '../icons/solar-eye-scan-linear.svg';
 
 // ==================== 导航栏图标 ====================
 export const IconMapPoint = createIcon(SvgMapPoint);
@@ -70,3 +72,7 @@ export const IconArrowRight = createIcon(SvgArrowRight);
 export const IconUser = createIcon(SvgUser);
 export const IconCalendar = createIcon(SvgCalendar);
 export const IconLogout = createIcon(SvgLogout);
+
+// ==================== 表单辅助图标 ====================
+export const IconEyeClosed = createIcon(SvgEyeClosed);
+export const IconEyeScan = createIcon(SvgEyeScan);

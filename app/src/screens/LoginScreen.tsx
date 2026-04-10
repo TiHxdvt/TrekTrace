@@ -17,6 +17,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Button } from '../components/Button';
+import { FullScreenBlur } from '../components/FullScreenBlur';
+import { IconEyeClosed, IconEyeScan } from '../components/SolarIcons';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
@@ -41,7 +43,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
 
   // 倒计时
   const [countdown, setCountdown] = useState(0);
@@ -219,6 +220,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         <View style={[styles.glowCircle, styles.glowPink]} />
       </View>
 
+      {/* 全屏模糊层 */}
+      <FullScreenBlur />
+
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -229,154 +233,115 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.cardContainer}>
-            <View style={styles.loginCard}>
-              <View style={styles.formContainer}>
-                {/* Form Header */}
-                <View style={styles.formHeader}>
-                  <Text style={styles.formTitle}>登录</Text>
-                  <Text style={styles.formSubtitle}>欢迎回来，继续你的户外探索</Text>
-                </View>
+            <View style={styles.formContainer}>
+              {/* Form Header */}
+              <View style={styles.formHeader}>
+                <Text style={styles.formTitle}>登录</Text>
+                <Text style={styles.formSubtitle}>欢迎回来，继续你的户外探索</Text>
+              </View>
 
-                {/* Mode Tabs */}
-                <View style={styles.tabContainer}>
-                  <TouchableOpacity
-                    style={[styles.tab, loginMode === 'sms' && styles.tabActive]}
-                    onPress={() => handleSwitchMode('sms')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.tabText, loginMode === 'sms' && styles.tabTextActive]}>
-                      验证码登录
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.tab, loginMode === 'password' && styles.tabActive]}
-                    onPress={() => handleSwitchMode('password')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.tabText, loginMode === 'password' && styles.tabTextActive]}>
-                      密码登录
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* SMS Login Form */}
-                {loginMode === 'sms' && (
-                  <View style={styles.formFields}>
-                    {/* Phone Input */}
-                    <View style={styles.inputContainer}>
-                      <View style={[styles.inputWrapper, phoneError && styles.inputError]}>
-                        <Text style={styles.inputPrefix}>+86</Text>
-                        <View style={styles.inputDivider} />
-                        <TextInput
-                          style={styles.input}
-                          value={phone}
-                          onChangeText={setPhone}
-                          placeholder="请输入手机号"
-                          placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
-                          keyboardType="phone-pad"
-                          maxLength={11}
-                          selectionColor={COLORS.PRIMARY}
-                        />
-                      </View>
-                      {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
+              {/* SMS Login Form */}
+              {loginMode === 'sms' && (
+                <View style={styles.formFields}>
+                  {/* Phone Input */}
+                  <View style={styles.inputContainer}>
+                    <View style={[styles.inputWrapper, phoneError && styles.inputError]}>
+                      <Text style={styles.inputPrefix}>+86</Text>
+                      <View style={styles.inputDivider} />
+                      <TextInput
+                        style={styles.input}
+                        value={phone}
+                        onChangeText={setPhone}
+                        placeholder="请输入手机号"
+                        placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+                        keyboardType="phone-pad"
+                        maxLength={11}
+                        selectionColor={COLORS.PRIMARY}
+                      />
                     </View>
-
-                    {/* Code Input */}
-                    <View style={styles.inputContainer}>
-                      <View style={styles.codeRow}>
-                        <View style={[styles.inputWrapper, styles.codeInputWrapper, codeError && styles.inputError]}>
-                          <TextInput
-                            style={styles.input}
-                            value={code}
-                            onChangeText={setCode}
-                            placeholder="请输入验证码"
-                            placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
-                            keyboardType="number-pad"
-                            maxLength={6}
-                            selectionColor={COLORS.PRIMARY}
-                          />
-                        </View>
-                        <Button
-                          title={countdown > 0 ? `${countdown}s` : '获取验证码'}
-                          onPress={handleSendCode}
-                          variant="secondary"
-                          size="small"
-                          disabled={countdown > 0 || sendingCode}
-                          loading={sendingCode}
-                          style={styles.codeButton}
-                        />
-                      </View>
-                      {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
-                    </View>
+                    {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
                   </View>
-                )}
 
-                {/* Password Login Form */}
-                {loginMode === 'password' && (
-                  <View style={styles.formFields}>
-                    {/* Account Input */}
-                    <View style={styles.inputContainer}>
-                      <View style={[styles.inputWrapper, accountError && styles.inputError]}>
-                        <Text style={styles.inputPrefix}>+86</Text>
-                        <View style={styles.inputDivider} />
+                  {/* Code Input */}
+                  <View style={styles.inputContainer}>
+                    <View style={styles.codeRow}>
+                      <View style={[styles.inputWrapper, styles.codeInputWrapper, codeError && styles.inputError]}>
                         <TextInput
                           style={styles.input}
-                          value={account}
-                          onChangeText={setAccount}
-                          placeholder="请输入手机号"
+                          value={code}
+                          onChangeText={setCode}
+                          placeholder="请输入验证码"
                           placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
-                          keyboardType="phone-pad"
-                          maxLength={11}
+                          keyboardType="number-pad"
+                          maxLength={6}
                           selectionColor={COLORS.PRIMARY}
                         />
                       </View>
-                      {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
+                      <Button
+                        title={countdown > 0 ? `${countdown}s` : '获取验证码'}
+                        onPress={handleSendCode}
+                        variant="secondary"
+                        size="small"
+                        disabled={countdown > 0 || sendingCode}
+                        loading={sendingCode}
+                        style={styles.codeButton}
+                      />
                     </View>
+                    {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
+                  </View>
+                </View>
+              )}
 
-                    {/* Password Input */}
-                    <View style={styles.inputContainer}>
-                      <View style={[styles.inputWrapper, passwordError && styles.inputError]}>
-                        <TextInput
-                          style={styles.input}
-                          value={password}
-                          onChangeText={setPassword}
-                          placeholder="请输入密码"
-                          placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
-                          secureTextEntry={!showPassword}
-                          selectionColor={COLORS.PRIMARY}
-                        />
-                        <TouchableOpacity
-                          onPress={() => setShowPassword(!showPassword)}
-                          style={styles.eyeButton}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.eyeIcon}>
-                            {showPassword ? '🙈' : '👁️'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                      {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+              {/* Password Login Form */}
+              {loginMode === 'password' && (
+                <View style={styles.formFields}>
+                  {/* Account Input */}
+                  <View style={styles.inputContainer}>
+                    <View style={[styles.inputWrapper, accountError && styles.inputError]}>
+                      <Text style={styles.inputPrefix}>+86</Text>
+                      <View style={styles.inputDivider} />
+                      <TextInput
+                        style={styles.input}
+                        value={account}
+                        onChangeText={setAccount}
+                        placeholder="请输入手机号"
+                        placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+                        keyboardType="phone-pad"
+                        maxLength={11}
+                        selectionColor={COLORS.PRIMARY}
+                      />
                     </View>
+                    {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
+                  </View>
 
-                    {/* Remember Me + Forgot Password */}
-                    <View style={styles.optionsRow}>
+                  {/* Password Input */}
+                  <View style={styles.inputContainer}>
+                    <View style={[styles.inputWrapper, passwordError && styles.inputError]}>
+                      <TextInput
+                        style={styles.input}
+                        value={password}
+                        onChangeText={setPassword}
+                        placeholder="请输入密码"
+                        placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+                        secureTextEntry={!showPassword}
+                        selectionColor={COLORS.PRIMARY}
+                      />
                       <TouchableOpacity
-                        style={styles.rememberMeRow}
-                        onPress={() => setRememberMe(!rememberMe)}
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.eyeButton}
                         activeOpacity={0.7}
                       >
-                        <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
-                          {rememberMe && <Text style={styles.checkboxIcon}>✓</Text>}
-                        </View>
-                        <Text style={styles.rememberMeText}>记住我</Text>
-                      </TouchableOpacity>
-                      {/* TODO: 接入忘记密码流程 */}
-                      <TouchableOpacity activeOpacity={0.7}>
-                        <Text style={styles.forgotPasswordText}>忘记密码？</Text>
+                        {showPassword ? (
+                          <IconEyeScan size={20} color={COLORS.TEXT.TERTIARY} />
+                        ) : (
+                          <IconEyeClosed size={20} color={COLORS.TEXT.TERTIARY} />
+                        )}
                       </TouchableOpacity>
                     </View>
+                    {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
                   </View>
-                )}
+                </View>
+              )}
 
                 {/* Login Button */}
                 <Button
@@ -386,6 +351,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   disabled={loading}
                   style={styles.loginButton}
                 />
+
+                {/* Switch Login Mode */}
+                <View style={styles.switchModeRow}>
+                  <Text style={styles.switchModeText}>
+                    {loginMode === 'sms' ? '账号密码登录' : '验证码登录'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => handleSwitchMode(loginMode === 'sms' ? 'password' : 'sms')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.switchModeLink}>切换</Text>
+                  </TouchableOpacity>
+                </View>
 
                 {/* Divider */}
                 <View style={styles.dividerContainer}>
@@ -405,14 +383,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   </TouchableOpacity>
                 </View>
 
-                {/* Register Link */}
-                {/* TODO: 接入注册页面 */}
-                <View style={styles.registerRow}>
-                  <Text style={styles.registerText}>还没有账号？</Text>
-                  <TouchableOpacity activeOpacity={0.7}>
-                    <Text style={styles.registerLink}>立即注册</Text>
-                  </TouchableOpacity>
-                </View>
+                {/* Bottom Area */}
+                {/* TODO: 接入忘记密码流程 */}
+                <TouchableOpacity style={styles.forgotPasswordRow} activeOpacity={0.7}>
+                  <Text style={styles.forgotPasswordText}>忘记密码</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.autoRegisterHint}>
+                  未注册手机号将自动创建账号
+                </Text>
 
                 {/* Terms */}
                 {/* TODO: 接入用户协议和隐私政策页面 */}
@@ -423,7 +402,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   <Text style={styles.termsLink}>隐私政策</Text>
                 </Text>
               </View>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -439,6 +417,7 @@ const styles = StyleSheet.create({
   backgroundGlow: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
+    zIndex: 0,
   },
   glowCircle: {
     position: 'absolute',
@@ -469,7 +448,7 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
-    zIndex: 1,
+    zIndex: 2,
   },
   scrollContent: {
     flexGrow: 1,
@@ -481,13 +460,6 @@ const styles = StyleSheet.create({
     maxWidth: 380,
     width: '100%',
     alignSelf: 'center',
-  },
-  loginCard: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    borderRadius: BORDER_RADIUS.G2.LG,
-    overflow: 'hidden',
   },
   formContainer: {
     paddingHorizontal: SPACING.XXL,
@@ -513,30 +485,19 @@ const styles = StyleSheet.create({
   },
 
   // Mode Tabs
-  tabContainer: {
+  switchModeRow: {
     flexDirection: 'row',
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderRadius: BORDER_RADIUS.MD,
-    padding: SPACING.XS,
-    marginBottom: SPACING.XXL,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
+    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS.SM,
+    marginTop: SPACING.LG,
+    gap: SPACING.XS,
   },
-  tabActive: {
-    backgroundColor: COLORS.GRADIENT.BLUE_LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.ACCENT,
-  },
-  tabText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    fontWeight: '500',
+  switchModeText: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.TEXT.QUATERNARY,
   },
-  tabTextActive: {
+  switchModeLink: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.PRIMARY,
     fontWeight: '600',
   },
@@ -602,49 +563,22 @@ const styles = StyleSheet.create({
   eyeButton: {
     padding: SPACING.XS,
   },
-  eyeIcon: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-  },
 
-  // Options Row
-  optionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  // Bottom Area
+  forgotPasswordRow: {
     alignItems: 'center',
-    marginBottom: SPACING.SM,
-  },
-  rememberMeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.HEAVY,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.SM,
-  },
-  checkboxActive: {
-    backgroundColor: COLORS.PRIMARY,
-    borderColor: COLORS.PRIMARY,
-  },
-  checkboxIcon: {
-    color: COLORS.TEXT.PRIMARY,
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    fontWeight: '600',
-  },
-  rememberMeText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.TERTIARY,
+    marginBottom: SPACING.LG,
   },
   forgotPasswordText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     color: COLORS.PRIMARY_LIGHT,
     fontWeight: '500',
+  },
+  autoRegisterHint: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+    color: COLORS.TEXT.QUINARY,
+    textAlign: 'center',
+    marginBottom: SPACING.LG,
   },
 
   // Login Button
@@ -699,22 +633,6 @@ const styles = StyleSheet.create({
   socialLabel: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
     color: COLORS.TEXT.QUATERNARY,
-  },
-
-  // Register
-  registerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: SPACING.LG,
-  },
-  registerText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  registerLink: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
   },
 
   // Terms
