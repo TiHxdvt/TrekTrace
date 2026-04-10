@@ -42,7 +42,7 @@ export const ProfileScreen: React.FC = () => {
         <BlurView
           style={StyleSheet.absoluteFillObject}
           blurRadius={20}
-          overlayColor="rgba(28, 30, 38, 0.65)"
+          overlayColor={COLORS.OVERLAY.BLUR_DARK}
           blurType="dark"
           blurAmount={20}
         />

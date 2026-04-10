@@ -19,7 +19,7 @@ import {
 import { Button } from '../components/Button';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
 
 type LoginMode = 'sms' | 'password';
 
@@ -170,6 +170,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     if (!account) {
       setAccountError('请输入手机号');
+      return;
+    }
+
+    if (!validatePhone(account)) {
+      setAccountError('请输入正确的手机号');
       return;
     }
 
@@ -365,6 +370,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         </View>
                         <Text style={styles.rememberMeText}>记住我</Text>
                       </TouchableOpacity>
+                      {/* TODO: 接入忘记密码流程 */}
                       <TouchableOpacity activeOpacity={0.7}>
                         <Text style={styles.forgotPasswordText}>忘记密码？</Text>
                       </TouchableOpacity>
@@ -389,6 +395,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 </View>
 
                 {/* Social Login (Placeholder) */}
+                {/* TODO: 接入微信/Apple 等第三方登录 */}
                 <View style={styles.socialContainer}>
                   <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
                     <View style={styles.socialIconWrapper}>
@@ -399,6 +406,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 </View>
 
                 {/* Register Link */}
+                {/* TODO: 接入注册页面 */}
                 <View style={styles.registerRow}>
                   <Text style={styles.registerText}>还没有账号？</Text>
                   <TouchableOpacity activeOpacity={0.7}>
@@ -407,6 +415,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 </View>
 
                 {/* Terms */}
+                {/* TODO: 接入用户协议和隐私政策页面 */}
                 <Text style={styles.terms}>
                   登录即表示同意{' '}
                   <Text style={styles.termsLink}>用户协议</Text>
@@ -465,7 +474,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: BORDER_RADIUS.XXL,
+    paddingHorizontal: SPACING.XXL,
     paddingVertical: 40,
   },
   cardContainer: {
@@ -481,8 +490,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   formContainer: {
-    paddingHorizontal: BORDER_RADIUS.XXL,
-    paddingVertical: BORDER_RADIUS.XXXL,
+    paddingHorizontal: SPACING.XXL,
+    paddingVertical: SPACING.XXXL,
   },
 
   // Form Header
@@ -494,7 +503,7 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
-    marginBottom: 8,
+    marginBottom: SPACING.SM,
     letterSpacing: -0.5,
   },
   formSubtitle: {
@@ -508,8 +517,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: COLORS.OVERLAY.LIGHT,
     borderRadius: BORDER_RADIUS.MD,
-    padding: 4,
-    marginBottom: BORDER_RADIUS.XXL,
+    padding: SPACING.XS,
+    marginBottom: SPACING.XXL,
   },
   tab: {
     flex: 1,
@@ -520,7 +529,7 @@ const styles = StyleSheet.create({
   tabActive: {
     backgroundColor: COLORS.GRADIENT.BLUE_LIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    borderColor: COLORS.BORDER.ACCENT,
   },
   tabText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
@@ -534,10 +543,10 @@ const styles = StyleSheet.create({
 
   // Form Fields
   formFields: {
-    marginBottom: 4,
+    marginBottom: SPACING.XS,
   },
   inputContainer: {
-    marginBottom: BORDER_RADIUS.LG,
+    marginBottom: SPACING.LG,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -546,12 +555,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.BORDER.MEDIUM,
     borderRadius: BORDER_RADIUS.LG,
-    paddingHorizontal: BORDER_RADIUS.LG,
+    paddingHorizontal: SPACING.LG,
     height: 48,
   },
   inputError: {
-    borderColor: 'rgba(239, 68, 68, 0.5)',
-    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+    borderColor: COLORS.ERROR_OVERLAY.BORDER,
+    backgroundColor: COLORS.ERROR_OVERLAY.BACKGROUND,
   },
   inputPrefix: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
@@ -562,7 +571,7 @@ const styles = StyleSheet.create({
     width: 1,
     height: 20,
     backgroundColor: COLORS.BORDER.MEDIUM,
-    marginHorizontal: BORDER_RADIUS.MD,
+    marginHorizontal: SPACING.MD,
   },
   input: {
     flex: 1,
@@ -586,12 +595,12 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.ERROR,
     marginTop: 6,
-    marginLeft: 4,
+    marginLeft: SPACING.XS,
   },
 
   // Password Eye Toggle
   eyeButton: {
-    padding: 4,
+    padding: SPACING.XS,
   },
   eyeIcon: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
@@ -602,7 +611,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: SPACING.SM,
   },
   rememberMeRow: {
     flexDirection: 'row',
@@ -617,7 +626,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.OVERLAY.LIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: SPACING.SM,
   },
   checkboxActive: {
     backgroundColor: COLORS.PRIMARY,
@@ -640,7 +649,7 @@ const styles = StyleSheet.create({
 
   // Login Button
   loginButton: {
-    marginTop: 8,
+    marginTop: SPACING.SM,
     height: 48,
   },
 
@@ -648,7 +657,7 @@ const styles = StyleSheet.create({
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: BORDER_RADIUS.XXL,
+    marginVertical: SPACING.XXL,
   },
   dividerLine: {
     flex: 1,
@@ -658,15 +667,15 @@ const styles = StyleSheet.create({
   dividerText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.TEXT.QUINARY,
-    marginHorizontal: BORDER_RADIUS.MD,
+    marginHorizontal: SPACING.MD,
   },
 
   // Social Login
   socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: BORDER_RADIUS.XXL,
-    marginBottom: BORDER_RADIUS.XXL,
+    gap: SPACING.XXL,
+    marginBottom: SPACING.XXL,
   },
   socialButton: {
     alignItems: 'center',
@@ -696,7 +705,7 @@ const styles = StyleSheet.create({
   registerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: BORDER_RADIUS.LG,
+    marginBottom: SPACING.LG,
   },
   registerText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,

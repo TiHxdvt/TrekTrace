@@ -361,9 +361,8 @@ export const ActivityScreen: React.FC = () => {
     const loc = latestLocation.current;
     if (loc) {
       shouldFollowRef.current = true;
-      currentZoomRef.current = 16;
       mapViewRef.current?.moveCamera(
-        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: 16 },
+        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: currentZoomRef.current },
         500,
       );
     }
@@ -584,7 +583,7 @@ export const ActivityScreen: React.FC = () => {
         <BlurView
           style={StyleSheet.absoluteFillObject}
           blurRadius={24}
-          overlayColor="rgba(28, 30, 38, 0.6)"
+          overlayColor={COLORS.OVERLAY.CARD}
           blurType="dark"
           blurAmount={24}
           autoUpdate
@@ -654,7 +653,7 @@ export const ActivityScreen: React.FC = () => {
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={12}
-            overlayColor="rgba(255, 255, 255, 0.2)"
+            overlayColor={COLORS.OVERLAY.HEAVY}
             blurType="dark"
             blurAmount={12}
             autoUpdate
@@ -690,7 +689,7 @@ export const ActivityScreen: React.FC = () => {
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={12}
-            overlayColor="rgba(28, 30, 38, 0.7)"
+            overlayColor={COLORS.OVERLAY.BLUR_LIGHT}
             blurType="dark"
             blurAmount={12}
             autoUpdate
@@ -952,14 +951,14 @@ const styles = StyleSheet.create({
   mapSimWrapper: {
     position: 'absolute', bottom: PANEL_HEIGHT + 12, left: 12,
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: COLORS.OVERLAY.GPS_SIM,
     borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
     justifyContent: 'center',
     alignItems: 'center',
   },
   mapSimActive: {
-    backgroundColor: 'rgba(239, 68, 68, 0.5)',
-    borderColor: 'rgba(239, 68, 68, 0.7)',
+    backgroundColor: COLORS.ERROR_OVERLAY.SIM_BG,
+    borderColor: COLORS.ERROR_OVERLAY.SIM_BORDER,
   },
   simText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
@@ -1070,9 +1069,9 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   stopBtnBg: {
-    backgroundColor: 'rgba(239,68,68,0.2)',
+    backgroundColor: COLORS.ERROR_OVERLAY.BUTTON_BG,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.3)',
+    borderColor: COLORS.ERROR_OVERLAY.BUTTON_BORDER,
     overflow: 'hidden',
   },
   stopBtnInner: {
@@ -1102,7 +1101,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   summaryStatsCard: {
-    backgroundColor: 'rgba(28, 30, 38, 0.85)',
+    backgroundColor: COLORS.OVERLAY.SUMMARY,
     borderRadius: BORDER_RADIUS.G2.LG,
     borderWidth: 1,
     borderColor: COLORS.BORDER.MEDIUM,

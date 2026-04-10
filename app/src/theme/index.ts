@@ -32,6 +32,10 @@ export const COLORS = {
     HEAVY: 'rgba(255, 255, 255, 0.2)',
     CARD: 'rgba(28, 30, 38, 0.6)',
     NAV: 'rgba(24, 26, 34, 0.75)',
+    SUMMARY: 'rgba(28, 30, 38, 0.85)',
+    BLUR_DARK: 'rgba(28, 30, 38, 0.65)',
+    BLUR_LIGHT: 'rgba(28, 30, 38, 0.7)',
+    GPS_SIM: 'rgba(255, 255, 255, 0.15)',
   },
 
   // Borders
@@ -39,6 +43,7 @@ export const COLORS = {
     LIGHT: 'rgba(255, 255, 255, 0.05)',
     MEDIUM: 'rgba(255, 255, 255, 0.1)',
     HEAVY: 'rgba(255, 255, 255, 0.2)',
+    ACCENT: 'rgba(59, 130, 246, 0.3)',
   },
 
   // Status colors
@@ -46,6 +51,16 @@ export const COLORS = {
   ERROR: '#ef4444',
   WARNING: '#f59e0b',
   INFO: '#3b82f6',
+
+  // Error state overlays
+  ERROR_OVERLAY: {
+    BACKGROUND: 'rgba(239, 68, 68, 0.05)',
+    BORDER: 'rgba(239, 68, 68, 0.5)',
+    BUTTON_BG: 'rgba(239, 68, 68, 0.2)',
+    BUTTON_BORDER: 'rgba(239, 68, 68, 0.3)',
+    SIM_BG: 'rgba(239, 68, 68, 0.5)',
+    SIM_BORDER: 'rgba(239, 68, 68, 0.7)',
+  },
 
   // Gradient colors for background effects
   GRADIENT: {

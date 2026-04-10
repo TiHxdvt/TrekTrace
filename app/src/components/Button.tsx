@@ -161,6 +161,6 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT.PRIMARY,
   },
   textSecondary: {
-    color: COLORS.TEXT.TERTIARY,
+    color: COLORS.TEXT.SECONDARY,
   },
 });
