@@ -3,7 +3,7 @@
  * 使用浮空导航栏代替系统底部 Tab
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useMemo, useCallback } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from '@react-native-community/blur';
@@ -39,8 +39,6 @@ const MainTab = createBottomTabNavigator<MainTabParamList>();
 
 // 自定义浮空 Tab Bar - 使用 BlurView 实现 backdrop-blur-xl + 滑动切换
 const FloatingTabBar = ({ state, navigation }: any) => {
-  const [isDragging, setIsDragging] = useState(false);
-
   // 根据手指 X 坐标计算对应的 tab 索引
   const calculateIndexFromX = (absoluteX: number) => {
     // 导航栏占 85% 宽度，居中，左右各 7.5% 边距
@@ -55,7 +53,6 @@ const FloatingTabBar = ({ state, navigation }: any) => {
   // 拖动手势：手指滑到哪个 tab 就选中哪个
   const panGesture = Gesture.Pan()
     .onStart((event) => {
-      setIsDragging(true);
       const index = calculateIndexFromX(event.absoluteX);
       const targetRoute = state.routes[index];
       if (targetRoute && state.index !== index) {
@@ -68,9 +65,6 @@ const FloatingTabBar = ({ state, navigation }: any) => {
       if (targetRoute && state.index !== index) {
         navigation.navigate(targetRoute.name);
       }
-    })
-    .onEnd(() => {
-      setIsDragging(false);
     });
 
   return (
