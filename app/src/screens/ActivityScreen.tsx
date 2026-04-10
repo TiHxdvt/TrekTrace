@@ -14,6 +14,9 @@ import {
   Platform,
   Animated,
   Alert,
+  Modal,
+  StatusBar,
+  Dimensions,
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { MapView, AMapSdk, MapType, Polyline } from 'react-native-amap3d';
@@ -113,6 +116,15 @@ export const ActivityScreen: React.FC = () => {
     currentSpeed: 0,
   });
   const [polylineSegments, setPolylineSegments] = useState<Array<Array<{ latitude: number; longitude: number }>>>([]);
+
+  // Summary modal state
+  const [showSummary, setShowSummary] = useState(false);
+  const summaryMapRef = useRef<MapView>(null);
+  // Snapshot of colored segments at the moment summary was shown
+  const [summarySegments, setSummarySegments] = useState<Array<{
+    coords: Array<{ latitude: number; longitude: number }>;
+    colors: string[];
+  }>>([]);
 
   // Long press stop state
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -393,6 +405,10 @@ export const ActivityScreen: React.FC = () => {
             { text: '重试', onPress: () => trackRecordingService.retryUpload() },
           ],
         );
+      } else {
+        // Show summary modal on success — snapshot current colored segments
+        setSummarySegments(coloredSegments);
+        setShowSummary(true);
       }
     }, LONG_PRESS_DURATION);
   };
@@ -405,6 +421,45 @@ export const ActivityScreen: React.FC = () => {
     longPressProgress.stopAnimation();
     longPressProgress.setValue(0);
   };
+
+  // Close summary modal and clear polyline data
+  const handleCloseSummary = () => {
+    setShowSummary(false);
+    setPolylineSegments([]);
+    setSummarySegments([]);
+  };
+
+  // Fit summary map camera to show full track
+  const fitSummaryMap = useCallback(() => {
+    const allPoints = summarySegments.flatMap(s => s.coords);
+    if (allPoints.length === 0) return;
+
+    const lats = allPoints.map(p => p.latitude);
+    const lons = allPoints.map(p => p.longitude);
+    const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const centerLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+
+    // Compute zoom from lat/lon span and viewport dimensions
+    const { width, height } = Dimensions.get('window');
+    const latSpan = Math.max(...lats) - Math.min(...lats);
+    const lonSpan = Math.max(...lons) - Math.min(...lons);
+    // Add 30% padding
+    const paddedLatSpan = latSpan * 1.3 || 0.01;
+    const paddedLonSpan = lonSpan * 1.3 || 0.01;
+    // At zoom Z, ~360 / 2^Z degrees fit in the viewport
+    const zoomByLat = Math.log2(360 * (height / width) / paddedLatSpan);
+    const zoomByLon = Math.log2(360 / paddedLonSpan);
+    const zoom = Math.min(zoomByLat, zoomByLon);
+    const clampedZoom = Math.max(3, Math.min(20, Math.round(zoom)));
+
+    summaryMapRef.current?.moveCamera(
+      {
+        target: { latitude: centerLat, longitude: centerLon },
+        zoom: clampedZoom,
+      },
+      500,
+    );
+  }, [summarySegments]);
 
   // 左按钮：空闲=模式选择，记录中=暂停，暂停中=继续
   const handleLeftButton = () => {
@@ -635,6 +690,83 @@ export const ActivityScreen: React.FC = () => {
           </View>
         </View>
       </View>
+
+      {/* ========== Summary Modal ========== */}
+      <Modal
+        visible={showSummary}
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={styles.summaryContainer}>
+          <StatusBar barStyle="light-content" />
+          <MapView
+            ref={summaryMapRef}
+            style={StyleSheet.absoluteFillObject}
+            mapType={MapType.Night}
+            initialCameraPosition={{
+              target: { latitude: 35.86, longitude: 104.19 },
+              zoom: 4,
+            }}
+            myLocationEnabled={false}
+            scaleControlsEnabled={false}
+            zoomControlsEnabled={false}
+            compassEnabled={false}
+            rotateGesturesEnabled={false}
+            tiltGesturesEnabled={false}
+            labelsEnabled
+            buildingsEnabled={false}
+            trafficEnabled={false}
+            // @ts-ignore — onMapLoaded exists at runtime but not in type definitions
+            onMapLoaded={fitSummaryMap}
+          >
+            {summarySegments.map((seg, idx) => (
+              <Polyline
+                key={`summary-segment-${idx}`}
+                points={seg.coords}
+                colors={seg.colors}
+                gradient
+                width={8}
+                zIndex={10}
+              />
+            ))}
+          </MapView>
+
+          {/* Top stats overlay */}
+          <View style={[styles.summaryStatsOverlay, { paddingTop: insets.top + 16 }]}>
+            <View style={styles.summaryStatsCard}>
+              <View style={styles.summaryStatsRow}>
+                <View style={styles.summaryStatItem}>
+                  <Text style={styles.summaryStatLabel}>距离</Text>
+                  <Text style={styles.summaryStatValue}>{(stats.distance / 1000).toFixed(2)} km</Text>
+                </View>
+                <View style={styles.summaryStatItem}>
+                  <Text style={styles.summaryStatLabel}>时长</Text>
+                  <Text style={styles.summaryStatValue}>{formatDuration(stats.duration)}</Text>
+                </View>
+                <View style={styles.summaryStatItem}>
+                  <Text style={styles.summaryStatLabel}>配速</Text>
+                  <Text style={styles.summaryStatValue}>{formatPace(stats.currentPace)}</Text>
+                </View>
+                <View style={styles.summaryStatItem}>
+                  <Text style={styles.summaryStatLabel}>爬升</Text>
+                  <Text style={styles.summaryStatValue}>{Math.round(stats.elevationGain)} m</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Bottom done button */}
+          <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
+            <TouchableOpacity
+              style={styles.summaryDoneBtn}
+              onPress={handleCloseSummary}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.summaryDoneText}>完成</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -846,5 +978,70 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: COLORS.ERROR,
     borderRadius: 1,
+  },
+
+  // ========== Summary Modal ==========
+  summaryContainer: {
+    flex: 1,
+    backgroundColor: COLORS.BACKGROUND,
+  },
+  summaryStatsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+  },
+  summaryStatsCard: {
+    backgroundColor: 'rgba(28, 30, 38, 0.85)',
+    borderRadius: BORDER_RADIUS.G2.LG,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.MEDIUM,
+    padding: 16,
+  },
+  summaryStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  summaryStatItem: {
+    alignItems: 'center',
+  },
+  summaryStatLabel: {
+    fontSize: 10,
+    color: COLORS.TEXT.QUATERNARY,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  summaryStatValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  summaryBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 40,
+    paddingTop: 16,
+  },
+  summaryDoneBtn: {
+    backgroundColor: COLORS.PRIMARY,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.PRIMARY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  summaryDoneText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
   },
 });
