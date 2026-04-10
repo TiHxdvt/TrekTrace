@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useMemo, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from '@react-native-community/blur';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -31,22 +31,22 @@ const TAB_CONFIG = [
   { name: 'ProfileTab' as const, Icon: IconChatRoundLine },
 ];
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TAB_COUNT = TAB_CONFIG.length;
+const BAR_PADDING = 8;
 
 // 主 Tab 导航器
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 
 // 自定义浮空 Tab Bar - 使用 BlurView 实现 backdrop-blur-xl + 滑动切换
 const FloatingTabBar = ({ state, navigation }: any) => {
+  // 通过 onLayout 获取导航栏的实际位置，避免硬编码计算
+  const barLayoutRef = useRef({ x: 0, width: 0 });
+
   // 根据手指 X 坐标计算对应的 tab 索引
   const calculateIndexFromX = (absoluteX: number) => {
-    // 导航栏占 85% 宽度，居中，左右各 7.5% 边距
-    const barMargin = SCREEN_WIDTH * 0.075;
-    const barPadding = 8;
-    const barWidth = SCREEN_WIDTH - barMargin * 2;
-    const effectiveTabWidth = (barWidth - barPadding * 2) / TAB_COUNT;
-    const relativeX = absoluteX - barMargin - barPadding;
+    const { x, width } = barLayoutRef.current;
+    const effectiveTabWidth = (width - BAR_PADDING * 2) / TAB_COUNT;
+    const relativeX = absoluteX - x - BAR_PADDING;
     return Math.max(0, Math.min(TAB_COUNT - 1, Math.floor(relativeX / effectiveTabWidth)));
   };
 
@@ -71,7 +71,14 @@ const FloatingTabBar = ({ state, navigation }: any) => {
   return (
     <View style={floatingStyles.container}>
       <GestureDetector gesture={panGesture}>
-        <View style={floatingStyles.barOuter} collapsable={false}>
+        <View
+          style={floatingStyles.barOuter}
+          collapsable={false}
+          onLayout={(e) => {
+            const { x, width } = e.nativeEvent.layout;
+            barLayoutRef.current = { x, width };
+          }}
+        >
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={20}
