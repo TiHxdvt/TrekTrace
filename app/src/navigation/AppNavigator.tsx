@@ -61,6 +61,7 @@ const FloatingTabBar = ({ state, navigation }: any) => {
 
   // 拖动手势：手指滑到哪个 tab 就选中哪个
   const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10])
     .onStart((event) => {
       navigateToTabAt(event.absoluteX);
     })
