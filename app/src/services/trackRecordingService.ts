@@ -23,6 +23,8 @@ const ACCURACY_FILTER = 30; // 米 - 最大允许精度
 const ELEVATION_BUFFER_SIZE = 5; // 滑动平均窗口
 const ELEVATION_MIN_DIFF = 3; // 米 - 海拔累计阈值
 const NOTIFY_THROTTLE_MS = 500; // notify 节流间隔
+const PERSIST_INTERVAL_MS = 5000; // 批量持久化间隔
+const PERSIST_POINT_THRESHOLD = 10; // 每积累 N 个点强制持久化
 
 // ======================== Storage Keys ========================
 const SESSION_KEY = '@trektrace:recording_session';
@@ -71,6 +73,8 @@ class TrackRecordingServiceImpl {
   private listeners: Set<StateCallback> = new Set();
   private lastNotifyTime = 0;
   private notifyPending = false;
+  private persistTimer: ReturnType<typeof setInterval> | null = null;
+  private pointsSinceLastPersist = 0;
 
   // ---------- Subscribe ----------
   subscribe(cb: StateCallback): () => void {
@@ -149,7 +153,9 @@ class TrackRecordingServiceImpl {
     this.elevationGainAccum = 0;
     this.lastSmoothedAltitude = null;
 
+    this.pointsSinceLastPersist = 0;
     this.startTimer();
+    this.startPersistTimer();
     await this.persist();
     this.doNotify();
   }
@@ -203,7 +209,8 @@ class TrackRecordingServiceImpl {
 
     this.lastAcceptedPoint = point;
 
-    await this.persist();
+    this.pointsSinceLastPersist++;
+    this.schedulePersist();
     this.notify();
     return true;
   }
@@ -229,7 +236,9 @@ class TrackRecordingServiceImpl {
     this.session.segments.push(newSegment);
     this.session.status = 'recording';
     this.lastAcceptedPoint = null;
+    this.pointsSinceLastPersist = 0;
     this.startTimer();
+    this.startPersistTimer();
     await this.persist();
     this.doNotify();
   }
@@ -343,10 +352,32 @@ class TrackRecordingServiceImpl {
     }, 1000);
   }
 
+  private startPersistTimer(): void {
+    if (this.persistTimer) clearInterval(this.persistTimer);
+    this.persistTimer = setInterval(() => {
+      if (this.pointsSinceLastPersist > 0) {
+        this.persist();
+        this.pointsSinceLastPersist = 0;
+      }
+    }, PERSIST_INTERVAL_MS);
+  }
+
+  /** Persist now if point threshold reached, otherwise rely on the interval timer */
+  private schedulePersist(): void {
+    if (this.pointsSinceLastPersist >= PERSIST_POINT_THRESHOLD) {
+      this.persist();
+      this.pointsSinceLastPersist = 0;
+    }
+  }
+
   private stopTimer(): void {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
+    }
+    if (this.persistTimer) {
+      clearInterval(this.persistTimer);
+      this.persistTimer = null;
     }
   }
 

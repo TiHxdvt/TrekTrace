@@ -7,7 +7,7 @@ import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BORDER_RADIUS, SHADOWS } from '../theme';
+import { COLORS, BORDER_RADIUS } from '../theme';
 import { IconUser, IconLogout } from '../components/SolarIcons';
 import { storageService } from '../services/storageService';
 

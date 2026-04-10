@@ -10,35 +10,55 @@ import com.trektrace.repository.VerificationCodeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    
+
+    // Simple in-memory rate limiter: phone -> last send timestamp
+    private final Map<String, Long> rateLimitMap = new ConcurrentHashMap<>();
+    private static final long RATE_LIMIT_MS = 60_000; // 1 minute between sends
+
     @Autowired
     private UserService userService;
-    
+
     @Autowired
     private SmsService smsService;
-    
+
     @Autowired
     private VerificationCodeRepository verificationCodeRepository;
-    
+
     @PostMapping("/send-code")
     public ResponseEntity<Void> sendVerificationCode(@RequestBody LoginRequest request) {
         String phone = request.getPhone();
-        
-        // 验证手机号格式（11位）
+
+        // Validate phone format
         if (phone == null || !phone.matches("^1[3-9]\\d{9}$")) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
-        
-        // 生成并保存验证码
-        String code = String.format("%06d", new java.util.Random().nextInt(1000000));
+
+        // Rate limit: 1 request per minute per phone
+        long now = System.currentTimeMillis();
+        Long lastSent = rateLimitMap.get(phone);
+        if (lastSent != null && (now - lastSent) < RATE_LIMIT_MS) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        }
+        rateLimitMap.put(phone, now);
+
+        // Periodically clean up old entries to prevent memory leak
+        if (rateLimitMap.size() > 10000) {
+            rateLimitMap.entrySet().removeIf(e -> (now - e.getValue()) > RATE_LIMIT_MS);
+        }
+
+        // Generate and save verification code
+        String code = String.format("%06d", new java.security.SecureRandom().nextInt(1000000));
         VerificationCode vc = new VerificationCode();
         vc.setPhone(phone);
         vc.setCode(code);
@@ -47,42 +67,43 @@ public class AuthController {
 
         verificationCodeRepository.save(vc);
 
-        // 发送验证码（传递生成的验证码）
+        // Send verification code
         smsService.sendVerificationCode(phone, code);
-        
+
         return ResponseEntity.ok().build();
     }
-    
+
     @PostMapping("/login")
+    @Transactional
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         String phone = request.getPhone();
         String code = request.getCode();
-        
-        // 验证验证码
+
+        // Validate verification code
         Optional<VerificationCode> vcOpt = verificationCodeRepository
             .findTopByPhoneAndCodeAndUsedFalseOrderByCreatedAtDesc(phone, code);
-        
+
         if (vcOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(java.util.Map.of("error", "验证码错误或已过期"));
+                .body(Map.of("error", "验证码错误或已过期"));
         }
-        
+
         VerificationCode vc = vcOpt.get();
         if (vc.getExpiresAt().isBefore(LocalDateTime.now())) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(java.util.Map.of("error", "验证码已过期"));
+                .body(Map.of("error", "验证码已过期"));
         }
-        
-        // 标记验证码已使用
+
+        // Mark code as used immediately to prevent reuse
         vc.setUsed(true);
         verificationCodeRepository.save(vc);
-        
-        // 登录或创建用户
+
+        // Login or create user
         User user = userService.createOrGetUser(phone);
-        
-        // 生成 token
+
+        // Generate token
         String token = userService.generateToken(user.getId());
-        
+
         return ResponseEntity.ok(new LoginResponse(token, user));
     }
 }

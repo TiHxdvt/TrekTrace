@@ -207,7 +207,8 @@ export const ActivityScreen: React.FC = () => {
         const colors = s.points.map(p => speedToColor(p.speed ?? 0));
         return { coords, colors };
       });
-  }, [polylineSegments, session]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only session.segments and activityType are used; full session dependency would recompute every second
+  }, [polylineSegments, session?.activityType, session?.segments]);
 
   // Crash recovery on mount
   useEffect(() => {

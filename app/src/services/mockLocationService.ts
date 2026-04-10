@@ -155,9 +155,11 @@ function computeCumulativeDistances(points: RoutePoint[]): number[] {
  * 在累积距离数组中，找到 distance 所在的区间索引
  */
 function findSegmentIndex(cumDists: number[], distance: number): number {
+  if (cumDists.length < 2) return 0;
   for (let i = 1; i < cumDists.length; i++) {
     if (distance <= cumDists[i]) return i - 1;
   }
+  // distance exceeds total route — clamp to last valid segment
   return cumDists.length - 2;
 }
 
@@ -232,7 +234,11 @@ class MockLocationService {
 
       // 路线循环：到达终点后从头开始
       if (this.currentDistance >= this.totalRouteDistance) {
-        this.currentDistance = this.currentDistance % this.totalRouteDistance;
+        this.currentDistance -= this.totalRouteDistance;
+        // Extra safety: if still past the end (e.g. very high speed), clamp to 0
+        if (this.currentDistance >= this.totalRouteDistance) {
+          this.currentDistance = 0;
+        }
       }
 
       this.emitPoint(route.points, Date.now());
@@ -270,13 +276,20 @@ class MockLocationService {
   private emitPoint(routePoints: RoutePoint[], timestamp: number): void {
     if (!this.callback) return;
 
-    const segIdx = findSegmentIndex(this.cumDists, this.currentDistance);
+    const segIdx = Math.min(
+      findSegmentIndex(this.cumDists, this.currentDistance),
+      routePoints.length - 2,
+    );
     const segStart = this.cumDists[segIdx];
     const segEnd = this.cumDists[segIdx + 1];
     const segLen = segEnd - segStart;
 
+    // Guard against division by zero when segment has zero length
     const t = segLen > 0 ? (this.currentDistance - segStart) / segLen : 0;
-    const pos = lerp(routePoints[segIdx], routePoints[segIdx + 1], t);
+
+    // Clamp segIdx + 1 to valid range
+    const nextIdx = Math.min(segIdx + 1, routePoints.length - 1);
+    const pos = lerp(routePoints[segIdx], routePoints[nextIdx], t);
 
     // 计算瞬时速度（带波动），下限不低于 SPEED_FLOOR
     const speed = Math.max(SPEED_FLOOR, this.baseSpeed * (0.7 + Math.random() * 0.6));
@@ -290,8 +303,8 @@ class MockLocationService {
     // 计算航向
     let heading = 0;
     if (segIdx < routePoints.length - 1) {
-      const dLat = routePoints[segIdx + 1].latitude - routePoints[segIdx].latitude;
-      const dLon = routePoints[segIdx + 1].longitude - routePoints[segIdx].longitude;
+      const dLat = routePoints[nextIdx].latitude - routePoints[segIdx].latitude;
+      const dLon = routePoints[nextIdx].longitude - routePoints[segIdx].longitude;
       heading = (Math.atan2(dLon, dLat) * 180) / Math.PI;
       if (heading < 0) heading += 360;
     }
