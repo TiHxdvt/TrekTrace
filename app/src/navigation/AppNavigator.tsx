@@ -60,12 +60,10 @@ const FloatingTabBar = ({ state, navigation }: any) => {
   };
 
   // 拖动手势：手指滑到哪个 tab 就选中哪个
+  // 只在 onUpdate 中触发导航，避免与 TouchableOpacity 的 tap 事件冲突
   const panGesture = useMemo(() =>
     Gesture.Pan()
       .activeOffsetX([-10, 10])
-      .onStart((event) => {
-        navigateToTabAt(event.absoluteX);
-      })
       .onUpdate((event) => {
         navigateToTabAt(event.absoluteX);
       }),
