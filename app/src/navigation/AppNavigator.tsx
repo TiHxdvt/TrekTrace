@@ -50,21 +50,22 @@ const FloatingTabBar = ({ state, navigation }: any) => {
     return Math.max(0, Math.min(TAB_COUNT - 1, Math.floor(relativeX / effectiveTabWidth)));
   };
 
+  // 根据手指位置切换到对应 tab
+  const navigateToTabAt = (absoluteX: number) => {
+    const index = calculateIndexFromX(absoluteX);
+    const targetRoute = state.routes[index];
+    if (targetRoute && state.index !== index) {
+      navigation.navigate(targetRoute.name);
+    }
+  };
+
   // 拖动手势：手指滑到哪个 tab 就选中哪个
   const panGesture = Gesture.Pan()
     .onStart((event) => {
-      const index = calculateIndexFromX(event.absoluteX);
-      const targetRoute = state.routes[index];
-      if (targetRoute && state.index !== index) {
-        navigation.navigate(targetRoute.name);
-      }
+      navigateToTabAt(event.absoluteX);
     })
     .onUpdate((event) => {
-      const index = calculateIndexFromX(event.absoluteX);
-      const targetRoute = state.routes[index];
-      if (targetRoute && state.index !== index) {
-        navigation.navigate(targetRoute.name);
-      }
+      navigateToTabAt(event.absoluteX);
     });
 
   return (
