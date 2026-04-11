@@ -317,15 +317,6 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
                   </View>
                 </View>
 
-                {/* 时间范围 */}
-                <View style={styles.timeRow}>
-                  <Text style={styles.timeLabel}>开始</Text>
-                  <Text style={styles.timeValue}>{format(startDate, 'HH:mm')}</Text>
-                  <Text style={styles.timeSeparator}>→</Text>
-                  <Text style={styles.timeLabel}>结束</Text>
-                  <Text style={styles.timeValue}>{format(endDate, 'HH:mm')}</Text>
-                </View>
-
                 {/* 路线概览：始终渲染 MapView，用空数据保持挂载 */}
                 {(trackLoading || (trackPoints && trackPoints.length >= 2)) && (
                   <View style={styles.expandedContent}>
@@ -337,7 +328,12 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
                     ) : (
                       <>
                         <View style={styles.sectionDivider} />
-                        <Text style={styles.sectionTitle}>路线概览</Text>
+                        <View style={styles.sectionTitleRow}>
+                          <Text style={styles.sectionTitle}>路线概览</Text>
+                          <Text style={styles.sectionTime}>
+                            {format(startDate, 'HH:mm')} → {format(endDate, 'HH:mm')}
+                          </Text>
+                        </View>
                         <RouteMiniMap points={mapPoints} />
                         {chartDataSets && (
                           <>
@@ -455,30 +451,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
     color: COLORS.TEXT.QUINARY,
   },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingTop: 16,
-    marginHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER.LIGHT,
-  },
-  timeLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  timeValue: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '500',
-    color: COLORS.TEXT.SECONDARY,
-  },
-  timeSeparator: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUINARY,
-    marginHorizontal: 4,
-  },
   expandedContent: {
     paddingBottom: 16,
   },
@@ -488,12 +460,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginVertical: 16,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     fontWeight: '500',
     color: COLORS.TEXT.TERTIARY,
-    marginHorizontal: 20,
-    marginBottom: 12,
+  },
+  sectionTime: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+    color: COLORS.TEXT.QUINARY,
   },
   loadingContainer: {
     alignItems: 'center',
