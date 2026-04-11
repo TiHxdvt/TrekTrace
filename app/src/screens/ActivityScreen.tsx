@@ -211,14 +211,10 @@ export const ActivityScreen: React.FC = () => {
       const recovered = await trackRecordingService.recoverSession();
       if (recovered) {
         if (recovered.status === 'stopped') {
-          Dialog.show(
-            '上传未完成',
-            '上次运动的记录上传失败，是否重试？',
-            [
-              { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
-              { text: '重试上传', onPress: () => retryUploadWithDialog() },
-            ],
-          );
+          // Stopped recording with unsaved data — show summary directly
+          lockedActivityType.current = recovered.activityType;
+          showSummaryRef.current = true;
+          setShowSummary(true);
         } else {
           Dialog.show(
             '恢复记录',
@@ -542,26 +538,13 @@ export const ActivityScreen: React.FC = () => {
       // Haptic feedback — long press completed
       Vibration.vibrate(100);
 
-      const success = await trackRecordingService.stopRecording();
+      await trackRecordingService.stopRecording();
       longPressProgress.setValue(0);
-      if (!success) {
-        isStoppingRef.current = false;
-        lockedActivityType.current = null;
-        Dialog.show(
-          '上传失败',
-          '运动记录已保存到本地，请检查网络后重试。',
-          [
-            { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
-            { text: '重试', onPress: () => retryUploadWithDialog() },
-          ],
-        );
-      } else {
-        // Delay summary to let stop button fully transition back to start
-        setTimeout(() => {
-          showSummaryRef.current = true;
-          setShowSummary(true);
-        }, 400);
-      }
+      // Delay summary to let stop button fully transition back to start
+      setTimeout(() => {
+        showSummaryRef.current = true;
+        setShowSummary(true);
+      }, 400);
     }, LONG_PRESS_DURATION);
   };
 
@@ -576,13 +559,38 @@ export const ActivityScreen: React.FC = () => {
     isStoppingRef.current = false;
   };
 
-  // Close summary overlay and discard recording data
-  const handleCloseSummary = () => {
+  // Discard recording from summary overlay
+  const handleDiscardFromSummary = () => {
     showSummaryRef.current = false;
     setShowSummary(false);
     isStoppingRef.current = false;
     lockedActivityType.current = null;
     trackRecordingService.discardRecording();
+  };
+
+  // Save recording from summary overlay
+  const isSavingRef = useRef(false);
+  const handleSaveFromSummary = async () => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    try {
+      const ok = await trackRecordingService.retryUpload();
+      if (ok) {
+        showSummaryRef.current = false;
+        setShowSummary(false);
+        isStoppingRef.current = false;
+        lockedActivityType.current = null;
+      } else {
+        await retryUploadWithDialog();
+        // If retryUploadWithDialog completes (success or discard), close summary
+        showSummaryRef.current = false;
+        setShowSummary(false);
+        isStoppingRef.current = false;
+        lockedActivityType.current = null;
+      }
+    } finally {
+      isSavingRef.current = false;
+    }
   };
 
   // When summary overlay opens, fit main map camera to show full track
@@ -800,15 +808,24 @@ export const ActivityScreen: React.FC = () => {
                 </View>
               </View>
             </View>
-            {/* Bottom done button */}
+            {/* Bottom discard / save buttons */}
             <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
-              <TouchableOpacity
-                style={styles.summaryDoneBtn}
-                onPress={handleCloseSummary}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.summaryDoneText}>完成</Text>
-              </TouchableOpacity>
+              <View style={styles.summaryButtonRow}>
+                <TouchableOpacity
+                  style={styles.summaryDiscardBtn}
+                  onPress={handleDiscardFromSummary}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.summaryDiscardText}>丢弃</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.summarySaveBtn}
+                  onPress={handleSaveFromSummary}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.summarySaveText}>保存</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </>
         )}
@@ -1252,19 +1269,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingTop: 16,
   },
-  summaryDoneBtn: {
-    backgroundColor: COLORS.PRIMARY,
+  summaryButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  summaryDiscardBtn: {
+    flex: 1,
     height: 48,
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.ERROR_OVERLAY.BUTTON_BG,
+    borderWidth: 1,
+    borderColor: COLORS.ERROR_OVERLAY.BUTTON_BORDER,
+  },
+  summaryDiscardText: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+    fontWeight: '600',
+    color: COLORS.ERROR,
+  },
+  summarySaveBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.PRIMARY,
     shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
   },
-  summaryDoneText: {
+  summarySaveText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,

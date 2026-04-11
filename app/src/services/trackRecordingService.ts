@@ -21,7 +21,6 @@ const DISTANCE_FILTER = 5; // 米 - 两点间最小距离
 const SPEED_FILTER = 1; // m/s - 最小有效速度
 const ACCURACY_FILTER = 30; // 米 - 最大允许精度
 const ELEVATION_BUFFER_SIZE = 5; // 滑动平均窗口
-const ELEVATION_MIN_DIFF = 3; // 米 - 海拔累计阈值
 const NOTIFY_THROTTLE_MS = 500; // notify 节流间隔
 const PERSIST_INTERVAL_MS = 5000; // 批量持久化间隔
 const PERSIST_POINT_THRESHOLD = 10; // 每积累 N 个点强制持久化
@@ -118,6 +117,23 @@ class TrackRecordingServiceImpl {
         if (allPoints.length > 0) {
           this.lastAcceptedPoint = allPoints[allPoints.length - 1];
         }
+
+        // Restore elevation state from persisted data
+        this.elevationGainAccum = saved.elevationGain;
+        if (allPoints.length > 0) {
+          this.lastSmoothedAltitude = allPoints[allPoints.length - 1].altitude;
+          // Rebuild buffer with recent points for smooth continuation
+          const recent = allPoints.slice(-ELEVATION_BUFFER_SIZE);
+          this.elevationBuffer = recent.map(p => p.altitude);
+        }
+
+        // Restart timers if actively recording
+        if (saved.status === 'recording') {
+          this.pointsSinceLastPersist = 0;
+          this.startTimer();
+          this.startPersistTimer();
+        }
+
         this.doNotify();
         return saved;
       }
@@ -253,22 +269,10 @@ class TrackRecordingServiceImpl {
     if (!this.session) return false;
     this.stopTimer();
     this.session.endTime = new Date().toISOString();
-
-    try {
-      await this.uploadToServer();
-      this.session.status = 'idle';
-      this.session.uploadedToServer = true;
-      await this.clearStorage();
-      this.doNotify();
-      return true;
-    } catch (err) {
-      // Upload failed — keep as 'stopped' (recoverable) so user can retry
-      this.session.status = 'stopped';
-      await this.persist();
-      this.doNotify();
-      console.error('Upload failed, data preserved locally:', err);
-      return false;
-    }
+    this.session.status = 'stopped';
+    await this.persist();
+    this.doNotify();
+    return true;
   }
 
   // ---------- Retry upload (for failed uploads) ----------
@@ -339,7 +343,7 @@ class TrackRecordingServiceImpl {
 
     if (this.lastSmoothedAltitude !== null) {
       const diff = avg - this.lastSmoothedAltitude;
-      if (diff > ELEVATION_MIN_DIFF) {
+      if (diff > 0) {
         this.elevationGainAccum += diff;
       }
     }
