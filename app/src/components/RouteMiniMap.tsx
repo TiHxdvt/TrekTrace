@@ -237,6 +237,7 @@ export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
         trafficEnabled={false}
       >
         <Polyline
+          key={trailStyle}
           points={replayCoords}
           colors={replayColors}
           gradient
