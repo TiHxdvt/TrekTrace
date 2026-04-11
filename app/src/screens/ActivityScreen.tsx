@@ -259,23 +259,32 @@ export const ActivityScreen: React.FC = () => {
   }, [gpsStrength, pulseAnim]);
 
   // 初始化高德地图 SDK + 请求定位权限
-  useEffect(() => {
-    AMapSdk.init(APP_CONFIG.AMAP_API_KEY);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState(false);
 
-    const enableLocation = async () => {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.requestMultiple([
-          'android.permission.ACCESS_FINE_LOCATION',
-          'android.permission.ACCESS_COARSE_LOCATION',
-        ]).catch(() => null as any);
-        if (granted) {
+  useEffect(() => {
+    const init = async () => {
+      try {
+        AMapSdk.init(APP_CONFIG.AMAP_API_KEY);
+
+        if (Platform.OS === 'android') {
+          const granted = await PermissionsAndroid.requestMultiple([
+            'android.permission.ACCESS_FINE_LOCATION',
+            'android.permission.ACCESS_COARSE_LOCATION',
+          ]).catch(() => null as any);
+          if (granted) {
+            setLocationEnabled(true);
+          }
+        } else {
           setLocationEnabled(true);
         }
-      } else {
-        setLocationEnabled(true);
+
+        setMapReady(true);
+      } catch {
+        setMapError(true);
       }
     };
-    enableLocation();
+    init();
     return () => {
       if (gpsTimeoutRef.current) clearTimeout(gpsTimeoutRef.current);
     };
@@ -622,8 +631,8 @@ export const ActivityScreen: React.FC = () => {
 
       {/* Map Card — expands to full screen during summary */}
       <View style={[styles.mapCard, showSummary && styles.mapCardSummary]}>
-        {/* 高德地图 */}
-        <MapView
+        {/* 高德地图 — 等待 SDK 初始化完成后再挂载 */}
+        {mapReady && <MapView
           ref={mapViewRef}
           style={StyleSheet.absoluteFillObject}
           mapType={MapType.Night}
@@ -659,7 +668,14 @@ export const ActivityScreen: React.FC = () => {
               zIndex={10}
             />
           ))}
-        </MapView>
+        </MapView>}
+        {mapError && (
+          <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+            <Text style={{ color: COLORS.TEXT.TERTIARY, textAlign: 'center', marginTop: 80 }}>
+              地图加载失败
+            </Text>
+          </View>
+        )}
 
         {/* GPS Status Indicator - 左上角 */}
         {!showSummary && (

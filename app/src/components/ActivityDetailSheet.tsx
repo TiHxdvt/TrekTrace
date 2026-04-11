@@ -1,10 +1,7 @@
 /**
  * 活动详情底部弹窗
- * 可拖拽底部面板：折叠态（统计卡片）/ 展开态（路线地图 + 图表）
- *
- * 拖拽策略：GestureHandlerRootView 包裹 Modal 内部内容，
- * GestureDetector 绑定到拖拽热区（手柄 + header），不干扰 ScrollView。
- * sheetState 通过 ref 保持同步，避免手势回调闭包过期。
+ * 使用 Modal 保证层级高于 TabBar
+ * MapView 永远不卸载，关闭时只清空数据避免原生崩溃
  */
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
@@ -44,13 +41,17 @@ interface ActivityDetailSheetProps {
 
 type SheetState = 'collapsed' | 'expanded';
 
+// 保持 MapView 永远挂载的空数据
+const EMPTY_POINTS: TrackPointUploadDTO[] = [];
+
 export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
   activity,
   onClose,
 }) => {
   const insets = useSafeAreaInsets();
 
-  const [modalVisible, setModalVisible] = useState(false);
+  // Modal 始终挂载，用 slideAnim 控制显隐
+  const [sheetVisible, setSheetVisible] = useState(false);
   const [visibleActivity, setVisibleActivity] = useState<ActivityResponseDTO | null>(null);
   const [sheetState, setSheetState] = useState<SheetState>('collapsed');
   const [trackPoints, setTrackPoints] = useState<TrackPointUploadDTO[] | null>(null);
@@ -67,37 +68,66 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
 
   const trackCache = useRef<Map<number, TrackPointUploadDTO[]>>(new Map());
 
-  // ---- 动画方法 ----
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // ---- 打开 ----
 
   useEffect(() => {
-    if (activity) {
-      setVisibleActivity(activity);
-      setModalVisible(true);
-      setSheetState('collapsed');
-      setTrackPoints(null);
-      sheetHeightAnim.setValue(SHEET_HEIGHT_COLLAPSED);
-      Animated.timing(slideAnim, {
-        toValue: 1,
-        duration: ANIMATION.NORMAL,
-        useNativeDriver: true,
-      }).start();
+    if (!activity) return;
+
+    setVisibleActivity(activity);
+    setSheetVisible(true);
+    setSheetState('collapsed');
+    sheetHeightAnim.setValue(SHEET_HEIGHT_COLLAPSED);
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: ANIMATION.NORMAL,
+      useNativeDriver: true,
+    }).start();
+
+    // 预加载轨迹数据
+    let stale = false;
+    const actId = activity.id;
+    if (trackCache.current.has(actId)) {
+      setTrackPoints(trackCache.current.get(actId)!);
+    } else {
+      setTrackLoading(true);
+      activityService
+        .getTrackPoints(actId)
+        .then(points => {
+          if (stale) return;
+          trackCache.current.set(actId, points);
+          setTrackPoints(points);
+        })
+        .catch(() => {
+          if (stale) return;
+          setTrackPoints(null);
+        })
+        .finally(() => {
+          if (!stale) setTrackLoading(false);
+        });
     }
+    return () => { stale = true; };
   }, [activity, slideAnim, sheetHeightAnim]);
 
+  // ---- 关闭：只动画隐藏，不卸载 Modal 内的 MapView ----
+
   const animateClose = useCallback(() => {
+    setSheetState('collapsed');
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: ANIMATION.FAST,
       useNativeDriver: true,
     }).start(() => {
-      setModalVisible(false);
-      setVisibleActivity(null);
-      setSheetState('collapsed');
+      setSheetVisible(false);
+      // 不 setVisibleActivity(null)！保持挂载避免 MapView 崩溃
+      // 只清空轨迹数据让地图不画线
       setTrackPoints(null);
       setTrackLoading(false);
-      onClose();
+      onCloseRef.current();
     });
-  }, [slideAnim, onClose]);
+  }, [slideAnim]);
 
   const snapToCollapsed = useCallback(() => {
     setSheetState('collapsed');
@@ -117,28 +147,10 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
       duration: ANIMATION.NORMAL,
       useNativeDriver: false,
     }).start();
-
-    const actId = act.id;
-    if (trackCache.current.has(actId)) {
-      setTrackPoints(trackCache.current.get(actId)!);
-      return;
-    }
-    setTrackLoading(true);
-    activityService
-      .getTrackPoints(actId)
-      .then(points => {
-        trackCache.current.set(actId, points);
-        setTrackPoints(points);
-      })
-      .catch(() => {
-        setTrackPoints(null);
-      })
-      .finally(() => {
-        setTrackLoading(false);
-      });
   }, [sheetHeightAnim]);
 
   // ---- 拖拽手势 ----
+
   const panGesture = useMemo(() => {
     return Gesture.Pan()
       .activeOffsetY([-10, 10])
@@ -197,6 +209,7 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
   }, [sheetHeightAnim, snapToCollapsed, snapToExpanded, animateClose]);
 
   // ---- 图表数据 ----
+
   const chartDataSets = useMemo(() => {
     if (!trackPoints || trackPoints.length < 2) return null;
     const raw = prepareChartData(trackPoints);
@@ -207,20 +220,22 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
     };
   }, [trackPoints]);
 
-  if (!visibleActivity) return null;
-
   const translateY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [SCREEN_HEIGHT, 0],
   });
 
-  const meta = ACTIVITY_TYPE_META[visibleActivity.type as keyof typeof ACTIVITY_TYPE_META];
+  // MapView 用空数据保持挂载，有数据时才画线
+  const mapPoints = trackPoints && trackPoints.length >= 2 ? trackPoints : EMPTY_POINTS;
+  const showContent = sheetVisible && visibleActivity !== null;
+
+  const meta = visibleActivity ? ACTIVITY_TYPE_META[visibleActivity.type as keyof typeof ACTIVITY_TYPE_META] : null;
   const TypeIcon = meta?.icon;
-  const startDate = new Date(visibleActivity.startTime);
-  const endDate = new Date(visibleActivity.endTime);
+  const startDate = visibleActivity ? new Date(visibleActivity.startTime) : new Date();
+  const endDate = visibleActivity ? new Date(visibleActivity.endTime) : new Date();
 
   return (
-    <Modal visible={modalVisible} transparent animationType="none" onRequestClose={animateClose}>
+    <Modal visible={showContent} transparent animationType="none" onRequestClose={animateClose}>
       <GestureHandlerRootView style={styles.root}>
         <View style={styles.overlay}>
           {/* 点击 sheet 上方空白区域关闭 */}
@@ -244,7 +259,6 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
                 styles.sheet,
                 {
                   height: sheetHeightAnim,
-                  paddingBottom: insets.bottom + 24,
                 },
               ]}
             >
@@ -252,13 +266,12 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
               <GestureDetector gesture={panGesture}>
                 <View style={styles.dragZone}>
                   <View style={styles.dragIndicator} />
-
                   {/* 类型 + 日期标题 */}
                   <View style={styles.sheetHeader}>
                     <View style={styles.typeBadge}>
                       {TypeIcon && <TypeIcon size={16} color={COLORS.TEXT.SECONDARY} />}
                       <Text style={styles.typeBadgeText}>
-                        {meta?.label ?? visibleActivity.type}
+                        {meta?.label ?? visibleActivity?.type}
                       </Text>
                     </View>
                     <Text style={styles.sheetDate}>
@@ -268,11 +281,13 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
                 </View>
               </GestureDetector>
 
+              {visibleActivity && (
               <ScrollView
                 scrollEnabled={sheetState === 'expanded'}
                 showsVerticalScrollIndicator={false}
                 bounces={false}
                 nestedScrollEnabled
+                contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
               >
                 {/* 四格统计 */}
                 <View style={styles.statsGrid}>
@@ -311,29 +326,32 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
                   <Text style={styles.timeValue}>{format(endDate, 'HH:mm')}</Text>
                 </View>
 
-                {/* 展开内容 */}
-                {sheetState === 'expanded' && (
+                {/* 路线概览：始终渲染 MapView，用空数据保持挂载 */}
+                {(trackLoading || (trackPoints && trackPoints.length >= 2)) && (
                   <View style={styles.expandedContent}>
                     {trackLoading ? (
                       <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={COLORS.PRIMARY} />
                         <Text style={styles.loadingText}>加载轨迹数据...</Text>
                       </View>
-                    ) : trackPoints && trackPoints.length >= 2 ? (
+                    ) : (
                       <>
                         <View style={styles.sectionDivider} />
                         <Text style={styles.sectionTitle}>路线概览</Text>
-                        <RouteMiniMap points={trackPoints} />
-                        {/* TODO: 暂时禁用图表，排查闪退原因 */}
+                        <RouteMiniMap points={mapPoints} />
+                        {chartDataSets && (
+                          <>
+                            <View style={styles.sectionDivider} />
+                            <ActivityChart data={chartDataSets.elevationData} type="elevation" />
+                            <ActivityChart data={chartDataSets.speedData} type="speed" />
+                          </>
+                        )}
                       </>
-                    ) : (
-                      <View style={styles.loadingContainer}>
-                        <Text style={styles.errorText}>轨迹数据不可用</Text>
-                      </View>
                     )}
                   </View>
                 )}
               </ScrollView>
+              )}
             </Animated.View>
           </Animated.View>
         </View>
@@ -462,7 +480,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   expandedContent: {
-    paddingBottom: 40,
+    paddingBottom: 16,
   },
   sectionDivider: {
     height: 1,

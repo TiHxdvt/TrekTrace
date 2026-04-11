@@ -33,6 +33,8 @@ import SvgCalendar from '../icons/solar-calendar-linear.svg';
 import SvgLogout from '../icons/solar-logout-linear.svg';
 import SvgEyeClosed from '../icons/solar-eye-closed-linear.svg';
 import SvgEyeScan from '../icons/solar-eye-scan-linear.svg';
+import SvgMapPointBold from '../icons/solar-map-point-bold.svg';
+import SvgFlagBold from '../icons/solar-flag-bold.svg';
 import SvgArrowDown from '../icons/solar-arrow-down-linear.svg';
 
 // ==================== 导航栏图标 ====================
@@ -80,3 +82,7 @@ export const IconEyeScan = createIcon(SvgEyeScan);
 
 // ==================== 方向图标 ====================
 export const IconArrowDown = createIcon(SvgArrowDown);
+
+// ==================== 地图标记图标 ====================
+export const IconMapPointBold = createIcon(SvgMapPointBold);
+export const IconFlagBold = createIcon(SvgFlagBold);
