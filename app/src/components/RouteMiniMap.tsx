@@ -1,38 +1,118 @@
 /**
  * 迷你路线预览
  * 使用高德地图 MapView 渲染轨迹
+ * 支持：速度/海拔渐变色切换、轨迹回放
  * pointerEvents="none" 防止拦截 ScrollView / 拖拽手势
  */
 
-import React, { useRef, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
+import { View, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { MapView, MapType, Polyline } from 'react-native-amap3d';
 import { COLORS, BORDER_RADIUS } from '../theme';
+import { IconLayersBold, IconPlaybackSpeedBold, IconWalkingBold } from './SolarIcons';
+import { haversineDistance } from '../utils/trackData';
 import type { TrackPointUploadDTO } from '../types';
+
+type TrailStyle = 'speed' | 'elevation';
 
 interface RouteMiniMapProps {
   points: TrackPointUploadDTO[];
 }
 
-const MAP_HEIGHT = 180;
+const MAP_HEIGHT = 200;
+const REPLAY_INTERVAL = 50;
+const REPLAY_STEP = 3;
+
+// 速度色带：慢(绿) → 中(黄) → 快(红)
+const SPEED_COLORS = ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'];
+// 海拔色带：低(蓝) → 中(青) → 高(橙) → 极高(白)
+const ELEVATION_COLORS = ['#3b82f6', '#06b6d4', '#22c55e', '#f97316', '#fbbf24'];
 
 export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
   const mapViewRef = useRef<MapView>(null);
+  const replayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const replayEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 下采样到 200 点，转为地图坐标
-  const coords = useMemo(() => {
+  const [trailStyle, setTrailStyle] = useState<TrailStyle>('speed');
+  const [replaying, setReplaying] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+
+  // 清理回放定时器
+  useEffect(() => {
+    return () => {
+      if (replayTimerRef.current) clearInterval(replayTimerRef.current);
+      if (replayEndTimerRef.current) clearTimeout(replayEndTimerRef.current);
+    };
+  }, []);
+
+  // 下采样到 200 点，保留原始数据用于颜色计算
+  const sampled = useMemo(() => {
     if (points.length < 2) return [];
     const maxPts = 200;
-    let sampled = points;
-    if (points.length > maxPts) {
-      const step = (points.length - 1) / (maxPts - 1);
-      sampled = [];
-      for (let i = 0; i < maxPts; i++) {
-        sampled.push(points[Math.min(Math.round(i * step), points.length - 1)]);
+    if (points.length <= maxPts) return points.slice();
+    const step = (points.length - 1) / (maxPts - 1);
+    const result: TrackPointUploadDTO[] = [];
+    for (let i = 0; i < maxPts; i++) {
+      result.push(points[Math.min(Math.round(i * step), points.length - 1)]);
+    }
+    return result;
+  }, [points]);
+
+  const coords = useMemo(
+    () => sampled.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
+    [sampled],
+  );
+
+  // 计算每个采样点的速度（km/h）
+  const speeds = useMemo(() => {
+    if (sampled.length === 0) return [];
+    const firstSpeed = sampled[0].speed > 0 ? sampled[0].speed * 3.6 : 0;
+    const result: number[] = [firstSpeed];
+    for (let i = 1; i < sampled.length; i++) {
+      const prev = sampled[i - 1];
+      const curr = sampled[i];
+      const dist = haversineDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+      const dtSec = (new Date(curr.timestamp).getTime() - new Date(prev.timestamp).getTime()) / 1000;
+      if (dtSec > 0 && dist > 0) {
+        result.push((dist / dtSec) * 3.6);
+      } else if (curr.speed > 0) {
+        result.push(curr.speed * 3.6);
+      } else {
+        result.push(result[i - 1]);
       }
     }
-    return sampled.map(p => ({ latitude: p.latitude, longitude: p.longitude }));
-  }, [points]);
+    return result;
+  }, [sampled]);
+
+  // 计算每个采样点的颜色
+  const segmentColors = useMemo(() => {
+    if (sampled.length < 2) return [];
+
+    if (trailStyle === 'speed') {
+      let minS = Infinity, maxS = -Infinity;
+      for (const s of speeds) {
+        if (s < minS) minS = s;
+        if (s > maxS) maxS = s;
+      }
+      const range = maxS - minS || 1;
+      return speeds.map(s => {
+        const t = (s - minS) / range;
+        return SPEED_COLORS[Math.min(Math.floor(t * SPEED_COLORS.length), SPEED_COLORS.length - 1)];
+      });
+    }
+
+    // elevation
+    let minA = Infinity, maxA = -Infinity;
+    for (const p of sampled) {
+      if (p.altitude < minA) minA = p.altitude;
+      if (p.altitude > maxA) maxA = p.altitude;
+    }
+    const range = maxA - minA || 1;
+    return sampled.map(p => {
+      const t = (p.altitude - minA) / range;
+      return ELEVATION_COLORS[Math.min(Math.floor(t * ELEVATION_COLORS.length), ELEVATION_COLORS.length - 1)];
+    });
+  }, [sampled, speeds, trailStyle]);
 
   // 计算相机中心和缩放
   const cameraTarget = useMemo(() => {
@@ -80,6 +160,57 @@ export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
     return () => clearTimeout(timer);
   }, [cameraTarget]);
 
+  // 回放时渐进绘制的坐标和颜色
+  const replayCoords = useMemo(() => {
+    if (!replaying) return coords;
+    return coords.slice(0, replayIndex + 1);
+  }, [coords, replaying, replayIndex]);
+
+  const replayColors = useMemo(() => {
+    if (!replaying) return segmentColors;
+    return segmentColors.slice(0, replayIndex + 1);
+  }, [segmentColors, replaying, replayIndex]);
+
+  // ---- 回放控制 ----
+
+  const stopReplay = useCallback(() => {
+    if (replayTimerRef.current) {
+      clearInterval(replayTimerRef.current);
+      replayTimerRef.current = null;
+    }
+    if (replayEndTimerRef.current) {
+      clearTimeout(replayEndTimerRef.current);
+      replayEndTimerRef.current = null;
+    }
+    setReplaying(false);
+    setReplayIndex(0);
+  }, []);
+
+  const startReplay = useCallback(() => {
+    stopReplay();
+    setReplaying(true);
+    setReplayIndex(0);
+
+    let idx = 0;
+    replayTimerRef.current = setInterval(() => {
+      idx += REPLAY_STEP;
+      if (idx >= coords.length - 1) {
+        if (replayTimerRef.current) {
+          clearInterval(replayTimerRef.current);
+          replayTimerRef.current = null;
+        }
+        setReplayIndex(coords.length - 1);
+        replayEndTimerRef.current = setTimeout(() => {
+          replayEndTimerRef.current = null;
+          setReplaying(false);
+          setReplayIndex(0);
+        }, 1000);
+      } else {
+        setReplayIndex(idx);
+      }
+    }, REPLAY_INTERVAL);
+  }, [coords, stopReplay]);
+
   if (coords.length < 2 || !cameraTarget) return null;
 
   return (
@@ -106,12 +237,54 @@ export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
         trafficEnabled={false}
       >
         <Polyline
-          points={coords}
-          color={COLORS.PRIMARY}
-          width={4}
+          points={replayCoords}
+          colors={replayColors}
+          gradient
+          width={5}
           zIndex={10}
         />
       </MapView>
+
+      {/* 左上角颜色条 */}
+      <View style={styles.styleLabel} pointerEvents="none">
+        <View style={styles.styleLabelBg}>
+          <View style={styles.styleGradientCol}>
+            {(trailStyle === 'speed' ? SPEED_COLORS : ELEVATION_COLORS).map((c, i) => (
+              <View key={i} style={[styles.styleGradSeg, { backgroundColor: c }]} />
+            ))}
+          </View>
+        </View>
+        <View style={[styles.styleDot, {
+          backgroundColor: trailStyle === 'speed' ? '#ef4444' : '#3b82f6',
+        }]} />
+      </View>
+
+      {/* 右上角控制按钮 */}
+      <View style={styles.controls} pointerEvents="box-none">
+        {/* 样式切换：速度 / 海拔 */}
+        <Pressable
+          style={styles.btn}
+          onPress={() => setTrailStyle(prev => prev === 'speed' ? 'elevation' : 'speed')}
+          hitSlop={6}
+        >
+          {trailStyle === 'speed' ? (
+            <IconWalkingBold size={18} color={COLORS.TEXT.SECONDARY} />
+          ) : (
+            <IconLayersBold size={18} color={COLORS.TEXT.SECONDARY} />
+          )}
+        </Pressable>
+        {/* 回放 */}
+        <Pressable
+          style={styles.btn}
+          onPress={replaying ? stopReplay : startReplay}
+          hitSlop={6}
+        >
+          <IconPlaybackSpeedBold
+            size={18}
+            color={replaying ? COLORS.PRIMARY : COLORS.TEXT.SECONDARY}
+          />
+        </Pressable>
+      </View>
     </View>
   );
 };
@@ -125,5 +298,51 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
     borderColor: COLORS.BORDER.LIGHT,
+  },
+  controls: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    gap: 6,
+    zIndex: 50,
+  },
+  btn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(28, 30, 38, 0.8)',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.MEDIUM,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  styleLabel: {
+    position: 'absolute',
+    left: 8,
+    top: 8,
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 50,
+  },
+  styleDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  styleLabelBg: {
+    backgroundColor: 'rgba(28, 30, 38, 0.8)',
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.MEDIUM,
+    borderRadius: 6,
+    padding: 4,
+  },
+  styleGradientCol: {
+    flexDirection: 'column',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  styleGradSeg: {
+    width: 8,
+    height: 8,
   },
 });

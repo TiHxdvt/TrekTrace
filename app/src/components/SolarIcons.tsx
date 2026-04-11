@@ -35,6 +35,9 @@ import SvgEyeClosed from '../icons/solar-eye-closed-linear.svg';
 import SvgEyeScan from '../icons/solar-eye-scan-linear.svg';
 import SvgMapPointBold from '../icons/solar-map-point-bold.svg';
 import SvgFlagBold from '../icons/solar-flag-bold.svg';
+import SvgLayersBold from '../icons/solar-layers-bold.svg';
+import SvgPlaybackSpeedBold from '../icons/solar-playback-speed-bold.svg';
+import SvgWalkingBold from '../icons/solar-walking-bold.svg';
 import SvgArrowDown from '../icons/solar-arrow-down-linear.svg';
 
 // ==================== 导航栏图标 ====================
@@ -86,3 +89,8 @@ export const IconArrowDown = createIcon(SvgArrowDown);
 // ==================== 地图标记图标 ====================
 export const IconMapPointBold = createIcon(SvgMapPointBold);
 export const IconFlagBold = createIcon(SvgFlagBold);
+
+// ==================== 轨迹地图图标 ====================
+export const IconLayersBold = createIcon(SvgLayersBold);
+export const IconPlaybackSpeedBold = createIcon(SvgPlaybackSpeedBold);
+export const IconWalkingBold = createIcon(SvgWalkingBold);
