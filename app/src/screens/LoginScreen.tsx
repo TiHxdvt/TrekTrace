@@ -12,15 +12,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   StatusBar,
   TouchableOpacity,
 } from 'react-native';
 import { Button } from '../components/Button';
+import { Dialog } from '../components/Dialog';
 import { FullScreenBlur } from '../components/FullScreenBlur';
 import { IconEyeClosed, IconEyeScan } from '../components/SolarIcons';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
+import { setCachedToken } from '../services/api';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
 
 type LoginMode = 'sms' | 'password';
@@ -110,14 +111,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
       setCountdown(60);
 
-      Alert.alert(
+      Dialog.show(
         '提示',
         '验证码已发送，请查看后端控制台',
         [{ text: '确定' }]
       );
     } catch (error: any) {
       console.error('Send code error:', error);
-      Alert.alert('错误', '验证码发送失败，请稍后重试');
+      Dialog.show('错误', '验证码发送失败，请稍后重试');
     } finally {
       setSendingCode(false);
     }
@@ -154,11 +155,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
       await storageService.saveToken(response.token);
       await storageService.saveUser(response.user);
+      setCachedToken(response.token);
 
       onLoginSuccess();
     } catch (error: any) {
       console.error('Login error:', error);
-      Alert.alert('登录失败', '验证码错误或已过期，请重新获取');
+      Dialog.show('登录失败', '验证码错误或已过期，请重新获取');
     } finally {
       setLoading(false);
     }
@@ -190,11 +192,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
       await storageService.saveToken(response.token);
       await storageService.saveUser(response.user);
+      setCachedToken(response.token);
 
       onLoginSuccess();
     } catch (error: any) {
       console.error('Password login error:', error);
-      Alert.alert('登录失败', '账号或密码错误');
+      Dialog.show('登录失败', '账号或密码错误');
     } finally {
       setLoading(false);
     }

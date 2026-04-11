@@ -1,16 +1,84 @@
 /**
  * 历史记录页面
+ * 手风琴折叠布局，按运动类型分组展示活动数据
  */
 
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { BlurView } from '@react-native-community/blur';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
-import { IconPlane, IconArrowRight } from '../components/SolarIcons';
+import { useFocusEffect } from '@react-navigation/native';
+import { COLORS, TYPOGRAPHY } from '../theme';
+import { IconBonfire } from '../components/SolarIcons';
+import { FullScreenBlur } from '../components/FullScreenBlur';
+import { AccordionSection } from '../components/AccordionSection';
+import { ActivityDetailSheet } from '../components/ActivityDetailSheet';
+import { EmptyState } from '../components/EmptyState';
+import { ACTIVITY_TYPES } from '../constants/activityMeta';
+import { activityService } from '../services/activityService';
+import type { ActivityResponseDTO, ActivityType } from '../types';
 
 export const HistoryScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const [activities, setActivities] = useState<ActivityResponseDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedType, setExpandedType] = useState<ActivityType | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityResponseDTO | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      const loadActivities = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          const data = await activityService.getActivities();
+          setActivities(data);
+        } catch {
+          setError('加载失败，请重试');
+        } finally {
+          setLoading(false);
+        }
+      };
+      loadActivities();
+    }, []),
+  );
+
+  // Group activities by type
+  const grouped = useMemo(() => {
+    const map: Record<ActivityType, ActivityResponseDTO[]> = {
+      HIKING: [],
+      RUNNING: [],
+      CYCLING: [],
+    };
+    for (const a of activities) {
+      const t = a.type as ActivityType;
+      if (map[t]) {
+        map[t].push(a);
+      }
+    }
+    // Sort each group by startTime descending
+    for (const key of ACTIVITY_TYPES) {
+      map[key].sort(
+        (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
+      );
+    }
+    return map;
+  }, [activities]);
+
+  const handleToggle = useCallback((type: ActivityType) => {
+    setExpandedType(prev => (prev === type ? null : type));
+  }, []);
+
+  const handleActivityPress = useCallback((activity: ActivityResponseDTO) => {
+    setSelectedActivity(activity);
+  }, []);
+
+  const handleCloseSheet = useCallback(() => {
+    setSelectedActivity(null);
+  }, []);
+
+  const isEmpty = !loading && !error && activities.length === 0;
+
   return (
     <View style={styles.container}>
       {/* Background Glow */}
@@ -18,16 +86,7 @@ export const HistoryScreen: React.FC = () => {
         <View style={styles.glowOrb} />
       </View>
 
-      {/* 全屏模糊层 */}
-      <View style={styles.fullScreenBlur} pointerEvents="none">
-        <BlurView
-          style={StyleSheet.absoluteFillObject}
-          blurRadius={20}
-          overlayColor={COLORS.OVERLAY.BLUR_DARK}
-          blurType="dark"
-          blurAmount={20}
-        />
-      </View>
+      <FullScreenBlur />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
@@ -39,20 +98,41 @@ export const HistoryScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Placeholder items */}
-        {['最近一次跑步', '周末骑行', '山间徒步'].map((item, index) => (
-          <View key={index} style={styles.historyCard}>
-            <View style={styles.historyCardIcon}>
-              <IconPlane size={20} color={COLORS.TEXT.SECONDARY} />
-            </View>
-            <View style={styles.historyCardContent}>
-              <Text style={styles.historyCardTitle}>{item}</Text>
-              <Text style={styles.historyCardSubtext}>暂无数据</Text>
-            </View>
-            <IconArrowRight size={16} color={COLORS.TEXT.QUINARY} />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.PRIMARY} />
+            <Text style={styles.loadingText}>加载中...</Text>
           </View>
-        ))}
+        ) : error ? (
+          <EmptyState
+            icon={<IconBonfire size={24} color={COLORS.TEXT.QUATERNARY} />}
+            title={error}
+            subtitle="下拉刷新或检查网络连接"
+          />
+        ) : isEmpty ? (
+          <EmptyState
+            icon={<IconBonfire size={24} color={COLORS.TEXT.QUATERNARY} />}
+            title="暂无运动记录"
+            subtitle="完成一次运动后，记录会出现在这里"
+          />
+        ) : (
+          ACTIVITY_TYPES.map(type => (
+            <AccordionSection
+              key={type}
+              type={type}
+              activities={grouped[type]}
+              isExpanded={expandedType === type}
+              onToggle={() => handleToggle(type)}
+              onActivityPress={handleActivityPress}
+            />
+          ))
+        )}
       </ScrollView>
+
+      <ActivityDetailSheet
+        activity={selectedActivity}
+        onClose={handleCloseSheet}
+      />
     </View>
   );
 };
@@ -78,10 +158,6 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: COLORS.GRADIENT.PURPLE_LIGHT,
   },
-  fullScreenBlur: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-  },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -102,34 +178,13 @@ const styles = StyleSheet.create({
     paddingBottom: 140,
     gap: 12,
   },
-  historyCard: {
-    flexDirection: 'row',
+  loadingContainer: {
     alignItems: 'center',
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.XXL,
-    padding: 16,
-    gap: 16,
-  },
-  historyCardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 64,
+    gap: 12,
   },
-  historyCardContent: {
-    flex: 1,
-  },
-  historyCardTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '500',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: 4,
-  },
-  historyCardSubtext: {
+  loadingText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.TEXT.QUATERNARY,
   },

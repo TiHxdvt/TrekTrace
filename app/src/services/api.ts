@@ -5,7 +5,10 @@
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Keychain from 'react-native-keychain';
 import { APP_CONFIG } from '../config';
+
+const KEYCHAIN_SERVICE = 'com.trektrace.auth';
 
 // Module-level token cache to avoid async reads on every request
 let _cachedToken: string | null = null;
@@ -15,9 +18,19 @@ export function setCachedToken(token: string | null): void {
   _cachedToken = token;
 }
 
-/** Retrieve the cached token, falling back to AsyncStorage */
+/** Retrieve the cached token, falling back to Keychain then AsyncStorage */
 async function getToken(): Promise<string | null> {
   if (_cachedToken !== null) return _cachedToken;
+  try {
+    // 优先从 Keychain 读取（与 storageService 一致）
+    const result = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICE });
+    if (result) {
+      _cachedToken = result.password;
+      return _cachedToken;
+    }
+  } catch {
+    // Keychain 不可用时 fallback
+  }
   try {
     const stored = await AsyncStorage.getItem('token');
     if (stored) _cachedToken = stored;

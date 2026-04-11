@@ -13,15 +13,16 @@ import {
   PermissionsAndroid,
   Platform,
   Animated,
-  Alert,
   StatusBar,
   Dimensions,
+  Vibration,
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { MapView, AMapSdk, MapType, Polyline } from 'react-native-amap3d';
 import type { NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import Svg, { Circle } from 'react-native-svg';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
 import { APP_CONFIG } from '../config';
 import {
@@ -37,8 +38,11 @@ import {
   IconPause,
   IconStop,
 } from '../components/SolarIcons';
+import { Dialog } from '../components/Dialog';
 import { trackRecordingService } from '../services/trackRecordingService';
 import { mockLocationService, MOCK_ROUTES } from '../services/mockLocationService';
+import { formatDuration, formatPace } from '../utils/format';
+import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
 import type {
   ActivityType,
   RecordingSession,
@@ -75,22 +79,8 @@ const ACTIVITY_TYPE_MAP: Record<ActivityTypeLocal, ActivityType> = {
   cycling: 'CYCLING',
 };
 
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-function formatPace(secondsPerKm: number): string {
-  if (secondsPerKm <= 0 || !isFinite(secondsPerKm)) return "--'--\"";
-  const m = Math.floor(secondsPerKm / 60);
-  const s = Math.floor(secondsPerKm % 60);
-  return `${m}'${String(s).padStart(2, '0')}"`;
-}
+// Animated SVG Circle for circular progress ring
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export const ActivityScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -126,6 +116,11 @@ export const ActivityScreen: React.FC = () => {
   // Long press stop state
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
+
+  // Prevent accidental tap after stop — stays true until UI fully transitions
+  const isStoppingRef = useRef(false);
+  // Activity type locked at start — prevents switching during/after stop
+  const lockedActivityType = useRef<ActivityType | null>(null);
 
   // Use ref for isRecording to avoid handleLocation re-creation
   const isRecordingRef = useRef(false);
@@ -216,7 +211,7 @@ export const ActivityScreen: React.FC = () => {
       const recovered = await trackRecordingService.recoverSession();
       if (recovered) {
         if (recovered.status === 'stopped') {
-          Alert.alert(
+          Dialog.show(
             '上传未完成',
             '上次运动的记录上传失败，是否重试？',
             [
@@ -225,7 +220,7 @@ export const ActivityScreen: React.FC = () => {
             ],
           );
         } else {
-          Alert.alert(
+          Dialog.show(
             '恢复记录',
             '检测到未完成的运动记录，是否恢复？',
             [
@@ -374,7 +369,7 @@ export const ActivityScreen: React.FC = () => {
     const routeKeys = Object.keys(MOCK_ROUTES);
     const routeOptions = routeKeys.map(key => MOCK_ROUTES[key].name);
 
-    Alert.alert(
+    Dialog.show(
       'GPS 模拟',
       '选择模拟路线：',
       [
@@ -465,12 +460,14 @@ export const ActivityScreen: React.FC = () => {
 
   // 循环切换运动模式
   const cycleType = () => {
-    if (!isIdle) return;
+    if (!isIdle || isStoppingRef.current || lockedActivityType.current) return;
     setActivityIndex(prev => (prev + 1) % ACTIVITY_CYCLE.length);
   };
 
   const handleStart = () => {
+    if (isStoppingRef.current) return;
     const activityType = ACTIVITY_TYPE_MAP[selectedType];
+    lockedActivityType.current = activityType;
     trackRecordingService.startRecording(activityType);
   };
 
@@ -484,6 +481,7 @@ export const ActivityScreen: React.FC = () => {
 
   // Long press stop (1.5s)
   const handleStopPressIn = () => {
+    isStoppingRef.current = true;
     longPressProgress.setValue(0);
     Animated.timing(longPressProgress, {
       toValue: 1,
@@ -492,10 +490,15 @@ export const ActivityScreen: React.FC = () => {
     }).start();
 
     longPressTimer.current = setTimeout(async () => {
+      // Haptic feedback — long press completed
+      Vibration.vibrate(100);
+
       const success = await trackRecordingService.stopRecording();
       longPressProgress.setValue(0);
       if (!success) {
-        Alert.alert(
+        isStoppingRef.current = false;
+        lockedActivityType.current = null;
+        Dialog.show(
           '上传失败',
           '运动记录已保存到本地，请检查网络后重试。',
           [
@@ -504,9 +507,11 @@ export const ActivityScreen: React.FC = () => {
           ],
         );
       } else {
-        // Show summary overlay — reuse main map with same colored segments
-        showSummaryRef.current = true;
-        setShowSummary(true);
+        // Delay summary to let stop button fully transition back to start
+        setTimeout(() => {
+          showSummaryRef.current = true;
+          setShowSummary(true);
+        }, 400);
       }
     }, LONG_PRESS_DURATION);
   };
@@ -518,12 +523,16 @@ export const ActivityScreen: React.FC = () => {
     }
     longPressProgress.stopAnimation();
     longPressProgress.setValue(0);
+    // Long press didn't complete — reset stopping guard
+    isStoppingRef.current = false;
   };
 
   // Close summary overlay and discard recording data
   const handleCloseSummary = () => {
     showSummaryRef.current = false;
     setShowSummary(false);
+    isStoppingRef.current = false;
+    lockedActivityType.current = null;
     trackRecordingService.discardRecording();
   };
 
@@ -568,6 +577,11 @@ export const ActivityScreen: React.FC = () => {
   };
 
   const ActiveIcon = ACTIVITY_ICONS[selectedType];
+
+  // Summary type info — computed once from locked type
+  const summaryType = lockedActivityType.current ?? session?.activityType ?? 'RUNNING';
+  const summaryTypeMeta = ACTIVITY_TYPE_META[summaryType];
+  const SummaryIcon = summaryTypeMeta.icon;
 
   return (
     <View style={styles.container}>
@@ -705,6 +719,11 @@ export const ActivityScreen: React.FC = () => {
             <StatusBar barStyle="light-content" />
             {/* Top stats overlay */}
             <View style={[styles.summaryStatsOverlay, { paddingTop: insets.top + 16 }]}>
+              {/* Activity type badge */}
+              <View style={styles.summaryTypeBadge}>
+                <SummaryIcon size={16} color={COLORS.TEXT.PRIMARY} />
+                <Text style={styles.summaryTypeText}>{summaryTypeMeta.label}</Text>
+              </View>
               <View style={styles.summaryStatsCard}>
                 <View style={styles.summaryStatsRow}>
                   <View style={styles.summaryStatItem}>
@@ -831,17 +850,41 @@ export const ActivityScreen: React.FC = () => {
                 >
                   <View style={styles.stopBtnInner}>
                     <IconStop size={18} color={COLORS.ERROR} />
+                  </View>
+                  {/* Circular progress ring */}
+                  <View style={styles.stopProgressRingContainer} pointerEvents="none">
                     <Animated.View
-                      style={[
-                        styles.stopProgressRing,
-                        {
-                          width: longPressProgress.interpolate({
+                      style={{
+                        transform: [{ rotate: '-90deg' }],
+                      }}
+                    >
+                      <Svg width={50} height={50}>
+                        {/* Background ring */}
+                        <Circle
+                          cx={25}
+                          cy={25}
+                          r={22}
+                          stroke="rgba(255,255,255,0.1)"
+                          strokeWidth={3}
+                          fill="none"
+                        />
+                        {/* Progress ring */}
+                        <AnimatedCircle
+                          cx={25}
+                          cy={25}
+                          r={22}
+                          stroke={COLORS.ERROR}
+                          strokeWidth={3}
+                          fill="none"
+                          strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 22}`}
+                          strokeDashoffset={longPressProgress.interpolate({
                             inputRange: [0, 1],
-                            outputRange: ['0%', '100%'],
-                          }),
-                        },
-                      ]}
-                    />
+                            outputRange: [2 * Math.PI * 22, 0],
+                          })}
+                        />
+                      </Svg>
+                    </Animated.View>
                   </View>
                 </TouchableOpacity>
               )}
@@ -1078,13 +1121,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  stopProgressRing: {
+  stopProgressRingContainer: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    height: 2,
-    backgroundColor: COLORS.ERROR,
-    borderRadius: 1,
+    top: -3,
+    left: -3,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // ========== Summary Overlay ==========
@@ -1099,6 +1143,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: 20,
+    gap: 12,
+  },
+  summaryTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 8,
+    backgroundColor: COLORS.OVERLAY.SUMMARY,
+    borderRadius: BORDER_RADIUS.G2.XXL,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.MEDIUM,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  summaryTypeText: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
   },
   summaryStatsCard: {
     backgroundColor: COLORS.OVERLAY.SUMMARY,

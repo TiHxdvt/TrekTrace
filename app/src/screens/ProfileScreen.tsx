@@ -3,19 +3,20 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
 import { IconUser, IconLogout } from '../components/SolarIcons';
+import { Dialog } from '../components/Dialog';
 import { storageService } from '../services/storageService';
 
 export const ProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
 
   const handleLogout = () => {
-    Alert.alert(
+    Dialog.show(
       '退出登录',
       '确定要退出登录吗？',
       [

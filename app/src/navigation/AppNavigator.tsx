@@ -213,6 +213,7 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <MainTab.Navigator
+      // eslint-disable-next-line react/no-unstable-nested-components
       tabBar={props => <FloatingTabBar {...props} />}
       screenOptions={{
         headerShown: false,
