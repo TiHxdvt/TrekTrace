@@ -79,6 +79,11 @@ const ACTIVITY_TYPE_MAP: Record<ActivityTypeLocal, ActivityType> = {
   cycling: 'CYCLING',
 };
 
+// Summary replay animation constants
+const SUMMARY_REPLAY_DURATION = 3500;
+const SUMMARY_REPLAY_INTERVAL = 50;
+const SUMMARY_REPLAY_STEPS = SUMMARY_REPLAY_DURATION / SUMMARY_REPLAY_INTERVAL;
+
 // Animated SVG Circle for circular progress ring
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -112,6 +117,39 @@ export const ActivityScreen: React.FC = () => {
   // Summary overlay state — reuses main map, no second MapView
   const [showSummary, setShowSummary] = useState(false);
   const showSummaryRef = useRef(false);
+
+  // Summary replay animation
+  const [replayProgress, setReplayProgress] = useState(0); // 0..1
+  const replayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startSummaryReplay = useCallback(() => {
+    if (replayTimerRef.current) {
+      clearInterval(replayTimerRef.current);
+      replayTimerRef.current = null;
+    }
+    setReplayProgress(0);
+    let step = 0;
+    replayTimerRef.current = setInterval(() => {
+      step++;
+      if (step >= SUMMARY_REPLAY_STEPS) {
+        setReplayProgress(1);
+        if (replayTimerRef.current) {
+          clearInterval(replayTimerRef.current);
+          replayTimerRef.current = null;
+        }
+      } else {
+        setReplayProgress(step / SUMMARY_REPLAY_STEPS);
+      }
+    }, SUMMARY_REPLAY_INTERVAL);
+  }, []);
+
+  const stopSummaryReplay = useCallback((reset?: boolean) => {
+    if (replayTimerRef.current) {
+      clearInterval(replayTimerRef.current);
+      replayTimerRef.current = null;
+    }
+    if (reset) setReplayProgress(1);
+  }, []);
 
   // Long press stop state
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -204,6 +242,47 @@ export const ActivityScreen: React.FC = () => {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only session.segments and activityType are used; full session dependency would recompute every second
   }, [polylineSegments, session?.activityType, session?.segments]);
+
+  // Slice coloredSegments by replayProgress for track replay animation
+  const displaySegments = useMemo(() => {
+    if (!showSummary || replayProgress >= 1 || coloredSegments.length === 0) return coloredSegments;
+
+    const totalPoints = coloredSegments.reduce((sum, s) => sum + s.coords.length, 0);
+    const targetCount = Math.max(1, Math.round(totalPoints * replayProgress));
+
+    const result: typeof coloredSegments = [];
+    let accumulated = 0;
+
+    for (const seg of coloredSegments) {
+      const remaining = targetCount - accumulated;
+      if (remaining <= 0) break;
+
+      if (remaining >= seg.coords.length) {
+        result.push(seg);
+        accumulated += seg.coords.length;
+      } else {
+        result.push({
+          coords: seg.coords.slice(0, remaining),
+          colors: seg.colors.slice(0, remaining),
+        });
+        accumulated += remaining;
+        break;
+      }
+    }
+
+    return result;
+  }, [coloredSegments, replayProgress, showSummary]);
+
+  // Animated stats for number rolling effect in summary
+  const animatedStats = useMemo(() => {
+    const p = replayProgress;
+    return {
+      distance: stats.distance * p,
+      duration: Math.round(stats.duration * p),
+      currentPace: stats.currentPace > 0 ? stats.currentPace * p : 0,
+      elevationGain: stats.elevationGain * p,
+    };
+  }, [stats, replayProgress]);
 
   // Crash recovery on mount
   useEffect(() => {
@@ -561,6 +640,7 @@ export const ActivityScreen: React.FC = () => {
 
   // Discard recording from summary overlay
   const handleDiscardFromSummary = () => {
+    stopSummaryReplay();
     showSummaryRef.current = false;
     setShowSummary(false);
     isStoppingRef.current = false;
@@ -572,6 +652,7 @@ export const ActivityScreen: React.FC = () => {
   const isSavingRef = useRef(false);
   const handleSaveFromSummary = async () => {
     if (isSavingRef.current) return;
+    stopSummaryReplay();
     isSavingRef.current = true;
     try {
       const ok = await trackRecordingService.retryUpload();
@@ -624,6 +705,21 @@ export const ActivityScreen: React.FC = () => {
       );
     }, 300);
     return () => clearTimeout(timer);
+  }, [showSummary, coloredSegments]);
+
+  // Auto-start replay when summary is shown and segments are ready (delayed for map camera)
+  useEffect(() => {
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
+    if (showSummary && coloredSegments.length > 0 && replayProgress === 0) {
+      delayTimer = setTimeout(() => {
+        startSummaryReplay();
+      }, 1000);
+    }
+    return () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      stopSummaryReplay();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- start/stop are stable callbacks
   }, [showSummary, coloredSegments]);
 
   // 左按钮：空闲=模式选择，记录中=暂停，暂停中=继续
@@ -706,7 +802,7 @@ export const ActivityScreen: React.FC = () => {
           }}
         >
           {/* Track Polylines */}
-          {coloredSegments.map((seg, idx) => (
+          {displaySegments.map((seg, idx) => (
             <Polyline
               key={`segment-${idx}`}
               points={seg.coords}
@@ -791,19 +887,19 @@ export const ActivityScreen: React.FC = () => {
                 <View style={styles.summaryStatsRow}>
                   <View style={styles.summaryStatItem}>
                     <Text style={styles.summaryStatLabel}>距离</Text>
-                    <Text style={styles.summaryStatValue}>{(stats.distance / 1000).toFixed(2)} km</Text>
+                    <Text style={styles.summaryStatValue}>{(animatedStats.distance / 1000).toFixed(2)} km</Text>
                   </View>
                   <View style={styles.summaryStatItem}>
                     <Text style={styles.summaryStatLabel}>时长</Text>
-                    <Text style={styles.summaryStatValue}>{formatDuration(stats.duration)}</Text>
+                    <Text style={styles.summaryStatValue}>{formatDuration(animatedStats.duration)}</Text>
                   </View>
                   <View style={styles.summaryStatItem}>
                     <Text style={styles.summaryStatLabel}>配速</Text>
-                    <Text style={styles.summaryStatValue}>{formatPace(stats.currentPace)}</Text>
+                    <Text style={styles.summaryStatValue}>{formatPace(animatedStats.currentPace)}</Text>
                   </View>
                   <View style={styles.summaryStatItem}>
                     <Text style={styles.summaryStatLabel}>爬升</Text>
-                    <Text style={styles.summaryStatValue}>{Math.round(stats.elevationGain)} m</Text>
+                    <Text style={styles.summaryStatValue}>{Math.round(animatedStats.elevationGain)} m</Text>
                   </View>
                 </View>
               </View>
