@@ -694,8 +694,8 @@ export const ActivityScreen: React.FC = () => {
           scaleControlsEnabled={false}
           zoomControlsEnabled={false}
           compassEnabled={false}
-          rotateGesturesEnabled={false}
-          tiltGesturesEnabled={false}
+          rotateGesturesEnabled={showSummary}
+          tiltGesturesEnabled={showSummary}
           labelsEnabled
           buildingsEnabled={false}
           trafficEnabled={false}
