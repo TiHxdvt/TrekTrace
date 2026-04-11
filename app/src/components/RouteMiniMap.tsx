@@ -1,52 +1,27 @@
 /**
  * 迷你路线预览
- * 使用 react-native-svg 绘制轨迹折线，避免多个 MapView 实例导致 AMap SDK 崩溃
+ * 使用高德地图 MapView 渲染轨迹
+ * pointerEvents="none" 防止拦截 ScrollView / 拖拽手势
  */
 
-import React, { useMemo, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import Svg, { Polyline, Circle } from 'react-native-svg';
-import { COLORS } from '../theme';
+import React, { useRef, useEffect, useMemo } from 'react';
+import { View, StyleSheet, Dimensions } from 'react-native';
+import { MapView, MapType, Polyline } from 'react-native-amap3d';
+import { COLORS, BORDER_RADIUS } from '../theme';
 import type { TrackPointUploadDTO } from '../types';
 
 interface RouteMiniMapProps {
   points: TrackPointUploadDTO[];
 }
 
-const PADDING = 12;
+const MAP_HEIGHT = 180;
 
 export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
-  const [layout, setLayout] = useState({ width: 0, height: 0 });
+  const mapViewRef = useRef<MapView>(null);
 
-  // 将 GPS 坐标映射到 SVG 坐标系
-  const svgPath = useMemo(() => {
-    if (points.length < 2 || layout.width === 0) return null;
-
-    let minLat = Infinity, maxLat = -Infinity;
-    let minLon = Infinity, maxLon = -Infinity;
-    for (const p of points) {
-      if (p.latitude < minLat) minLat = p.latitude;
-      if (p.latitude > maxLat) maxLat = p.latitude;
-      if (p.longitude < minLon) minLon = p.longitude;
-      if (p.longitude > maxLon) maxLon = p.longitude;
-    }
-
-    const drawW = layout.width - PADDING * 2;
-    const drawH = layout.height - PADDING * 2;
-    const latSpan = maxLat - minLat || 0.0001;
-    const lonSpan = maxLon - minLon || 0.0001;
-
-    // 保持纵横比
-    const scaleX = drawW / lonSpan;
-    const scaleY = drawH / latSpan;
-    const scale = Math.min(scaleX, scaleY);
-
-    const actualW = lonSpan * scale;
-    const actualH = latSpan * scale;
-    const offsetX = PADDING + (drawW - actualW) / 2;
-    const offsetY = PADDING + (drawH - actualH) / 2;
-
-    // 下采样到最多 200 个点（SVG 性能）
+  // 下采样到 200 点，转为地图坐标
+  const coords = useMemo(() => {
+    if (points.length < 2) return [];
     const maxPts = 200;
     let sampled = points;
     if (points.length > maxPts) {
@@ -56,60 +31,99 @@ export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
         sampled.push(points[Math.min(Math.round(i * step), points.length - 1)]);
       }
     }
+    return sampled.map(p => ({ latitude: p.latitude, longitude: p.longitude }));
+  }, [points]);
 
-    const coords = sampled.map(p => ({
-      x: offsetX + (p.longitude - minLon) * scale,
-      y: offsetY + (maxLat - p.latitude) * scale, // Y 轴翻转
-    }));
+  // 计算相机中心和缩放
+  const cameraTarget = useMemo(() => {
+    if (coords.length < 2) return null;
 
-    const pathStr = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+    let minLat = Infinity, maxLat = -Infinity;
+    let minLon = Infinity, maxLon = -Infinity;
+    for (const c of coords) {
+      if (c.latitude < minLat) minLat = c.latitude;
+      if (c.latitude > maxLat) maxLat = c.latitude;
+      if (c.longitude < minLon) minLon = c.longitude;
+      if (c.longitude > maxLon) maxLon = c.longitude;
+    }
 
-    return {
-      pathStr,
-      start: coords[0],
-      end: coords[coords.length - 1],
-    };
-  }, [points, layout]);
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLon = (minLon + maxLon) / 2;
+    const latSpan = maxLat - minLat;
+    const lonSpan = maxLon - minLon;
+    const paddedLatSpan = latSpan * 1.3 || 0.01;
+    const paddedLonSpan = lonSpan * 1.3 || 0.01;
 
-  if (!svgPath) return null;
+    const { width } = Dimensions.get('window');
+    const mapWidth = width - 40;
+    const mapHeight = MAP_HEIGHT;
+    const zoomByLat = Math.log2((360 * mapHeight / mapWidth) / paddedLatSpan);
+    const zoomByLon = Math.log2(360 / paddedLonSpan);
+    const zoom = Math.min(zoomByLat, zoomByLon);
+    const clampedZoom = Math.max(3, Math.min(20, Math.round(zoom)));
+
+    return { latitude: centerLat, longitude: centerLon, zoom: clampedZoom };
+  }, [coords]);
+
+  // 地图加载后移动相机到轨迹范围
+  useEffect(() => {
+    if (!cameraTarget || !mapViewRef.current) return;
+    const timer = setTimeout(() => {
+      mapViewRef.current?.moveCamera(
+        {
+          target: { latitude: cameraTarget.latitude, longitude: cameraTarget.longitude },
+          zoom: cameraTarget.zoom,
+        },
+        500,
+      );
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [cameraTarget]);
+
+  if (coords.length < 2 || !cameraTarget) return null;
 
   return (
-    <View
-      style={styles.container}
-      onLayout={(e) => {
-        const { width, height } = e.nativeEvent.layout;
-        setLayout({ width, height });
-      }}
-    >
-      {layout.width > 0 && svgPath && (
-        <Svg width={layout.width} height={layout.height}>
-          {/* 轨迹线 */}
-          <Polyline
-            d={svgPath.pathStr}
-            stroke={COLORS.PRIMARY}
-            strokeWidth={3}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {/* 起点 */}
-          <Circle cx={svgPath.start.x} cy={svgPath.start.y} r={4} fill={COLORS.SUCCESS} />
-          {/* 终点 */}
-          <Circle cx={svgPath.end.x} cy={svgPath.end.y} r={4} fill={COLORS.ERROR} />
-        </Svg>
-      )}
+    <View style={styles.container}>
+      <MapView
+        ref={mapViewRef}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+        mapType={MapType.Night}
+        initialCameraPosition={{
+          target: { latitude: cameraTarget.latitude, longitude: cameraTarget.longitude },
+          zoom: cameraTarget.zoom,
+        }}
+        myLocationEnabled={false}
+        scaleControlsEnabled={false}
+        zoomControlsEnabled={false}
+        compassEnabled={false}
+        rotateGesturesEnabled={false}
+        tiltGesturesEnabled={false}
+        scrollGesturesEnabled={false}
+        zoomGesturesEnabled={false}
+        labelsEnabled
+        buildingsEnabled={false}
+        trafficEnabled={false}
+      >
+        <Polyline
+          points={coords}
+          color={COLORS.PRIMARY}
+          width={4}
+          zIndex={10}
+        />
+      </MapView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    height: 180,
-    width: '100%',
-    borderRadius: 12,
+    height: MAP_HEIGHT,
+    marginHorizontal: 20,
+    borderRadius: BORDER_RADIUS.MD,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: COLORS.BORDER.LIGHT,
   },
 });
