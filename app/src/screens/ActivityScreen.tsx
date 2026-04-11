@@ -657,13 +657,13 @@ export const ActivityScreen: React.FC = () => {
     try {
       const ok = await trackRecordingService.retryUpload();
       if (ok) {
+        trackRecordingService.discardRecording();
         showSummaryRef.current = false;
         setShowSummary(false);
         isStoppingRef.current = false;
         lockedActivityType.current = null;
       } else {
         await retryUploadWithDialog();
-        // If retryUploadWithDialog completes (success or discard), close summary
         showSummaryRef.current = false;
         setShowSummary(false);
         isStoppingRef.current = false;
