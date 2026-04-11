@@ -216,7 +216,7 @@ export const ActivityScreen: React.FC = () => {
             '上次运动的记录上传失败，是否重试？',
             [
               { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
-              { text: '重试上传', onPress: () => trackRecordingService.retryUpload() },
+              { text: '重试上传', onPress: () => retryUploadWithDialog() },
             ],
           );
         } else {
@@ -467,17 +467,57 @@ export const ActivityScreen: React.FC = () => {
 
   const selectedType = ACTIVITY_CYCLE[activityIndex];
 
+  // 重试上传：失败后持续弹窗，直到成功或用户主动丢弃
+  const retryUploadWithDialog = async () => {
+    let ok = false;
+    while (!ok) {
+      ok = await trackRecordingService.retryUpload();
+      if (!ok) {
+        const action = await new Promise<'discard' | 'retry'>(resolve => {
+          Dialog.show(
+            '上传失败',
+            '网络不可用，记录已保留在本地，请稍后再试。',
+            [
+              { text: '丢弃', style: 'destructive', onPress: () => resolve('discard') },
+              { text: '重试', onPress: () => resolve('retry') },
+            ],
+          );
+        });
+        if (action === 'discard') {
+          trackRecordingService.discardRecording();
+          return;
+        }
+      }
+    }
+  };
+
   // 循环切换运动模式
   const cycleType = () => {
     if (!isIdle || isStoppingRef.current || lockedActivityType.current) return;
     setActivityIndex(prev => (prev + 1) % ACTIVITY_CYCLE.length);
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (isStoppingRef.current) return;
     const activityType = ACTIVITY_TYPE_MAP[selectedType];
     lockedActivityType.current = activityType;
-    trackRecordingService.startRecording(activityType);
+    try {
+      await trackRecordingService.startRecording(activityType);
+    } catch (e: any) {
+      lockedActivityType.current = null;
+      if (e.message === 'UNSYNCED_RECORD') {
+        Dialog.show(
+          '未上传的记录',
+          '存在未上传的运动记录，请先处理后再开始新记录。',
+          [
+            { text: '丢弃旧记录', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
+            { text: '重试上传', onPress: () => retryUploadWithDialog() },
+          ],
+        );
+      } else {
+        console.error('Failed to start recording:', e);
+      }
+    }
   };
 
   const handlePause = () => {
@@ -512,7 +552,7 @@ export const ActivityScreen: React.FC = () => {
           '运动记录已保存到本地，请检查网络后重试。',
           [
             { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
-            { text: '重试', onPress: () => trackRecordingService.retryUpload() },
+            { text: '重试', onPress: () => retryUploadWithDialog() },
           ],
         );
       } else {
@@ -657,13 +697,12 @@ export const ActivityScreen: React.FC = () => {
             currentZoomRef.current = e.nativeEvent.cameraPosition.zoom ?? currentZoomRef.current;
           }}
         >
-          {/* Speed-colored Track Polylines */}
+          {/* Track Polylines */}
           {coloredSegments.map((seg, idx) => (
             <Polyline
               key={`segment-${idx}`}
               points={seg.coords}
-              colors={seg.colors}
-              gradient
+              color={COLORS.PRIMARY}
               width={8}
               zIndex={10}
             />

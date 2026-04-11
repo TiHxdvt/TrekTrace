@@ -129,6 +129,11 @@ class TrackRecordingServiceImpl {
 
   // ---------- Start ----------
   async startRecording(activityType: ActivityType): Promise<void> {
+    // 保护：如果存在未上传的记录，拒绝启动新记录
+    if (this.session && this.session.status === 'stopped' && !this.session.uploadedToServer) {
+      throw new Error('UNSYNCED_RECORD');
+    }
+
     const now = new Date().toISOString();
     const segment: TrackSegment = {
       id: uid(),
