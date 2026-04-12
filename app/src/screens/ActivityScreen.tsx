@@ -22,7 +22,7 @@ import { MapView, AMapSdk, MapType, Polyline } from 'react-native-amap3d';
 import type { NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Polyline as SvgPolyline } from 'react-native-svg';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
 import { APP_CONFIG } from '../config';
 import {
@@ -39,7 +39,7 @@ import {
   IconStop,
   IconShareBold,
 } from '../components/SolarIcons';
-import { captureScreen } from 'react-native-view-shot';
+import { captureRef } from 'react-native-view-shot';
 import Share from 'react-native-share';
 import { Dialog } from '../components/Dialog';
 import { trackRecordingService } from '../services/trackRecordingService';
@@ -90,6 +90,17 @@ const SUMMARY_REPLAY_STEPS = SUMMARY_REPLAY_DURATION / SUMMARY_REPLAY_INTERVAL;
 // Animated SVG Circle for circular progress ring
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
+// Uniform sampling for share card SVG track
+function samplePoints(coords: Array<{latitude: number; longitude: number}>, maxCount: number) {
+  if (coords.length <= maxCount) return coords;
+  const step = (coords.length - 1) / (maxCount - 1);
+  const result = [];
+  for (let i = 0; i < maxCount; i++) {
+    result.push(coords[Math.round(i * step)]);
+  }
+  return result;
+}
+
 export const ActivityScreen: React.FC = () => {
   const navigation = useNavigation();
   const [activityIndex, setActivityIndex] = useState(1); // 默认跑步
@@ -120,7 +131,10 @@ export const ActivityScreen: React.FC = () => {
   // Summary overlay state — reuses main map, no second MapView
   const [showSummary, setShowSummary] = useState(false);
   const showSummaryRef = useRef(false);
-  const [hidingSummaryButtons, setHidingSummaryButtons] = useState(false);
+
+  // Share card state
+  const [showShareCard, setShowShareCard] = useState(false);
+  const shareCardRef = useRef<View>(null);
 
   // Summary replay animation
   const [replayProgress, setReplayProgress] = useState(0); // 0..1
@@ -276,6 +290,36 @@ export const ActivityScreen: React.FC = () => {
 
     return result;
   }, [coloredSegments, replayProgress, showSummary]);
+
+  // Normalize track coords to SVG viewBox (0-200) for share card
+  const shareTrackPoints = useMemo(() => {
+    if (!showShareCard || coloredSegments.length === 0) return [];
+
+    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    let totalPoints = 0;
+    for (const seg of coloredSegments) {
+      for (const p of seg.coords) {
+        if (p.latitude < minLat) minLat = p.latitude;
+        if (p.latitude > maxLat) maxLat = p.latitude;
+        if (p.longitude < minLon) minLon = p.longitude;
+        if (p.longitude > maxLon) maxLon = p.longitude;
+        totalPoints++;
+      }
+    }
+    if (totalPoints < 2) return [];
+
+    const padLat = (maxLat - minLat) * 0.15 || 0.01;
+    const padLon = (maxLon - minLon) * 0.15 || 0.01;
+
+    const VB = 200;
+    return coloredSegments.map(seg => {
+      const sampled = samplePoints(seg.coords, 60);
+      return sampled.map(p => ({
+        x: VB * (p.longitude - minLon + padLon) / (maxLon - minLon + padLon * 2),
+        y: VB * (1 - (p.latitude - minLat + padLat) / (maxLat - minLat + padLat * 2)),
+      }));
+    });
+  }, [showShareCard, coloredSegments]);
 
   // Animated stats for number rolling effect in summary
   const animatedStats = useMemo(() => {
@@ -681,20 +725,21 @@ export const ActivityScreen: React.FC = () => {
   // Share card screenshot from summary overlay
   const handleShareFromSummary = async () => {
     try {
-      setHidingSummaryButtons(true);
-      await new Promise<void>(r => setTimeout(() => r(), 100));
-      const uri = await captureScreen({
+      setShowShareCard(true);
+      await new Promise<void>(r => setTimeout(() => r(), 150));
+      if (!shareCardRef.current) throw new Error('Share card not rendered');
+      const uri = await captureRef(shareCardRef, {
         format: 'png',
         quality: 1,
         result: 'tmpfile',
       });
-      setHidingSummaryButtons(false);
+      setShowShareCard(false);
       await Share.open({
         url: uri.startsWith('file://') ? uri : `file://${uri}`,
         type: 'image/png',
       });
     } catch (e: any) {
-      setHidingSummaryButtons(false);
+      setShowShareCard(false);
       if (e?.message !== 'User did not share') {
         console.error('Share failed:', e);
       }
@@ -931,10 +976,8 @@ export const ActivityScreen: React.FC = () => {
                 </View>
               </View>
             </View>
-            {/* 途迹水印 */}
-            <Text style={styles.summaryWatermark}>途迹 · TrekTrace</Text>
-            {/* Bottom discard / share / save buttons — hidden during screenshot capture */}
-            {!hidingSummaryButtons && <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
+            {/* Bottom discard / share / save buttons */}
+            <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
               <View style={styles.summaryButtonRow}>
                 <TouchableOpacity
                   style={styles.summaryDiscardBtn}
@@ -958,7 +1001,7 @@ export const ActivityScreen: React.FC = () => {
                   <Text style={styles.summarySaveText}>保存</Text>
                 </TouchableOpacity>
               </View>
-            </View>}
+            </View>
           </>
         )}
 
@@ -1098,6 +1141,63 @@ export const ActivityScreen: React.FC = () => {
         </View>
         )}
       </View>
+
+      {/* ========== Offscreen Share Card ========== */}
+      {showShareCard && (
+        <View ref={shareCardRef} style={styles.shareCard}>
+          {/* SVG Track */}
+          <View style={styles.shareCardTrackArea}>
+            <Svg width="100%" height="100%" viewBox="0 0 200 200">
+              {shareTrackPoints.map((points, idx) =>
+                points.length >= 2 ? (
+                  <SvgPolyline
+                    key={idx}
+                    points={points.map(p => `${p.x},${p.y}`).join(' ')}
+                    fill="none"
+                    stroke={COLORS.PRIMARY}
+                    strokeWidth="3"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                ) : null
+              )}
+            </Svg>
+          </View>
+
+          {/* Divider */}
+          <View style={styles.shareCardDivider} />
+
+          {/* Data Area */}
+          <View style={styles.shareCardDataArea}>
+            {/* Activity type */}
+            <View style={styles.shareCardTypeRow}>
+              <SummaryIcon size={16} color={COLORS.TEXT.PRIMARY} />
+              <Text style={styles.shareCardTypeText}>{summaryTypeMeta.label}</Text>
+            </View>
+            {/* Stats */}
+            <View style={styles.shareCardStatsRow}>
+              <View style={styles.shareCardStatItem}>
+                <Text style={styles.shareCardStatLabel}>距离</Text>
+                <Text style={styles.shareCardStatValue}>{(stats.distance / 1000).toFixed(2)} km</Text>
+              </View>
+              <View style={styles.shareCardStatItem}>
+                <Text style={styles.shareCardStatLabel}>时长</Text>
+                <Text style={styles.shareCardStatValue}>{formatDuration(stats.duration)}</Text>
+              </View>
+              <View style={styles.shareCardStatItem}>
+                <Text style={styles.shareCardStatLabel}>配速</Text>
+                <Text style={styles.shareCardStatValue}>{formatPace(stats.currentPace)}</Text>
+              </View>
+              <View style={styles.shareCardStatItem}>
+                <Text style={styles.shareCardStatLabel}>爬升</Text>
+                <Text style={styles.shareCardStatValue}>{Math.round(stats.elevationGain)} m</Text>
+              </View>
+            </View>
+            {/* Watermark */}
+            <Text style={styles.shareCardWatermark}>途迹 · TrekTrace</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -1438,15 +1538,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
   },
-  summaryWatermark: {
-    position: 'absolute',
-    bottom: 80,
-    right: 20,
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: 'rgba(255, 255, 255, 0.15)',
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
   summaryShareBtn: {
     width: 48,
     height: 48,
@@ -1456,5 +1547,70 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.OVERLAY.SUMMARY,
     borderWidth: 1,
     borderColor: COLORS.BORDER.MEDIUM,
+  },
+
+  // ========== Share Card ==========
+  shareCard: {
+    position: 'absolute',
+    left: 0,
+    top: -9999,
+    width: Dimensions.get('window').width,
+    height: Math.round(Dimensions.get('window').width * 1.3),
+    backgroundColor: COLORS.BACKGROUND,
+    borderRadius: BORDER_RADIUS.G2.LG,
+    overflow: 'hidden',
+  },
+  shareCardTrackArea: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareCardDivider: {
+    height: 1,
+    marginHorizontal: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  shareCardDataArea: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  shareCardTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  shareCardTypeText: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  shareCardStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  shareCardStatItem: {
+    alignItems: 'center',
+  },
+  shareCardStatLabel: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+    color: COLORS.TEXT.QUATERNARY,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  shareCardStatValue: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+    fontWeight: '600',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  shareCardWatermark: {
+    textAlign: 'right',
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+    color: 'rgba(255, 255, 255, 0.15)',
+    fontWeight: '600',
+    letterSpacing: 1,
   },
 });
