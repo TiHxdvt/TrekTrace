@@ -39,6 +39,7 @@ import SvgLayersBold from '../icons/solar-layers-bold.svg';
 import SvgPlaybackSpeedBold from '../icons/solar-playback-speed-bold.svg';
 import SvgWalkingBold from '../icons/solar-walking-bold.svg';
 import SvgArrowDown from '../icons/solar-arrow-down-linear.svg';
+import SvgShareBold from '../icons/solar-share-bold.svg';
 
 // ==================== 导航栏图标 ====================
 export const IconMapPoint = createIcon(SvgMapPoint);
@@ -94,3 +95,6 @@ export const IconFlagBold = createIcon(SvgFlagBold);
 export const IconLayersBold = createIcon(SvgLayersBold);
 export const IconPlaybackSpeedBold = createIcon(SvgPlaybackSpeedBold);
 export const IconWalkingBold = createIcon(SvgWalkingBold);
+
+// ==================== 分享图标 ====================
+export const IconShareBold = createIcon(SvgShareBold);

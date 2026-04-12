@@ -37,7 +37,10 @@ import {
   IconPlay,
   IconPause,
   IconStop,
+  IconShareBold,
 } from '../components/SolarIcons';
+import { captureScreen } from 'react-native-view-shot';
+import Share from 'react-native-share';
 import { Dialog } from '../components/Dialog';
 import { trackRecordingService } from '../services/trackRecordingService';
 import { mockLocationService, MOCK_ROUTES } from '../services/mockLocationService';
@@ -117,6 +120,7 @@ export const ActivityScreen: React.FC = () => {
   // Summary overlay state — reuses main map, no second MapView
   const [showSummary, setShowSummary] = useState(false);
   const showSummaryRef = useRef(false);
+  const [hidingSummaryButtons, setHidingSummaryButtons] = useState(false);
 
   // Summary replay animation
   const [replayProgress, setReplayProgress] = useState(0); // 0..1
@@ -674,6 +678,29 @@ export const ActivityScreen: React.FC = () => {
     }
   };
 
+  // Share card screenshot from summary overlay
+  const handleShareFromSummary = async () => {
+    try {
+      setHidingSummaryButtons(true);
+      await new Promise<void>(r => setTimeout(() => r(), 100));
+      const uri = await captureScreen({
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+      setHidingSummaryButtons(false);
+      await Share.open({
+        url: uri.startsWith('file://') ? uri : `file://${uri}`,
+        type: 'image/png',
+      });
+    } catch (e: any) {
+      setHidingSummaryButtons(false);
+      if (e?.message !== 'User did not share') {
+        console.error('Share failed:', e);
+      }
+    }
+  };
+
   // When summary overlay opens, fit main map camera to show full track
   useEffect(() => {
     if (!showSummary || coloredSegments.length === 0) return;
@@ -904,8 +931,10 @@ export const ActivityScreen: React.FC = () => {
                 </View>
               </View>
             </View>
-            {/* Bottom discard / save buttons */}
-            <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
+            {/* 途迹水印 */}
+            <Text style={styles.summaryWatermark}>途迹 · TrekTrace</Text>
+            {/* Bottom discard / share / save buttons — hidden during screenshot capture */}
+            {!hidingSummaryButtons && <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
               <View style={styles.summaryButtonRow}>
                 <TouchableOpacity
                   style={styles.summaryDiscardBtn}
@@ -915,6 +944,13 @@ export const ActivityScreen: React.FC = () => {
                   <Text style={styles.summaryDiscardText}>丢弃</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  style={styles.summaryShareBtn}
+                  onPress={handleShareFromSummary}
+                  activeOpacity={0.7}
+                >
+                  <IconShareBold size={18} color={COLORS.TEXT.PRIMARY} />
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={styles.summarySaveBtn}
                   onPress={handleSaveFromSummary}
                   activeOpacity={0.7}
@@ -922,7 +958,7 @@ export const ActivityScreen: React.FC = () => {
                   <Text style={styles.summarySaveText}>保存</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </View>}
           </>
         )}
 
@@ -1401,5 +1437,24 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
+  },
+  summaryWatermark: {
+    position: 'absolute',
+    bottom: 80,
+    right: 20,
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+    color: 'rgba(255, 255, 255, 0.15)',
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  summaryShareBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.OVERLAY.SUMMARY,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.MEDIUM,
   },
 });
