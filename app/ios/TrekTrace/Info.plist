@@ -35,7 +35,9 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>途迹需要获取您的位置来记录运动轨迹和展示地图</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>途迹需要获取您的位置来在后台持续记录运动轨迹</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>用于保存运动轨迹卡片到相册</string>
 	<key>UILaunchStoryboardName</key>
@@ -54,5 +56,10 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+	</array>
 </dict>
 </plist>

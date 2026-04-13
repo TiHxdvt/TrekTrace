@@ -140,10 +140,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.LG,
     paddingVertical: SPACING.MD,
     maxWidth: 360,
-    minWidth: 200,
   },
   message: {
-    flex: 1,
+    flexShrink: 1,
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     color: COLORS.TEXT.SECONDARY,
     fontWeight: '500',

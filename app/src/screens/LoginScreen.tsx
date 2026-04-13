@@ -10,7 +10,7 @@ import {
   StyleSheet,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
+  Keyboard,
   ScrollView,
   StatusBar,
   TouchableOpacity,
@@ -48,7 +48,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   // 倒计时
   const [countdown, setCountdown] = useState(0);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownEndRef = useRef(0); // 倒计时结束的绝对时间戳
 
   // 错误状态
@@ -117,6 +117,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       setPhoneError('请输入正确的手机号');
       return;
     }
+
+    Keyboard.dismiss();
 
     try {
       setSendingCode(true);
@@ -243,7 +245,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -381,31 +382,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   >
                     <Text style={styles.switchModeLink}>切换</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => Toast.show('功能开发中')}
+                    activeOpacity={0.7}
+                    style={styles.forgotPasswordLink}
+                  >
+                    <Text style={styles.forgotPasswordText}>忘记密码</Text>
+                  </TouchableOpacity>
                 </View>
 
-                {/* Divider */}
-                <View style={styles.dividerContainer}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>其他登录方式</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-
-                {/* Social Login (Placeholder) */}
+                {/* Social Login */}
                 {/* TODO: 接入微信/Apple 等第三方登录 */}
                 <View style={styles.socialContainer}>
                   <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
                     <View style={styles.socialIconWrapper}>
                       <Text style={styles.socialIcon}>W</Text>
                     </View>
-                    <Text style={styles.socialLabel}>微信</Text>
                   </TouchableOpacity>
                 </View>
-
-                {/* Bottom Area */}
-                {/* TODO: 接入忘记密码流程 */}
-                <TouchableOpacity style={styles.forgotPasswordRow} activeOpacity={0.7}>
-                  <Text style={styles.forgotPasswordText}>忘记密码</Text>
-                </TouchableOpacity>
 
                 <Text style={styles.autoRegisterHint}>
                   未注册手机号将自动创建账号
@@ -583,12 +577,11 @@ const styles = StyleSheet.create({
   },
 
   // Bottom Area
-  forgotPasswordRow: {
-    alignItems: 'center',
-    marginBottom: SPACING.LG,
+  forgotPasswordLink: {
+    marginLeft: 'auto',
   },
   forgotPasswordText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.PRIMARY_LIGHT,
     fontWeight: '500',
   },
@@ -605,28 +598,11 @@ const styles = StyleSheet.create({
     height: 48,
   },
 
-  // Divider
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SPACING.XXL,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.BORDER.LIGHT,
-  },
-  dividerText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUINARY,
-    marginHorizontal: SPACING.MD,
-  },
-
   // Social Login
   socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: SPACING.XXL,
+    marginTop: SPACING.XXL,
     marginBottom: SPACING.XXL,
   },
   socialButton: {
@@ -641,16 +617,11 @@ const styles = StyleSheet.create({
     borderColor: COLORS.BORDER.MEDIUM,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
   },
   socialIcon: {
     fontSize: TYPOGRAPHY.FONT_SIZE.LG,
     fontWeight: '600',
     color: COLORS.TEXT.TERTIARY,
-  },
-  socialLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUATERNARY,
   },
 
   // Terms

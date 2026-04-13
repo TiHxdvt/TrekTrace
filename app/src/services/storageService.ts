@@ -25,7 +25,7 @@ const authListeners = new Set<AuthListener>();
 export const authServiceEvents = {
   subscribe: (listener: AuthListener) => {
     authListeners.add(listener);
-    return () => authListeners.delete(listener);
+    return () => { authListeners.delete(listener); };
   },
   notify: () => {
     authListeners.forEach(fn => fn());

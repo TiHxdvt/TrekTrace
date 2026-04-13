@@ -16,6 +16,8 @@ import {
   StatusBar,
   Dimensions,
   Vibration,
+  Alert,
+  Linking,
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { MapView, AMapSdk, MapType, Polyline } from 'react-native-amap3d';
@@ -44,6 +46,7 @@ import Share from 'react-native-share';
 import { Dialog } from '../components/Dialog';
 import { Drawer } from '../components/Drawer';
 import { trackRecordingService } from '../services/trackRecordingService';
+import { backgroundLocationService } from '../services/backgroundLocationService';
 import { mockLocationService, MOCK_ROUTES } from '../services/mockLocationService';
 import { formatDuration, formatPace } from '../utils/format';
 import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
@@ -371,13 +374,29 @@ export const ActivityScreen: React.FC = () => {
           lockedActivityType.current = recovered.activityType;
           showSummaryRef.current = true;
           setShowSummary(true);
-        } else {
+        } else if (recovered.status === 'recording') {
           Dialog.show(
             '恢复记录',
             '检测到未完成的运动记录，是否恢复？',
             [
-              { text: '丢弃', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
-              { text: '恢复', style: 'default' },
+              {
+                text: '丢弃',
+                style: 'destructive',
+                onPress: () => {
+                  backgroundLocationService.stop();
+                  trackRecordingService.discardRecording();
+                },
+              },
+              {
+                text: '恢复',
+                style: 'default',
+                onPress: () => {
+                  // Restart background location service
+                  backgroundLocationService.start(recovered.activityType).catch(() => {
+                    // If permission denied, still resume recording (just no background tracking)
+                  });
+                },
+              },
             ],
           );
         }
@@ -488,18 +507,21 @@ export const ActivityScreen: React.FC = () => {
         );
       }
 
-      // Feed GPS data to recording service
+      // Feed GPS data to recording service — only in simulation mode
+      // In real mode, backgroundLocationService handles all GPS data
       if (isRecordingRef.current) {
-        const rawPoint: RawLocationPoint = {
-          latitude,
-          longitude,
-          altitude: altitude ?? 0,
-          accuracy,
-          speed: speed ?? 0,
-          heading: heading ?? 0,
-          timestamp: event.nativeEvent.timestamp,
-        };
-        trackRecordingService.processLocation(rawPoint);
+        if (isSimulatingRef.current) {
+          const rawPoint: RawLocationPoint = {
+            latitude,
+            longitude,
+            altitude: altitude ?? 0,
+            accuracy,
+            speed: speed ?? 0,
+            heading: heading ?? 0,
+            timestamp: event.nativeEvent.timestamp,
+          };
+          trackRecordingService.processLocation(rawPoint);
+        }
 
         // Follow user on map
         if (shouldFollowRef.current) {
@@ -659,6 +681,26 @@ export const ActivityScreen: React.FC = () => {
     lockedActivityType.current = activityType;
     try {
       await trackRecordingService.startRecording(activityType);
+
+      // Start background location service (skip in simulation mode)
+      if (!isSimulatingRef.current) {
+        try {
+          await backgroundLocationService.start(activityType);
+        } catch (bgErr: any) {
+          // Permission denied — stop recording and prompt user
+          trackRecordingService.discardRecording();
+          lockedActivityType.current = null;
+          Alert.alert(
+            '定位权限不足',
+            '途迹需要后台定位权限才能在后台持续记录轨迹。请在系统设置中开启"始终允许"定位权限。',
+            [
+              { text: '取消', style: 'cancel' },
+              { text: '去设置', onPress: () => Linking.openSettings() },
+            ],
+          );
+          return;
+        }
+      }
     } catch (e: any) {
       lockedActivityType.current = null;
       if (e.message === 'UNSYNCED_RECORD') {
@@ -678,10 +720,16 @@ export const ActivityScreen: React.FC = () => {
 
   const handlePause = () => {
     trackRecordingService.pauseRecording();
+    if (!isSimulatingRef.current) {
+      backgroundLocationService.pause();
+    }
   };
 
   const handleResume = () => {
     trackRecordingService.resumeRecording();
+    if (!isSimulatingRef.current) {
+      backgroundLocationService.resume();
+    }
   };
 
   // Long press stop (1.5s)
@@ -698,6 +746,9 @@ export const ActivityScreen: React.FC = () => {
       // Haptic feedback — long press completed
       Vibration.vibrate(100);
 
+      if (!isSimulatingRef.current) {
+        await backgroundLocationService.stop();
+      }
       await trackRecordingService.stopRecording();
       longPressProgress.setValue(0);
       // Delay summary to let stop button fully transition back to start
@@ -726,6 +777,7 @@ export const ActivityScreen: React.FC = () => {
     setShowSummary(false);
     isStoppingRef.current = false;
     lockedActivityType.current = null;
+    backgroundLocationService.stop();
     trackRecordingService.discardRecording();
   };
 
