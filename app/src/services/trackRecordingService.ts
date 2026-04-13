@@ -21,6 +21,19 @@ const DISTANCE_FILTER = 5; // 米 - 两点间最小距离
 const SPEED_FILTER = 1; // m/s - 最小有效速度
 const ACCURACY_FILTER = 30; // 米 - 最大允许精度
 const ELEVATION_BUFFER_SIZE = 5; // 滑动平均窗口
+
+// ======================== 瞬移检测常量 ========================
+const MAX_SPEED_BY_ACTIVITY: Record<string, number> = {
+  HIKING: 6,   // 21.6 km/h — 极限越野跑下坡
+  RUNNING: 12, // 43.2 km/h — 短跑冲刺
+  CYCLING: 25, // 90 km/h   — 职业下坡
+};
+const SIGNAL_LOSS_THRESHOLD = 30; // 秒 — 超过此时长视为信号丢失
+const MAX_JUMP_DURING_SIGNAL_LOSS: Record<string, number> = {
+  HIKING: 200,  // 米
+  RUNNING: 400,
+  CYCLING: 800,
+};
 const NOTIFY_THROTTLE_MS = 500; // notify 节流间隔
 const PERSIST_INTERVAL_MS = 5000; // 批量持久化间隔
 const PERSIST_POINT_THRESHOLD = 10; // 每积累 N 个点强制持久化
@@ -75,6 +88,14 @@ class TrackRecordingServiceImpl {
   private persistTimer: ReturnType<typeof setInterval> | null = null;
   private pointsSinceLastPersist = 0;
 
+  // 瞬移检测状态
+  private suspiciousPoint: ProcessedPoint | null = null;
+  private lastAcceptedTimestamp: number = 0;
+
+  // 真实时间计时
+  private recordingStartWallTime = 0; // 当前 recording 段开始的 Date.now()
+  private pausedAccum = 0;            // 之前所有 recording 段累计的真实秒数
+
   // ---------- Subscribe ----------
   subscribe(cb: StateCallback): () => void {
     this.listeners.add(cb);
@@ -116,7 +137,13 @@ class TrackRecordingServiceImpl {
         const allPoints = this.getAllPoints();
         if (allPoints.length > 0) {
           this.lastAcceptedPoint = allPoints[allPoints.length - 1];
+          // 恢复最后接受点的时间戳
+          const lastTs = allPoints[allPoints.length - 1].timestamp;
+          this.lastAcceptedTimestamp = new Date(lastTs).getTime();
         }
+
+        // 瞬移检测状态重置
+        this.suspiciousPoint = null;
 
         // Restore elevation state from persisted data
         this.elevationGainAccum = saved.elevationGain;
@@ -129,9 +156,17 @@ class TrackRecordingServiceImpl {
 
         // Restart timers if actively recording
         if (saved.status === 'recording') {
+          // 恢复计时：已持久化的 totalDuration 作为 pausedAccum，
+          // startTimer 会用 recordingStartWallTime = Date.now() 开始新段
+          this.pausedAccum = saved.totalDuration;
+          this.recordingStartWallTime = 0;
           this.pointsSinceLastPersist = 0;
-          this.startTimer();
+          this.startTimer(); // 会设置 recordingStartWallTime 并用 pausedAccum 计算真实时长
           this.startPersistTimer();
+        } else {
+          // paused 状态：totalDuration 已经是暂停前的真实值
+          this.pausedAccum = saved.totalDuration;
+          this.recordingStartWallTime = 0;
         }
 
         this.doNotify();
@@ -173,6 +208,10 @@ class TrackRecordingServiceImpl {
     this.elevationBuffer = [];
     this.elevationGainAccum = 0;
     this.lastSmoothedAltitude = null;
+    this.suspiciousPoint = null;
+    this.lastAcceptedTimestamp = 0;
+    this.recordingStartWallTime = 0;
+    this.pausedAccum = 0;
 
     this.pointsSinceLastPersist = 0;
     this.startTimer();
@@ -203,6 +242,52 @@ class TrackRecordingServiceImpl {
       if (dist < DISTANCE_FILTER) return false;
     }
 
+    // Filter 4: 瞬移检测 — 基于活动类型的最大速度 / 信号丢失距离上限
+    if (this.lastAcceptedPoint && dist > 0) {
+      const rawTs = raw.timestamp;
+      const prevTs = this.lastAcceptedTimestamp;
+      const timeDeltaSec = prevTs > 0 ? Math.abs(rawTs - prevTs) / 1000 : 0;
+
+      // 如果存在可疑缓冲点，对比距离应从可疑点而非上一个接受点计算
+      const referencePoint = this.suspiciousPoint ?? this.lastAcceptedPoint;
+      const distFromRef = this.suspiciousPoint
+        ? haversineDistance(referencePoint.latitude, referencePoint.longitude, raw.latitude, raw.longitude)
+        : dist;
+
+      const activityType = this.session.activityType;
+      const maxSpeed = MAX_SPEED_BY_ACTIVITY[activityType] ?? MAX_SPEED_BY_ACTIVITY.HIKING;
+      const maxJump = MAX_JUMP_DURING_SIGNAL_LOSS[activityType] ?? MAX_JUMP_DURING_SIGNAL_LOSS.HIKING;
+
+      let isTeleport = false;
+      if (timeDeltaSec > 0 && timeDeltaSec < SIGNAL_LOSS_THRESHOLD) {
+        // 正常间隔：严格速度检查
+        const impliedSpeed = distFromRef / timeDeltaSec;
+        isTeleport = impliedSpeed > maxSpeed;
+      } else if (timeDeltaSec >= SIGNAL_LOSS_THRESHOLD) {
+        // 信号丢失后恢复：距离上限检查
+        isTeleport = distFromRef > maxJump;
+      }
+
+      if (isTeleport) {
+        // 缓冲可疑点（不直接丢弃，等下一个点确认）
+        this.suspiciousPoint = {
+          latitude: raw.latitude,
+          longitude: raw.longitude,
+          altitude: this.smoothElevation(raw.altitude),
+          timestamp: normalizeTimestamp(raw.timestamp),
+          speed: raw.speed,
+        };
+        // 回滚平滑海拔（因为 smoothing side effect 不应保留）
+        this.elevationBuffer.pop();
+        return false;
+      }
+
+      // 新点正常 → 如果之前有可疑点则确认丢弃
+      if (this.suspiciousPoint) {
+        this.suspiciousPoint = null;
+      }
+    }
+
     // Accept point
     const altitude = this.smoothElevation(raw.altitude);
     this.lastSmoothedAltitude = altitude;
@@ -229,6 +314,7 @@ class TrackRecordingServiceImpl {
     currentSegment.endTime = point.timestamp;
 
     this.lastAcceptedPoint = point;
+    this.lastAcceptedTimestamp = raw.timestamp;
 
     this.pointsSinceLastPersist++;
     this.schedulePersist();
@@ -239,6 +325,10 @@ class TrackRecordingServiceImpl {
   // ---------- Pause ----------
   async pauseRecording(): Promise<void> {
     if (!this.session || this.session.status !== 'recording') return;
+    // 暂停前把当前段的真实耗时累加到 pausedAccum
+    this.finalizeDuration();
+    this.pausedAccum = this.session.totalDuration;
+    this.recordingStartWallTime = 0;
     this.session.status = 'paused';
     this.stopTimer();
     await this.persist();
@@ -257,6 +347,8 @@ class TrackRecordingServiceImpl {
     this.session.segments.push(newSegment);
     this.session.status = 'recording';
     this.lastAcceptedPoint = null;
+    this.suspiciousPoint = null;
+    this.lastAcceptedTimestamp = 0;
     this.pointsSinceLastPersist = 0;
     this.startTimer();
     this.startPersistTimer();
@@ -267,6 +359,8 @@ class TrackRecordingServiceImpl {
   // ---------- Stop ----------
   async stopRecording(): Promise<boolean> {
     if (!this.session) return false;
+    // 最终校正 totalDuration
+    this.finalizeDuration();
     this.stopTimer();
     this.session.endTime = new Date().toISOString();
     this.session.status = 'stopped';
@@ -300,6 +394,10 @@ class TrackRecordingServiceImpl {
     this.elevationBuffer = [];
     this.elevationGainAccum = 0;
     this.lastSmoothedAltitude = null;
+    this.suspiciousPoint = null;
+    this.lastAcceptedTimestamp = 0;
+    this.recordingStartWallTime = 0;
+    this.pausedAccum = 0;
     this.stopTimer();
     await this.clearStorage();
     this.doNotify();
@@ -353,12 +451,25 @@ class TrackRecordingServiceImpl {
 
   private startTimer(): void {
     this.stopTimer();
+    this.recordingStartWallTime = Date.now();
     this.timerInterval = setInterval(() => {
       if (this.session && this.session.status === 'recording') {
-        this.session.totalDuration += 1;
+        this.syncDuration();
         this.doNotify();
       }
     }, 1000);
+  }
+
+  /** 根据 wall clock 校正 totalDuration */
+  private syncDuration(): void {
+    if (!this.session || this.recordingStartWallTime === 0) return;
+    const elapsed = Math.floor((Date.now() - this.recordingStartWallTime) / 1000);
+    this.session.totalDuration = this.pausedAccum + elapsed;
+  }
+
+  /** 停止/暂停前调用，确保 totalDuration 是最终准确值 */
+  private finalizeDuration(): void {
+    this.syncDuration();
   }
 
   private startPersistTimer(): void {

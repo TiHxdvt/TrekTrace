@@ -49,6 +49,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   // 倒计时
   const [countdown, setCountdown] = useState(0);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownEndRef = useRef(0); // 倒计时结束的绝对时间戳
 
   // 错误状态
   const [phoneError, setPhoneError] = useState('');
@@ -56,19 +57,30 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [accountError, setAccountError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  // 倒计时逻辑
+  // 倒计时逻辑 — 基于绝对时间戳，后台回来也能正确显示剩余时间
+  const [countdownActive, setCountdownActive] = useState(false);
+
   useEffect(() => {
-    if (countdown > 0) {
-      countdownRef.current = setTimeout(() => {
-        setCountdown(countdown - 1);
-      }, 1000);
-    }
+    if (!countdownActive) return;
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((countdownEndRef.current - Date.now()) / 1000));
+      setCountdown(remaining);
+      if (remaining > 0) {
+        countdownRef.current = setTimeout(tick, 1000);
+      } else {
+        countdownEndRef.current = 0;
+        setCountdownActive(false);
+      }
+    };
+
+    tick();
     return () => {
       if (countdownRef.current) {
         clearTimeout(countdownRef.current);
       }
     };
-  }, [countdown]);
+  }, [countdownActive]);
 
   // 切换模式时清空表单和错误
   const handleSwitchMode = (mode: LoginMode) => {
@@ -111,6 +123,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       const code = await authService.sendVerificationCode(phone);
 
       setCountdown(60);
+      countdownEndRef.current = Date.now() + 60 * 1000;
+      setCountdownActive(true);
 
       if (code) {
         Toast.show(`验证码：${code}`, { copyText: code });
