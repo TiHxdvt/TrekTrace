@@ -40,6 +40,16 @@ import SvgPlaybackSpeedBold from '../icons/solar-playback-speed-bold.svg';
 import SvgWalkingBold from '../icons/solar-walking-bold.svg';
 import SvgArrowDown from '../icons/solar-arrow-down-linear.svg';
 import SvgShareBold from '../icons/solar-share-bold.svg';
+import SvgCloseCircle from '../icons/solar-close-circle-linear.svg';
+import SvgBell from '../icons/solar-bell-linear.svg';
+import SvgShieldCheck from '../icons/solar-shield-check-linear.svg';
+import SvgUsersGroupRounded from '../icons/solar-users-group-rounded-linear.svg';
+import SvgMoon from '../icons/solar-moon-linear.svg';
+import SvgChatRoundDots from '../icons/solar-chat-round-dots-linear.svg';
+import SvgAltArrowRight from '../icons/solar-alt-arrow-right-linear.svg';
+import SvgMoonStars from '../icons/solar-moon-stars-linear.svg';
+import SvgSettingsMinimalistic from '../icons/solar-settings-minimalistic-linear.svg';
+import SvgUserId from '../icons/solar-user-id-linear.svg';
 
 // ==================== 导航栏图标 ====================
 export const IconMapPoint = createIcon(SvgMapPoint);
@@ -98,3 +108,15 @@ export const IconWalkingBold = createIcon(SvgWalkingBold);
 
 // ==================== 分享图标 ====================
 export const IconShareBold = createIcon(SvgShareBold);
+
+// ==================== 抽屉设置页图标 ====================
+export const IconCloseCircle = createIcon(SvgCloseCircle);
+export const IconBell = createIcon(SvgBell);
+export const IconShieldCheck = createIcon(SvgShieldCheck);
+export const IconUsersGroupRounded = createIcon(SvgUsersGroupRounded);
+export const IconMoon = createIcon(SvgMoon);
+export const IconChatRoundDots = createIcon(SvgChatRoundDots);
+export const IconAltArrowRight = createIcon(SvgAltArrowRight);
+export const IconMoonStars = createIcon(SvgMoonStars);
+export const IconSettingsMinimalistic = createIcon(SvgSettingsMinimalistic);
+export const IconUserId = createIcon(SvgUserId);

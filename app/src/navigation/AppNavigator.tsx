@@ -12,7 +12,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { ActivityScreen } from '../screens/ActivityScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { StatsScreen } from '../screens/StatsScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
+import { MessagesScreen } from '../screens/MessagesScreen';
 import { MainTabParamList } from './types';
 import { storageService, authServiceEvents } from '../services/storageService';
 import { COLORS, SHADOWS } from '../theme';
@@ -28,7 +28,7 @@ const TAB_CONFIG = [
   { name: 'ActivityTab' as const, Icon: IconMapPoint },
   { name: 'HistoryTab' as const, Icon: IconPlane },
   { name: 'StatsTab' as const, Icon: IconHeart },
-  { name: 'ProfileTab' as const, Icon: IconChatRoundLine },
+  { name: 'MessagesTab' as const, Icon: IconChatRoundLine },
 ];
 
 const TAB_COUNT = TAB_CONFIG.length;
@@ -222,7 +222,7 @@ export const AppNavigator: React.FC = () => {
       <MainTab.Screen name="ActivityTab" component={ActivityScreen} />
       <MainTab.Screen name="HistoryTab" component={HistoryScreen} />
       <MainTab.Screen name="StatsTab" component={StatsScreen} />
-      <MainTab.Screen name="ProfileTab" component={ProfileScreen} />
+      <MainTab.Screen name="MessagesTab" component={MessagesScreen} />
     </MainTab.Navigator>
   );
 };

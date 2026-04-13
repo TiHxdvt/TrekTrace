@@ -216,10 +216,6 @@ export const ActivityScreen: React.FC = () => {
   // Register Drawer callbacks (stable — refs always point to latest functions)
   useEffect(() => {
     Drawer.setCallbacks({
-      getIsSimulating: () => isSimulatingRef.current,
-      onStartSimulation: (routeId: string) => startSimRef.current?.(routeId),
-      onStopSimulation: () => stopSimRef.current?.(),
-      onChangeMapType: (type: MapType) => setMapType(type),
       onLogout: () => {
         // Navigation reset handled by auth state listener in AppNavigator
       },

@@ -11,11 +11,13 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { DialogRoot } from './src/components/Dialog';
 import { ToastRoot } from './src/components/Toast';
 import { DrawerRoot } from './src/components/Drawer';
+import { ThemeProvider } from './src/contexts/ThemeContext';
 
 function App() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
+        <ThemeProvider>
         <NavigationContainer>
           <StatusBar barStyle="light-content" backgroundColor="#1c1e26" />
           <AppNavigator />
@@ -23,6 +25,7 @@ function App() {
           <ToastRoot />
           <DrawerRoot />
         </NavigationContainer>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

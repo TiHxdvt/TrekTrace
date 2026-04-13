@@ -7,5 +7,5 @@ export type MainTabParamList = {
   ActivityTab: undefined;
   HistoryTab: undefined;
   StatsTab: undefined;
-  ProfileTab: undefined;
+  MessagesTab: undefined;
 };
