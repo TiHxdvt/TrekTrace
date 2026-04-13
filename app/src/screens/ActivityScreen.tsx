@@ -44,6 +44,7 @@ import {
 import { captureRef } from 'react-native-view-shot';
 import Share from 'react-native-share';
 import { Dialog } from '../components/Dialog';
+import { Toast } from '../components/Toast';
 import { Drawer } from '../components/Drawer';
 import { trackRecordingService } from '../services/trackRecordingService';
 import { backgroundLocationService } from '../services/backgroundLocationService';
@@ -88,6 +89,7 @@ const ACTIVITY_TYPE_MAP: Record<ActivityTypeLocal, ActivityType> = {
 
 // Summary replay animation constants
 const SUMMARY_REPLAY_DURATION = 3500;
+const MIN_RECORDING_DISTANCE = 20; // 米 — 低于此距离不保存记录
 
 // Animated SVG Circle for circular progress ring
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -760,6 +762,20 @@ export const ActivityScreen: React.FC = () => {
     longPressTimer.current = setTimeout(async () => {
       // Haptic feedback — long press completed
       Vibration.vibrate(100);
+
+      const distance = trackRecordingService.getStats().distance;
+      if (distance < MIN_RECORDING_DISTANCE) {
+        // 距离太短，丢弃记录
+        if (!isSimulatingRef.current) {
+          await backgroundLocationService.stop();
+        }
+        await trackRecordingService.discardRecording();
+        longPressProgress.setValue(0);
+        isStoppingRef.current = false;
+        lockedActivityType.current = null;
+        Toast.show('运动距离太短，记录已丢弃');
+        return;
+      }
 
       if (!isSimulatingRef.current) {
         await backgroundLocationService.stop();
