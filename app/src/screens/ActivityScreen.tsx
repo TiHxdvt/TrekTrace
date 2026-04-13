@@ -42,6 +42,7 @@ import {
 import { captureRef } from 'react-native-view-shot';
 import Share from 'react-native-share';
 import { Dialog } from '../components/Dialog';
+import { Drawer } from '../components/Drawer';
 import { trackRecordingService } from '../services/trackRecordingService';
 import { mockLocationService, MOCK_ROUTES } from '../services/mockLocationService';
 import { formatDuration, formatPace } from '../utils/format';
@@ -184,6 +185,12 @@ export const ActivityScreen: React.FC = () => {
   // Mock GPS simulation state (__DEV__ only)
   const [isSimulating, setIsSimulating] = useState(false);
 
+  // Map type state
+  const [mapType, setMapType] = useState<MapType>(MapType.Night);
+
+  // Refs for Drawer callbacks (to always get latest state)
+  const isSimulatingRef = useRef(false);
+
   // Derived state
   const isIdle = !session || session.status === 'idle' || session.status === 'stopped';
   const isRecording = session?.status === 'recording';
@@ -193,6 +200,28 @@ export const ActivityScreen: React.FC = () => {
   useEffect(() => {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
+
+  // Keep isSimulating ref in sync
+  useEffect(() => {
+    isSimulatingRef.current = isSimulating;
+  }, [isSimulating]);
+
+  // Refs for Drawer callbacks (avoid stale closures)
+  const startSimRef = useRef<(routeId: string) => void>(() => {});
+  const stopSimRef = useRef<() => void>(() => {});
+
+  // Register Drawer callbacks (stable — refs always point to latest functions)
+  useEffect(() => {
+    Drawer.setCallbacks({
+      getIsSimulating: () => isSimulatingRef.current,
+      onStartSimulation: (routeId: string) => startSimRef.current?.(routeId),
+      onStopSimulation: () => stopSimRef.current?.(),
+      onChangeMapType: (type: MapType) => setMapType(type),
+      onLogout: () => {
+        // Navigation reset handled by auth state listener in AppNavigator
+      },
+    });
+  }, []);
 
   // Subscribe to recording service
   useEffect(() => {
@@ -561,6 +590,10 @@ export const ActivityScreen: React.FC = () => {
     setIsSimulating(false);
   };
 
+  // Keep Drawer callback refs up to date
+  startSimRef.current = startSimWithRoute;
+  stopSimRef.current = handleStopSim;
+
   const handleSimButton = () => {
     if (isSimulating) {
       handleStopSim();
@@ -832,7 +865,7 @@ export const ActivityScreen: React.FC = () => {
       {/* Header — hidden during summary */}
       {!showSummary && (
       <View style={[styles.headerBar, { paddingTop: insets.top + 16 }]}>
-        <TouchableOpacity style={styles.headerIconButton}>
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => Drawer.open()}>
           <IconHamburgerMenu size={20} color={COLORS.TEXT.PRIMARY} />
         </TouchableOpacity>
         <View style={styles.searchBar}>
@@ -851,7 +884,7 @@ export const ActivityScreen: React.FC = () => {
         {mapReady && <MapView
           ref={mapViewRef}
           style={StyleSheet.absoluteFillObject}
-          mapType={MapType.Night}
+          mapType={mapType}
           initialCameraPosition={{
             target: { latitude: 35.86, longitude: 104.19 },
             zoom: 16,

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 开发环境：本地调试 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+    <!-- 生产环境：后端 API -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">haoeast.top</domain>
+        <domain includeSubdomains="false">139.155.152.218</domain>
+    </domain-config>
+</network-security-config>

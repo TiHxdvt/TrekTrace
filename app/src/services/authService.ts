@@ -11,9 +11,11 @@ export const authService = {
    * 发送验证码
    * @param phone 手机号
    */
-  sendVerificationCode: async (phone: string): Promise<void> => {
+  sendVerificationCode: async (phone: string): Promise<string | null> => {
     const data: SendCodeRequest = { phone };
-    await api.post('/auth/send-code', data);
+    const response = await api.post('/auth/send-code', data);
+    // 开发环境后端返回 { code: "123456" }
+    return response.data?.code ?? null;
   },
 
   /**

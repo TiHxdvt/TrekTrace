@@ -36,7 +36,7 @@ public class AuthController {
     private VerificationCodeRepository verificationCodeRepository;
 
     @PostMapping("/send-code")
-    public ResponseEntity<Void> sendVerificationCode(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> sendVerificationCode(@RequestBody LoginRequest request) {
         String phone = request.getPhone();
 
         // Validate phone format
@@ -70,6 +70,9 @@ public class AuthController {
         // Send verification code
         smsService.sendVerificationCode(phone, code);
 
+        if (smsService.isMock()) {
+            return ResponseEntity.ok(Map.of("code", code));
+        }
         return ResponseEntity.ok().build();
     }
 

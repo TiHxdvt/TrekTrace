@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Button } from '../components/Button';
 import { Dialog } from '../components/Dialog';
+import { Toast } from '../components/Toast';
 import { FullScreenBlur } from '../components/FullScreenBlur';
 import { IconEyeClosed, IconEyeScan } from '../components/SolarIcons';
 import { authService } from '../services/authService';
@@ -107,18 +108,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     try {
       setSendingCode(true);
-      await authService.sendVerificationCode(phone);
+      const code = await authService.sendVerificationCode(phone);
 
       setCountdown(60);
 
-      Dialog.show(
-        '提示',
-        '验证码已发送，请查看后端控制台',
-        [{ text: '确定' }]
-      );
+      if (code) {
+        Toast.show(`验证码：${code}`, { copyText: code });
+      } else {
+        Toast.show('验证码已发送');
+      }
     } catch (error: any) {
       console.error('Send code error:', error);
-      Dialog.show('错误', '验证码发送失败，请稍后重试');
+      Toast.show('验证码发送失败，请稍后重试');
     } finally {
       setSendingCode(false);
     }
