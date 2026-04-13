@@ -771,9 +771,12 @@ export const ActivityScreen: React.FC = () => {
         }
         await trackRecordingService.discardRecording();
         longPressProgress.setValue(0);
-        isStoppingRef.current = false;
         lockedActivityType.current = null;
         Toast.show('运动距离太短，记录已丢弃');
+        // 延迟重置，防止抬手时触发开始按钮
+        setTimeout(() => {
+          isStoppingRef.current = false;
+        }, 500);
         return;
       }
 
