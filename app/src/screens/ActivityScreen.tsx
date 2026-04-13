@@ -88,8 +88,6 @@ const ACTIVITY_TYPE_MAP: Record<ActivityTypeLocal, ActivityType> = {
 
 // Summary replay animation constants
 const SUMMARY_REPLAY_DURATION = 3500;
-const SUMMARY_REPLAY_INTERVAL = 50;
-const SUMMARY_REPLAY_STEPS = SUMMARY_REPLAY_DURATION / SUMMARY_REPLAY_INTERVAL;
 
 // Animated SVG Circle for circular progress ring
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -140,35 +138,56 @@ export const ActivityScreen: React.FC = () => {
   const [showShareCard, setShowShareCard] = useState(false);
   const shareCardRef = useRef<View>(null);
 
-  // Summary replay animation
+  // Summary replay animation — Animated.Value drives everything, listener updates state
   const [replayProgress, setReplayProgress] = useState(0); // 0..1
-  const replayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const replayAnimRef = useRef<Animated.Value | null>(null);
+  const replayListenerRef = useRef<string | null>(null);
 
   const startSummaryReplay = useCallback(() => {
-    if (replayTimerRef.current) {
-      clearInterval(replayTimerRef.current);
-      replayTimerRef.current = null;
+    // Clean up previous animation
+    if (replayListenerRef.current && replayAnimRef.current) {
+      replayAnimRef.current.removeListener(replayListenerRef.current);
     }
+    if (replayAnimRef.current) {
+      replayAnimRef.current.stopAnimation();
+    }
+
     setReplayProgress(0);
-    let step = 0;
-    replayTimerRef.current = setInterval(() => {
-      step++;
-      if (step >= SUMMARY_REPLAY_STEPS) {
-        setReplayProgress(1);
-        if (replayTimerRef.current) {
-          clearInterval(replayTimerRef.current);
-          replayTimerRef.current = null;
-        }
-      } else {
-        setReplayProgress(step / SUMMARY_REPLAY_STEPS);
+    const anim = new Animated.Value(0);
+    replayAnimRef.current = anim;
+
+    // Throttled state update: only trigger re-render at ~100ms intervals
+    let lastUpdateTime = 0;
+    const UPDATE_INTERVAL_MS = 100;
+
+    replayListenerRef.current = anim.addListener(({ value }) => {
+      const now = Date.now();
+      if (now - lastUpdateTime >= UPDATE_INTERVAL_MS || value >= 1) {
+        lastUpdateTime = now;
+        setReplayProgress(value);
       }
-    }, SUMMARY_REPLAY_INTERVAL);
+    });
+
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: SUMMARY_REPLAY_DURATION,
+      useNativeDriver: false, // Must be false — drives non-style props via listener
+    }).start(({ finished }) => {
+      if (finished) setReplayProgress(1);
+      if (replayListenerRef.current) {
+        anim.removeListener(replayListenerRef.current);
+        replayListenerRef.current = null;
+      }
+    });
   }, []);
 
   const stopSummaryReplay = useCallback((reset?: boolean) => {
-    if (replayTimerRef.current) {
-      clearInterval(replayTimerRef.current);
-      replayTimerRef.current = null;
+    if (replayListenerRef.current && replayAnimRef.current) {
+      replayAnimRef.current.removeListener(replayListenerRef.current);
+      replayListenerRef.current = null;
+    }
+    if (replayAnimRef.current) {
+      replayAnimRef.current.stopAnimation();
     }
     if (reset) setReplayProgress(1);
   }, []);
@@ -906,7 +925,6 @@ export const ActivityScreen: React.FC = () => {
           overlayColor={COLORS.OVERLAY.CARD}
           blurType="dark"
           blurAmount={24}
-          autoUpdate
         />
       </View>
 
@@ -982,7 +1000,6 @@ export const ActivityScreen: React.FC = () => {
             overlayColor={COLORS.OVERLAY.HEAVY}
             blurType="dark"
             blurAmount={12}
-            autoUpdate
             pointerEvents="none"
           />
           <Animated.View style={{ opacity: pulseAnim }}>
@@ -1018,7 +1035,6 @@ export const ActivityScreen: React.FC = () => {
             overlayColor={COLORS.OVERLAY.BLUR_LIGHT}
             blurType="dark"
             blurAmount={12}
-            autoUpdate
             pointerEvents="none"
           />
           <IconGps size={18} color={hasGps ? COLORS.TEXT.SECONDARY : COLORS.TEXT.DISABLED} />
@@ -1148,7 +1164,7 @@ export const ActivityScreen: React.FC = () => {
                 style={[
                   styles.actionBtn,
                   isIdle ? styles.idleBtnBg : null,
-                  isRecording ? styles.pauseBtnBg : null,
+                  isRecording ? styles.startBtnBg : null,
                   isPaused ? styles.resumeBtnBg : null,
                 ]}
               >
@@ -1181,38 +1197,33 @@ export const ActivityScreen: React.FC = () => {
                   </View>
                   {/* Circular progress ring */}
                   <View style={styles.stopProgressRingContainer} pointerEvents="none">
-                    <Animated.View
-                      style={{
-                        transform: [{ rotate: '-90deg' }],
-                      }}
-                    >
-                      <Svg width={50} height={50}>
+                      <Svg width={44} height={44} viewBox="0 0 44 44">
                         {/* Background ring */}
                         <Circle
-                          cx={25}
-                          cy={25}
-                          r={22}
+                          cx={22}
+                          cy={22}
+                          r={20}
                           stroke="rgba(255,255,255,0.1)"
                           strokeWidth={3}
                           fill="none"
                         />
                         {/* Progress ring */}
                         <AnimatedCircle
-                          cx={25}
-                          cy={25}
-                          r={22}
+                          cx={22}
+                          cy={22}
+                          r={20}
+                          transform="rotate(-90 22 22)"
                           stroke={COLORS.ERROR}
                           strokeWidth={3}
                           fill="none"
                           strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 22}`}
+                          strokeDasharray={`${2 * Math.PI * 20}`}
                           strokeDashoffset={longPressProgress.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [2 * Math.PI * 22, 0],
+                            outputRange: [2 * Math.PI * 20, 0],
                           })}
                         />
                       </Svg>
-                    </Animated.View>
                   </View>
                 </TouchableOpacity>
               )}
@@ -1466,17 +1477,9 @@ const styles = StyleSheet.create({
 
   // 左按钮背景
   idleBtnBg: {
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
+    backgroundColor: '#2a2d38',
     borderWidth: 1,
     borderColor: COLORS.BORDER.MEDIUM,
-  },
-  pauseBtnBg: {
-    backgroundColor: COLORS.PRIMARY,
-    shadowColor: COLORS.PRIMARY,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
   },
   resumeBtnBg: {
     backgroundColor: COLORS.SUCCESS,
@@ -1484,7 +1487,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
-    elevation: 8,
   },
 
   // 右按钮背景
@@ -1493,8 +1495,6 @@ const styles = StyleSheet.create({
     shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
   },
   stopBtnBg: {
     backgroundColor: COLORS.ERROR_OVERLAY.BUTTON_BG,
@@ -1505,15 +1505,15 @@ const styles = StyleSheet.create({
   stopBtnInner: {
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
   stopProgressRingContainer: {
     position: 'absolute',
-    top: -3,
-    left: -3,
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
+    top: -1,
+    left: -1,
+    width: 44,
+    height: 44,
   },
 
   // ========== Summary Overlay ==========

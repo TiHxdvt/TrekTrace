@@ -91,6 +91,7 @@ class BackgroundLocationServiceImpl {
       color: '#3b82f6',
       linkingURI: 'trektrace://activity',
       progressBar: { max: 0, value: 0, indeterminate: false },
+      foregroundServiceType: ['location' as const],
     };
 
     await BackgroundService.start(this.backgroundTask.bind(this), options);

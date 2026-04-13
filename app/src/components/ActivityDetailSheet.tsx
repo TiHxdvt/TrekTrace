@@ -152,25 +152,46 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
   // ---- 拖拽手势 ----
 
   const panGesture = useMemo(() => {
+    let rafId: number | null = null;
+    let pendingEvent: { translationY: number; velocityY: number } | null = null;
+
+    const flushUpdate = () => {
+      rafId = null;
+      if (!pendingEvent) return;
+      const event = pendingEvent;
+      pendingEvent = null;
+      const current = sheetStateRef.current;
+      if (current === 'collapsed') {
+        const newHeight = Math.max(
+          SHEET_HEIGHT_COLLAPSED * 0.6,
+          Math.min(SHEET_HEIGHT_EXPANDED, SHEET_HEIGHT_COLLAPSED - event.translationY),
+        );
+        sheetHeightAnim.setValue(newHeight);
+      } else {
+        const newHeight = Math.max(
+          SHEET_HEIGHT_COLLAPSED,
+          Math.min(SHEET_HEIGHT_EXPANDED, SHEET_HEIGHT_EXPANDED - event.translationY),
+        );
+        sheetHeightAnim.setValue(newHeight);
+      }
+    };
+
     return Gesture.Pan()
       .activeOffsetY([-10, 10])
       .onUpdate((event) => {
-        const current = sheetStateRef.current;
-        if (current === 'collapsed') {
-          const newHeight = Math.max(
-            SHEET_HEIGHT_COLLAPSED * 0.6,
-            Math.min(SHEET_HEIGHT_EXPANDED, SHEET_HEIGHT_COLLAPSED - event.translationY),
-          );
-          sheetHeightAnim.setValue(newHeight);
-        } else {
-          const newHeight = Math.max(
-            SHEET_HEIGHT_COLLAPSED,
-            Math.min(SHEET_HEIGHT_EXPANDED, SHEET_HEIGHT_EXPANDED - event.translationY),
-          );
-          sheetHeightAnim.setValue(newHeight);
+        pendingEvent = { translationY: event.translationY, velocityY: event.velocityY };
+        if (!rafId) {
+          rafId = requestAnimationFrame(flushUpdate);
         }
       })
       .onEnd((event) => {
+        // Flush any pending rAF update and cancel future ones
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        // Apply final position immediately
+        pendingEvent = null;
         const { translationY, velocityY } = event;
         const current = sheetStateRef.current;
 
