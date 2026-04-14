@@ -32,8 +32,8 @@ export const StatsTabSelector: React.FC<StatsTabSelectorProps> = ({ mode, onChan
         toValue: index * tabWidthRef.current,
         useNativeDriver: true,
         overshootClamping: true,
-        damping: 20,
-        stiffness: 200,
+        damping: 24,
+        stiffness: 400,
       }).start();
     }
   }, [index, translateX]);

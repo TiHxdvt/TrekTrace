@@ -112,12 +112,12 @@ export const DrawerRoot: React.FC = () => {
       Animated.parallel([
         Animated.timing(slideAnim.current, {
           toValue: 0,
-          duration: ANIMATION.NORMAL,
+          duration: ANIMATION.FAST,
           useNativeDriver: true,
         }),
         Animated.timing(maskAnim.current, {
           toValue: 1,
-          duration: ANIMATION.NORMAL,
+          duration: ANIMATION.FAST,
           useNativeDriver: true,
         }),
       ]).start();
@@ -133,12 +133,12 @@ export const DrawerRoot: React.FC = () => {
     Animated.parallel([
       Animated.timing(slideAnim.current, {
         toValue: -500,
-        duration: ANIMATION.NORMAL,
+        duration: ANIMATION.FAST,
         useNativeDriver: true,
       }),
       Animated.timing(maskAnim.current, {
         toValue: 0,
-        duration: ANIMATION.NORMAL,
+        duration: ANIMATION.FAST,
         useNativeDriver: true,
       }),
     ]).start(({ finished }) => {
@@ -173,7 +173,7 @@ export const DrawerRoot: React.FC = () => {
           },
         ],
       );
-    }, ANIMATION.NORMAL);
+    }, ANIMATION.FAST);
   };
 
   const showComingSoon = () => {
