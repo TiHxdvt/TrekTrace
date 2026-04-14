@@ -30,7 +30,7 @@ import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
 import { formatDuration, formatPaceFromDistance } from '../utils/format';
 import { prepareChartData, downsample } from '../utils/trackData';
 import { RouteMiniMap } from './RouteMiniMap';
-import { ActivityChart } from './ActivityChart';
+import { DataChart, niceScale, distanceLabels } from './stats/StatsChart';
 import { activityService } from '../services/activityService';
 import type { ActivityResponseDTO, TrackPointUploadDTO } from '../types';
 
@@ -293,10 +293,26 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
   const chartDataSets = useMemo(() => {
     if (!trackPoints || trackPoints.length < 2) return null;
     const raw = prepareChartData(trackPoints);
+    const elevRaw = downsample(raw.elevationData, 80);
+    const speedRaw = downsample(raw.speedData, 80);
+
+    const maxDist = elevRaw.length > 0 ? elevRaw[elevRaw.length - 1].distanceKm : 0;
+    const xLabels = distanceLabels(maxDist);
+
+    const elevMax = Math.max(...elevRaw.map(p => p.value), 0);
+    const speedMax = Math.max(...speedRaw.map(p => p.value), 0);
+
     return {
-      elevationData: downsample(raw.elevationData, 80),
-      paceData: downsample(raw.paceData, 80),
-      speedData: downsample(raw.speedData, 80),
+      elevation: {
+        data: elevRaw.map(p => p.value),
+        xLabels,
+        yTicks: niceScale(elevMax).ticks,
+      },
+      speed: {
+        data: speedRaw.map(p => p.value),
+        xLabels,
+        yTicks: niceScale(speedMax).ticks,
+      },
     };
   }, [trackPoints]);
 
@@ -422,11 +438,23 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
                         </View>
                         <RouteMiniMap points={mapPoints} />
                         {chartDataSets && (
-                          <>
+                          <View style={styles.chartArea}>
                             <View style={styles.sectionDivider} />
-                            <ActivityChart data={chartDataSets.elevationData} type="elevation" />
-                            <ActivityChart data={chartDataSets.speedData} type="speed" />
-                          </>
+                            <DataChart
+                              title="海拔剖面"
+                              data={chartDataSets.elevation.data}
+                              xLabels={chartDataSets.elevation.xLabels}
+                              yTicks={chartDataSets.elevation.yTicks}
+                              unit="m" chartType="curve" showArea showDots={false}
+                            />
+                            <DataChart
+                              title="速度"
+                              data={chartDataSets.speed.data}
+                              xLabels={chartDataSets.speed.xLabels}
+                              yTicks={chartDataSets.speed.yTicks}
+                              unit="km/h" chartType="curve" showDots={false}
+                            />
+                          </View>
                         )}
                       </>
                     )}
@@ -539,6 +567,10 @@ const styles = StyleSheet.create({
   },
   expandedContent: {
     paddingBottom: 16,
+  },
+  chartArea: {
+    paddingHorizontal: 20,
+    gap: 12,
   },
   sectionDivider: {
     height: 1,

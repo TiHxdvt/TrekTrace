@@ -50,6 +50,11 @@ import SvgAltArrowRight from '../icons/solar-alt-arrow-right-linear.svg';
 import SvgMoonStars from '../icons/solar-moon-stars-linear.svg';
 import SvgSettingsMinimalistic from '../icons/solar-settings-minimalistic-linear.svg';
 import SvgUserId from '../icons/solar-user-id-linear.svg';
+import SvgMedalStar from '../icons/solar-medal-star-linear.svg';
+import SvgCupStar from '../icons/solar-cup-star-bold.svg';
+import SvgChart from '../icons/solar-chart-2-linear.svg';
+import SvgFlame from '../icons/solar-flame-linear.svg';
+import SvgChecklistMinimalistic from '../icons/solar-checklist-minimalistic-linear.svg';
 
 // ==================== 导航栏图标 ====================
 export const IconMapPoint = createIcon(SvgMapPoint);
@@ -120,3 +125,10 @@ export const IconAltArrowRight = createIcon(SvgAltArrowRight);
 export const IconMoonStars = createIcon(SvgMoonStars);
 export const IconSettingsMinimalistic = createIcon(SvgSettingsMinimalistic);
 export const IconUserId = createIcon(SvgUserId);
+
+// ==================== 数据统计页图标 ====================
+export const IconMedalStar = createIcon(SvgMedalStar);
+export const IconCupStar = createIcon(SvgCupStar);
+export const IconChart = createIcon(SvgChart);
+export const IconFlame = createIcon(SvgFlame);
+export const IconChecklistMinimalistic = createIcon(SvgChecklistMinimalistic);

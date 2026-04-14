@@ -56,8 +56,8 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
       toValue: targetX,
       useNativeDriver: true,
       overshootClamping: true,
-      damping: 20,
-      stiffness: 200,
+      damping: 24,
+      stiffness: 400,
     }).start(({ finished }) => {
       if (finished) callback?.();
     });

@@ -7,15 +7,30 @@ import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS, TYPOGRAPHY } from '../theme';
-import { IconBonfire } from '../components/SolarIcons';
+import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
+import { IconBonfire, IconFlame, IconMedalStar } from '../components/SolarIcons';
 import { FullScreenBlur } from '../components/FullScreenBlur';
 import { AccordionSection } from '../components/AccordionSection';
 import { ActivityDetailSheet } from '../components/ActivityDetailSheet';
 import { EmptyState } from '../components/EmptyState';
+import { DateFilterDropdown } from '../components/DateFilterDropdown';
 import { ACTIVITY_TYPES } from '../constants/activityMeta';
 import { activityService } from '../services/activityService';
+import { computeLifetimeStats } from '../utils/statsComputations';
 import type { ActivityResponseDTO, ActivityType } from '../types';
+import type { ActivityItem } from '../utils/statsComputations';
+
+function toActivityItem(dto: ActivityResponseDTO): ActivityItem {
+  return {
+    id: dto.id,
+    type: dto.type as ActivityItem['type'],
+    startTime: dto.startTime,
+    endTime: dto.endTime,
+    duration: dto.duration,
+    distance: dto.distance,
+    elevationGain: dto.elevationGain,
+  };
+}
 
 export const HistoryScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -24,6 +39,10 @@ export const HistoryScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [expandedType, setExpandedType] = useState<ActivityType | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<ActivityResponseDTO | null>(null);
+
+  const now = new Date();
+  const [filterYear, setFilterYear] = useState(now.getFullYear());
+  const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1);
 
   const hasLoaded = useRef(false);
 
@@ -48,14 +67,22 @@ export const HistoryScreen: React.FC = () => {
     }, []),
   );
 
-  // Group activities by type
+  // Filter activities by selected year & month
+  const filteredActivities = useMemo(() => {
+    return activities.filter(a => {
+      const d = new Date(a.startTime);
+      return d.getFullYear() === filterYear && d.getMonth() + 1 === filterMonth;
+    });
+  }, [activities, filterYear, filterMonth]);
+
+  // Group filtered activities by type
   const grouped = useMemo(() => {
     const map: Record<ActivityType, ActivityResponseDTO[]> = {
       HIKING: [],
       RUNNING: [],
       CYCLING: [],
     };
-    for (const a of activities) {
+    for (const a of filteredActivities) {
       const t = a.type as ActivityType;
       if (map[t]) {
         map[t].push(a);
@@ -68,7 +95,7 @@ export const HistoryScreen: React.FC = () => {
       );
     }
     return map;
-  }, [activities]);
+  }, [filteredActivities]);
 
   const handleToggle = useCallback((type: ActivityType) => {
     setExpandedType(prev => (prev === type ? null : type));
@@ -82,7 +109,17 @@ export const HistoryScreen: React.FC = () => {
     setSelectedActivity(null);
   }, []);
 
-  const isEmpty = !loading && !error && activities.length === 0;
+  const isEmpty = !loading && !error && filteredActivities.length === 0;
+
+  const handleFilterChange = useCallback((year: number, month: number) => {
+    setFilterYear(year);
+    setFilterMonth(month);
+  }, []);
+
+  const lifetimeStats = useMemo(() => {
+    if (activities.length === 0) return null;
+    return computeLifetimeStats(activities.map(toActivityItem));
+  }, [activities]);
 
   return (
     <View style={styles.container}>
@@ -95,8 +132,34 @@ export const HistoryScreen: React.FC = () => {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.headerTitle}>历史记录</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>历史记录</Text>
+          <DateFilterDropdown
+            year={filterYear}
+            month={filterMonth}
+            onChange={handleFilterChange}
+          />
+        </View>
       </View>
+
+      {/* 连续打卡 */}
+      {lifetimeStats && (
+        <View style={styles.statsArea}>
+          <View style={styles.streakRow}>
+            <View style={styles.streakItem}>
+              <IconFlame size={20} color="#f97316" />
+              <Text style={styles.streakValue}>{lifetimeStats.currentStreak}</Text>
+              <Text style={styles.streakLabel}>当前连续</Text>
+            </View>
+            <View style={styles.streakSep} />
+            <View style={styles.streakItem}>
+              <IconMedalStar size={20} color={COLORS.PRIMARY} />
+              <Text style={styles.streakValue}>{lifetimeStats.longestStreak}</Text>
+              <Text style={styles.streakLabel}>最长连续</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       <ScrollView
         style={styles.scrollView}
@@ -168,11 +231,46 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     zIndex: 20,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   headerTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
     letterSpacing: -0.5,
+  },
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.LG,
+    zIndex: 10,
+  },
+  statsArea: {
+    paddingHorizontal: 20,
+    marginBottom: SPACING.MD,
+    alignItems: 'center',
+  },
+  streakItem: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  streakValue: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.LG,
+    fontWeight: '700',
+    color: COLORS.TEXT.PRIMARY,
+  },
+  streakLabel: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+    color: COLORS.TEXT.QUATERNARY,
+  },
+  streakSep: {
+    width: 1,
+    height: 28,
+    backgroundColor: COLORS.BORDER.LIGHT,
   },
   scrollView: {
     flex: 1,
