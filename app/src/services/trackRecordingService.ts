@@ -15,49 +15,19 @@ import {
   TrackPointUploadDTO,
 } from '../types';
 import { activityService } from './activityService';
+import { haversineDistance } from '../utils/geo';
 
 // ======================== 过滤常量 ========================
-const DISTANCE_FILTER = 5; // 米 - 两点间最小距离
-const SPEED_FILTER = 1; // m/s - 最小有效速度
-const ACCURACY_FILTER = 30; // 米 - 最大允许精度
+const DISTANCE_FILTER = 2; // 米 - 两点间最小距离（去重）
+const ACCURACY_FILTER = 50; // 米 - 最大允许精度
 const ELEVATION_BUFFER_SIZE = 5; // 滑动平均窗口
 
-// ======================== 瞬移检测常量 ========================
-const MAX_SPEED_BY_ACTIVITY: Record<string, number> = {
-  HIKING: 6,   // 21.6 km/h — 极限越野跑下坡
-  RUNNING: 12, // 43.2 km/h — 短跑冲刺
-  CYCLING: 25, // 90 km/h   — 职业下坡
-};
-const SIGNAL_LOSS_THRESHOLD = 30; // 秒 — 超过此时长视为信号丢失
-const MAX_JUMP_DURING_SIGNAL_LOSS: Record<string, number> = {
-  HIKING: 200,  // 米
-  RUNNING: 400,
-  CYCLING: 800,
-};
 const NOTIFY_THROTTLE_MS = 500; // notify 节流间隔
 const PERSIST_INTERVAL_MS = 5000; // 批量持久化间隔
 const PERSIST_POINT_THRESHOLD = 10; // 每积累 N 个点强制持久化
 
 // ======================== Storage Keys ========================
 const SESSION_KEY = '@trektrace:recording_session';
-
-// ======================== Haversine ========================
-function haversineDistance(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number,
-): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
 
 // ======================== UID ========================
 function uid(): string {
@@ -87,10 +57,6 @@ class TrackRecordingServiceImpl {
   private notifyPending = false;
   private persistTimer: ReturnType<typeof setInterval> | null = null;
   private pointsSinceLastPersist = 0;
-
-  // 瞬移检测状态
-  private suspiciousPoint: ProcessedPoint | null = null;
-  private lastAcceptedTimestamp: number = 0;
 
   // 真实时间计时
   private recordingStartWallTime = 0; // 当前 recording 段开始的 Date.now()
@@ -137,13 +103,7 @@ class TrackRecordingServiceImpl {
         const allPoints = this.getAllPoints();
         if (allPoints.length > 0) {
           this.lastAcceptedPoint = allPoints[allPoints.length - 1];
-          // 恢复最后接受点的时间戳
-          const lastTs = allPoints[allPoints.length - 1].timestamp;
-          this.lastAcceptedTimestamp = new Date(lastTs).getTime();
         }
-
-        // 瞬移检测状态重置
-        this.suspiciousPoint = null;
 
         // Restore elevation state from persisted data
         this.elevationGainAccum = saved.elevationGain;
@@ -208,8 +168,6 @@ class TrackRecordingServiceImpl {
     this.elevationBuffer = [];
     this.elevationGainAccum = 0;
     this.lastSmoothedAltitude = null;
-    this.suspiciousPoint = null;
-    this.lastAcceptedTimestamp = 0;
     this.recordingStartWallTime = 0;
     this.pausedAccum = 0;
 
@@ -227,10 +185,7 @@ class TrackRecordingServiceImpl {
     // Filter 1: accuracy
     if (raw.accuracy > ACCURACY_FILTER) return false;
 
-    // Filter 2: speed (skip for first point)
-    if (this.lastAcceptedPoint !== null && raw.speed < SPEED_FILTER) return false;
-
-    // Filter 3: distance (reuse computed distance)
+    // Filter 2: distance dedup
     let dist = 0;
     if (this.lastAcceptedPoint) {
       dist = haversineDistance(
@@ -240,52 +195,6 @@ class TrackRecordingServiceImpl {
         raw.longitude,
       );
       if (dist < DISTANCE_FILTER) return false;
-    }
-
-    // Filter 4: 瞬移检测 — 基于活动类型的最大速度 / 信号丢失距离上限
-    if (this.lastAcceptedPoint && dist > 0) {
-      const rawTs = raw.timestamp;
-      const prevTs = this.lastAcceptedTimestamp;
-      const timeDeltaSec = prevTs > 0 ? Math.abs(rawTs - prevTs) / 1000 : 0;
-
-      // 如果存在可疑缓冲点，对比距离应从可疑点而非上一个接受点计算
-      const referencePoint = this.suspiciousPoint ?? this.lastAcceptedPoint;
-      const distFromRef = this.suspiciousPoint
-        ? haversineDistance(referencePoint.latitude, referencePoint.longitude, raw.latitude, raw.longitude)
-        : dist;
-
-      const activityType = this.session.activityType;
-      const maxSpeed = MAX_SPEED_BY_ACTIVITY[activityType] ?? MAX_SPEED_BY_ACTIVITY.HIKING;
-      const maxJump = MAX_JUMP_DURING_SIGNAL_LOSS[activityType] ?? MAX_JUMP_DURING_SIGNAL_LOSS.HIKING;
-
-      let isTeleport = false;
-      if (timeDeltaSec > 0 && timeDeltaSec < SIGNAL_LOSS_THRESHOLD) {
-        // 正常间隔：严格速度检查
-        const impliedSpeed = distFromRef / timeDeltaSec;
-        isTeleport = impliedSpeed > maxSpeed;
-      } else if (timeDeltaSec >= SIGNAL_LOSS_THRESHOLD) {
-        // 信号丢失后恢复：距离上限检查
-        isTeleport = distFromRef > maxJump;
-      }
-
-      if (isTeleport) {
-        // 缓冲可疑点（不直接丢弃，等下一个点确认）
-        this.suspiciousPoint = {
-          latitude: raw.latitude,
-          longitude: raw.longitude,
-          altitude: this.smoothElevation(raw.altitude),
-          timestamp: normalizeTimestamp(raw.timestamp),
-          speed: raw.speed,
-        };
-        // 回滚平滑海拔（因为 smoothing side effect 不应保留）
-        this.elevationBuffer.pop();
-        return false;
-      }
-
-      // 新点正常 → 如果之前有可疑点则确认丢弃
-      if (this.suspiciousPoint) {
-        this.suspiciousPoint = null;
-      }
     }
 
     // Accept point
@@ -314,7 +223,6 @@ class TrackRecordingServiceImpl {
     currentSegment.endTime = point.timestamp;
 
     this.lastAcceptedPoint = point;
-    this.lastAcceptedTimestamp = raw.timestamp;
 
     this.pointsSinceLastPersist++;
     this.schedulePersist();
@@ -347,8 +255,6 @@ class TrackRecordingServiceImpl {
     this.session.segments.push(newSegment);
     this.session.status = 'recording';
     this.lastAcceptedPoint = null;
-    this.suspiciousPoint = null;
-    this.lastAcceptedTimestamp = 0;
     this.pointsSinceLastPersist = 0;
     this.startTimer();
     this.startPersistTimer();
@@ -394,8 +300,6 @@ class TrackRecordingServiceImpl {
     this.elevationBuffer = [];
     this.elevationGainAccum = 0;
     this.lastSmoothedAltitude = null;
-    this.suspiciousPoint = null;
-    this.lastAcceptedTimestamp = 0;
     this.recordingStartWallTime = 0;
     this.pausedAccum = 0;
     this.stopTimer();

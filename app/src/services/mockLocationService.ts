@@ -5,9 +5,10 @@
  */
 
 import type { RawLocationPoint } from '../types';
+import { haversineDistance } from '../utils/geo';
 
-// Same as SPEED_FILTER in trackRecordingService — simulated speed must not fall below this
-const SPEED_FLOOR = 1.0; // m/s
+// Simulated speed floor — slightly below typical walking pace, more realistic than 1.0
+const SPEED_FLOOR = 0.5; // m/s
 
 // ======================== 预设路线 ========================
 
@@ -118,23 +119,7 @@ export const MOCK_ROUTES: Record<string, { name: string; points: RoutePoint[]; d
   },
 };
 
-// ======================== Haversine ========================
-
-function haversineDistance(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number,
-): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+// ======================== Haversine (imported from utils/geo) ========================
 
 /**
  * 计算路线上每个点到起点的累积距离
@@ -294,7 +279,7 @@ class MockLocationService {
     // 计算瞬时速度（带波动），下限不低于 SPEED_FLOOR
     const speed = Math.max(SPEED_FLOOR, this.baseSpeed * (0.7 + Math.random() * 0.6));
 
-    // 模拟 GPS 精度：5-15 米（始终满足 ACCURACY_FILTER=30 的要求）
+    // 模拟 GPS 精度：5-15 米（始终满足 ACCURACY_FILTER=50 的要求）
     const accuracy = 5 + Math.random() * 10;
 
     // 模拟海拔：北京奥森约 45-55m

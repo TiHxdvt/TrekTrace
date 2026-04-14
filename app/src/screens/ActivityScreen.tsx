@@ -50,6 +50,7 @@ import { trackRecordingService } from '../services/trackRecordingService';
 import { backgroundLocationService } from '../services/backgroundLocationService';
 import { mockLocationService, MOCK_ROUTES } from '../services/mockLocationService';
 import { formatDuration, formatPace } from '../utils/format';
+import { haversineDistance } from '../utils/geo';
 import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
 import type {
   ActivityType,
@@ -60,9 +61,6 @@ import type {
 
 type ActivityTypeLocal = 'running' | 'cycling' | 'hiking';
 type GpsStrength = 'none' | 'weak' | 'medium' | 'strong';
-
-// Same as SPEED_FILTER in trackRecordingService — points below this are rejected
-const SPEED_FILTER = 1; // m/s
 
 const GPS_COLORS: Record<GpsStrength, string> = {
   none: COLORS.TEXT.DISABLED,
@@ -288,10 +286,10 @@ export const ActivityScreen: React.FC = () => {
       return `rgb(${r},${g},${b})`;
     };
 
-    // Map speed to color, accounting for SPEED_FILTER so green range is reachable
+    // Map speed to color
     const speedToColor = (speed: number): string => {
       if (speed <= slow) {
-        const t = Math.max(0, (speed - SPEED_FILTER)) / Math.max(0.01, slow - SPEED_FILTER);
+        const t = speed / Math.max(0.01, slow);
         return lerpColor(GREEN, YELLOW, Math.min(1, t));
       } else if (speed <= fast) {
         const t = (speed - slow) / (fast - slow);
@@ -311,16 +309,54 @@ export const ActivityScreen: React.FC = () => {
   }, [polylineSegments, session?.activityType, session?.segments]);
 
   // Slice coloredSegments by replayProgress for track replay animation
+  // During replay, interpolate virtual points in large gaps (> 50m) for smooth animation
   const displaySegments = useMemo(() => {
-    if (!showSummary || replayProgress >= 1 || coloredSegments.length === 0) return coloredSegments;
+    // Only interpolate during active replay
+    const needsInterpolation = showSummary && replayProgress < 1 && coloredSegments.length > 0;
+    if (!needsInterpolation) return coloredSegments;
 
-    const totalPoints = coloredSegments.reduce((sum, s) => sum + s.coords.length, 0);
+    const INTERPOLATION_GAP_THRESHOLD = 50; // meters — gaps larger than this get interpolated
+    const INTERPOLATION_STEP = 10; // meters — virtual point spacing
+
+    // Interpolate gaps in each segment
+    const interpolated = coloredSegments.map(seg => {
+      const newCoords: Array<{ latitude: number; longitude: number }> = [];
+      const newColors: string[] = [];
+
+      for (let i = 0; i < seg.coords.length; i++) {
+        newCoords.push(seg.coords[i]);
+        newColors.push(seg.colors[i]);
+
+        if (i < seg.coords.length - 1) {
+          const gap = haversineDistance(
+            seg.coords[i].latitude, seg.coords[i].longitude,
+            seg.coords[i + 1].latitude, seg.coords[i + 1].longitude,
+          );
+          if (gap > INTERPOLATION_GAP_THRESHOLD) {
+            const steps = Math.floor(gap / INTERPOLATION_STEP);
+            for (let s = 1; s < steps; s++) {
+              const t = s / steps;
+              newCoords.push({
+                latitude: seg.coords[i].latitude + (seg.coords[i + 1].latitude - seg.coords[i].latitude) * t,
+                longitude: seg.coords[i].longitude + (seg.coords[i + 1].longitude - seg.coords[i].longitude) * t,
+              });
+              newColors.push(seg.colors[i]); // use previous point's color
+            }
+          }
+        }
+      }
+
+      return { coords: newCoords, colors: newColors };
+    });
+
+    // Slice by replayProgress
+    const totalPoints = interpolated.reduce((sum, s) => sum + s.coords.length, 0);
     const targetCount = Math.max(1, Math.round(totalPoints * replayProgress));
 
-    const result: typeof coloredSegments = [];
+    const result: typeof interpolated = [];
     let accumulated = 0;
 
-    for (const seg of coloredSegments) {
+    for (const seg of interpolated) {
       const remaining = targetCount - accumulated;
       if (remaining <= 0) break;
 
@@ -985,7 +1021,7 @@ export const ActivityScreen: React.FC = () => {
           labelsEnabled
           buildingsEnabled={false}
           trafficEnabled={false}
-          distanceFilter={5}
+          distanceFilter={2}
           onLocation={handleLocation}
           onCameraMove={(e) => {
             currentZoomRef.current = e.nativeEvent.cameraPosition.zoom ?? currentZoomRef.current;
