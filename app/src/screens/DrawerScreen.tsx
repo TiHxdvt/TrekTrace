@@ -1,27 +1,25 @@
 /**
- * Drawer 组件 - 全屏设置页
- * 从左侧滑入，全屏模糊背景
- * 玻璃拟态风格，与 Dialog / Toast 同模式
+ * DrawerScreen - 抽屉菜单页面（作为导航页面）
+ * 从 Drawer.tsx 改造而来，去掉命令式 overlay，使用 navigation 跳转
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Animated,
   ScrollView,
   Switch,
-  Pressable,
   InteractionManager,
 } from 'react-native';
-import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, TYPOGRAPHY, SPACING, ANIMATION } from '../theme';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { DrawerStackParamList } from '../navigation/DrawerStack';
+import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
 import { storageService } from '../services/storageService';
-import { Dialog } from './Dialog';
-import { Toast } from './Toast';
+import { Dialog } from '../components/Dialog';
+import { Toast } from '../components/Toast';
 import {
   IconUser,
   IconLogout,
@@ -34,38 +32,14 @@ import {
   IconSettingsMinimalistic,
   IconUserId,
   IconAltArrowRight,
-} from './SolarIcons';
+} from '../components/SolarIcons';
 import { useTheme } from '../contexts/ThemeContext';
 
-// Callbacks type for communication with ActivityScreen
-interface DrawerCallbacks {
-  onLogout?: () => void;
+type DrawerNavigationProp = NativeStackNavigationProp<DrawerStackParamList, 'Drawer'>;
+
+interface Props {
+  navigation: DrawerNavigationProp;
 }
-
-// Module-level state for imperative API
-let openFn: (() => void) | null = null;
-let closeFn: (() => void) | null = null;
-let callbacks: DrawerCallbacks = {};
-
-export const Drawer = {
-  open() {
-    if (openFn) {
-      openFn();
-    } else if (__DEV__) {
-      console.warn('Drawer.open() called before DrawerRoot was mounted');
-    }
-  },
-
-  close() {
-    if (closeFn) {
-      closeFn();
-    }
-  },
-
-  setCallbacks(cbs: DrawerCallbacks) {
-    callbacks = cbs;
-  },
-};
 
 // Mask phone number: 138****8888
 function maskPhone(phone: string): string {
@@ -75,18 +49,12 @@ function maskPhone(phone: string): string {
   return phone;
 }
 
-export const DrawerRoot: React.FC = () => {
-  const [visible, setVisible] = useState(false);
+export const DrawerScreen: React.FC<Props> = ({ navigation }) => {
   const [userName, setUserName] = useState('用户');
   const [userPhone, setUserPhone] = useState('');
   const { isDarkMode, toggleDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const slideAnim = useRef(new Animated.Value(-500));
-  const maskAnim = useRef(new Animated.Value(0));
-  const openRafRef = useRef<number | null>(null);
-
-  // Load user info when drawer opens
   const loadUser = useCallback(async () => {
     const user = await storageService.getUser();
     if (user) {
@@ -95,127 +63,42 @@ export const DrawerRoot: React.FC = () => {
     }
   }, []);
 
-  const openDrawer = useCallback(() => {
-    // 取消上一次未执行的 rAF
-    if (openRafRef.current !== null) {
-      cancelAnimationFrame(openRafRef.current);
-      openRafRef.current = null;
-    }
-
-    setVisible(true);
-    slideAnim.current.setValue(-500);
-    maskAnim.current.setValue(0);
-
-    // 延迟一帧再启动动画，让 pointerEvents 变化引起的重渲染先完成
-    openRafRef.current = requestAnimationFrame(() => {
-      openRafRef.current = null;
-      Animated.parallel([
-        Animated.timing(slideAnim.current, {
-          toValue: 0,
-          duration: ANIMATION.FAST,
-          useNativeDriver: true,
-        }),
-        Animated.timing(maskAnim.current, {
-          toValue: 1,
-          duration: ANIMATION.FAST,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-
-    // 将 loadUser 推迟到动画完成之后，避免与动画争抢 JS 线程
+  useEffect(() => {
     InteractionManager.runAfterInteractions(() => {
       loadUser();
     });
   }, [loadUser]);
 
-  const closeDrawer = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(slideAnim.current, {
-        toValue: -500,
-        duration: ANIMATION.FAST,
-        useNativeDriver: true,
-      }),
-      Animated.timing(maskAnim.current, {
-        toValue: 0,
-        duration: ANIMATION.FAST,
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (finished) setVisible(false);
-    });
-  }, []);
-
-  useEffect(() => {
-    openFn = openDrawer;
-    closeFn = closeDrawer;
-    return () => {
-      openFn = null;
-      closeFn = null;
-    };
-  }, [openDrawer, closeDrawer]);
-
   const handleLogout = () => {
-    closeDrawer();
-    setTimeout(() => {
-      Dialog.show(
-        '退出登录',
-        '确定要退出登录吗？',
-        [
-          { text: '取消', style: 'cancel' },
-          {
-            text: '退出',
-            style: 'destructive',
-            onPress: async () => {
-              await storageService.clearAuthData();
-              callbacks.onLogout?.();
-            },
+    Dialog.show(
+      '退出登录',
+      '确定要退出登录吗？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '退出',
+          style: 'destructive',
+          onPress: async () => {
+            await storageService.clearAuthData();
+            // 返回主页，auth state 变化会自动跳转到登录页
+            navigation.goBack();
           },
-        ],
-      );
-    }, ANIMATION.FAST);
+        },
+      ],
+    );
   };
 
   const showComingSoon = () => {
     Toast.show('功能开发中');
   };
 
+  const closeAndNavigate = (screen: keyof DrawerStackParamList) => {
+    navigation.navigate(screen);
+  };
+
   return (
-    <View style={styles.overlay} pointerEvents={visible ? 'box-none' : 'none'}>
-      {/* Static background layer (fades in/out) */}
-      <Animated.View style={[styles.bgLayer, { opacity: maskAnim.current }]}>
-        {/* Background glow orbs */}
-        <View style={styles.ambientGlow} pointerEvents="none">
-          <View style={[styles.glowOrb, styles.glowOrbTop]} />
-          <View style={[styles.glowOrb, styles.glowOrbCenter]} />
-          <View style={[styles.glowOrb, styles.glowOrbBottom]} />
-        </View>
-
-        {/* Blur layer over glow orbs */}
-        <View style={styles.blurLayer} pointerEvents="none">
-          <BlurView
-            style={StyleSheet.absoluteFillObject}
-            blurRadius={24}
-            overlayColor={COLORS.OVERLAY.CARD}
-            blurType="dark"
-            blurAmount={24}
-          />
-        </View>
-      </Animated.View>
-
-      {/* Mask - tap to close */}
-      <Pressable
-        style={StyleSheet.absoluteFillObject}
-        onPress={closeDrawer}
-      />
-
-      {/* Content layer - slides in from left */}
-      <Animated.View
-        style={[
-          styles.contentLayer,
-          { paddingTop: insets.top + 16, transform: [{ translateX: slideAnim.current }] },
-        ]}
-      >
+    <View style={styles.container}>
+      <View style={{ paddingTop: insets.top + 16, flex: 1 }}>
         {/* Header: avatar + nickname + close */}
         <View style={styles.header}>
           <View style={styles.userArea}>
@@ -228,7 +111,7 @@ export const DrawerRoot: React.FC = () => {
             </View>
           </View>
           <TouchableOpacity
-            onPress={closeDrawer}
+            onPress={() => navigation.goBack()}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
@@ -245,14 +128,14 @@ export const DrawerRoot: React.FC = () => {
           {/* Section 1: 账户设置 */}
           <Text style={styles.sectionTitle}>账户设置</Text>
 
-          <TouchableOpacity style={styles.menuItem} onPress={showComingSoon} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => closeAndNavigate('Notification')} activeOpacity={0.7}>
             <View style={styles.menuIconWrap}>
               <IconBell size={22} color={COLORS.TEXT.SECONDARY} />
             </View>
             <Text style={styles.menuLabel}>系统通知</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={showComingSoon} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => closeAndNavigate('Profile')} activeOpacity={0.7}>
             <View style={styles.menuIconWrap}>
               <IconUserId size={22} color={COLORS.TEXT.SECONDARY} />
             </View>
@@ -260,7 +143,7 @@ export const DrawerRoot: React.FC = () => {
             <IconAltArrowRight size={20} color={COLORS.TEXT.QUINARY} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={showComingSoon} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => closeAndNavigate('AccountPrivacy')} activeOpacity={0.7}>
             <View style={styles.menuIconWrap}>
               <IconShieldCheck size={22} color={COLORS.TEXT.SECONDARY} />
             </View>
@@ -268,7 +151,7 @@ export const DrawerRoot: React.FC = () => {
             <IconAltArrowRight size={20} color={COLORS.TEXT.QUINARY} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={showComingSoon} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => closeAndNavigate('Friends')} activeOpacity={0.7}>
             <View style={styles.menuIconWrap}>
               <IconUsersGroupRounded size={22} color={COLORS.TEXT.SECONDARY} />
             </View>
@@ -276,7 +159,7 @@ export const DrawerRoot: React.FC = () => {
             <IconAltArrowRight size={20} color={COLORS.TEXT.QUINARY} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={showComingSoon} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => closeAndNavigate('DataManagement')} activeOpacity={0.7}>
             <View style={styles.menuIconWrap}>
               <IconGraphUp size={22} color={COLORS.TEXT.SECONDARY} />
             </View>
@@ -320,76 +203,16 @@ export const DrawerRoot: React.FC = () => {
             <Text style={styles.logoutText}>退出登录</Text>
           </TouchableOpacity>
         </View>
-      </Animated.View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9000,
-    elevation: 9000,
-  },
-
-  // Static background layer (fades in/out with mask anim)
-  bgLayer: {
-    ...StyleSheet.absoluteFillObject,
+  container: {
+    flex: 1,
     backgroundColor: COLORS.BACKGROUND,
-    zIndex: 0,
   },
-
-  // Background glow orbs (same style as ActivityScreen)
-  ambientGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 0,
-  },
-  glowOrb: {
-    position: 'absolute',
-    borderRadius: 9999,
-  },
-  glowOrbTop: {
-    top: -80,
-    right: -40,
-    width: 300,
-    height: 300,
-    backgroundColor: COLORS.GRADIENT.BLUE,
-  },
-  glowOrbCenter: {
-    top: '40%',
-    left: '50%',
-    transform: [{ translateX: -150 }],
-    width: 400,
-    height: 400,
-    backgroundColor: COLORS.GRADIENT.PINK,
-  },
-  glowOrbBottom: {
-    bottom: -80,
-    left: -60,
-    width: 500,
-    height: 500,
-    backgroundColor: COLORS.GRADIENT.PURPLE,
-  },
-  blurLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-  },
-
-  // Content layer - slides in from left, no background (bg layer underneath)
-  contentLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 2,
-  },
-
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -427,16 +250,12 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     color: COLORS.TEXT.TERTIARY,
   },
-
-  // ScrollView
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: SPACING.XL,
   },
-
-  // Section title
   sectionTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     fontWeight: '500',
@@ -444,8 +263,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.MD,
     marginTop: SPACING.SM,
   },
-
-  // Menu item - no background
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -467,8 +284,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: COLORS.TEXT.SECONDARY,
   },
-
-  // Bottom Area - logout pinned to bottom
   bottomArea: {
     paddingHorizontal: SPACING.XL,
   },

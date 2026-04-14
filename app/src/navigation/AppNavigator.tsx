@@ -14,6 +14,7 @@ import { ActivityScreen } from '../screens/ActivityScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { StatsScreen } from '../screens/StatsScreen';
 import { MessagesScreen } from '../screens/MessagesScreen';
+import { DrawerStack } from './DrawerStack';
 import { MainTabParamList } from './types';
 import { storageService, authServiceEvents } from '../services/storageService';
 import { COLORS, SHADOWS, ANIMATION } from '../theme';
@@ -272,7 +273,7 @@ export const AppNavigator: React.FC = () => {
         headerShown: false,
       }}
     >
-      <MainTab.Screen name="ActivityTab" component={ActivityScreen} />
+      <MainTab.Screen name="ActivityTab" component={DrawerStack} />
       <MainTab.Screen name="HistoryTab" component={HistoryScreen} />
       <MainTab.Screen name="StatsTab" component={StatsScreen} />
       <MainTab.Screen name="MessagesTab" component={MessagesScreen} />

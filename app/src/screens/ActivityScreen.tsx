@@ -24,6 +24,8 @@ import { MapView, AMapSdk, MapType, Polyline } from 'react-native-amap3d';
 import type { NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { DrawerStackParamList } from '../navigation/DrawerStack';
 import Svg, { Circle, Polyline as SvgPolyline } from 'react-native-svg';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
 import { APP_CONFIG } from '../config';
@@ -45,7 +47,6 @@ import { captureRef } from 'react-native-view-shot';
 import Share from 'react-native-share';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
-import { Drawer } from '../components/Drawer';
 import { trackRecordingService } from '../services/trackRecordingService';
 import { backgroundLocationService } from '../services/backgroundLocationService';
 import { mockLocationService, MOCK_ROUTES } from '../services/mockLocationService';
@@ -104,7 +105,7 @@ function samplePoints(coords: Array<{latitude: number; longitude: number}>, maxC
 }
 
 export const ActivityScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<DrawerStackParamList, 'Home'>>();
   const [activityIndex, setActivityIndex] = useState(1); // 默认跑步
   const insets = useSafeAreaInsets();
   const mapViewRef = useRef<MapView>(null);
@@ -232,15 +233,6 @@ export const ActivityScreen: React.FC = () => {
   const startSimRef = useRef<(routeId: string) => void>(() => {});
   const stopSimRef = useRef<() => void>(() => {});
 
-  // Register Drawer callbacks (stable — refs always point to latest functions)
-  useEffect(() => {
-    Drawer.setCallbacks({
-      onLogout: () => {
-        // Navigation reset handled by auth state listener in AppNavigator
-      },
-    });
-  }, []);
-
   // Subscribe to recording service
   useEffect(() => {
     const unsubscribe = trackRecordingService.subscribe((s, st) => {
@@ -253,7 +245,10 @@ export const ActivityScreen: React.FC = () => {
 
   // Hide/show floating tab bar when summary is visible
   useEffect(() => {
-    navigation.setOptions({ tabBarVisible: !showSummary });
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.setOptions({ tabBarVisible: !showSummary } as any);
+    }
   }, [navigation, showSummary]);
 
   // Derive colored segments from polyline data + session type (computed only when data changes)
@@ -986,7 +981,7 @@ export const ActivityScreen: React.FC = () => {
       {/* Header — hidden during summary */}
       {!showSummary && (
       <View style={[styles.headerBar, { paddingTop: insets.top + 16 }]}>
-        <TouchableOpacity style={styles.headerIconButton} onPress={() => Drawer.open()}>
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.navigate('Drawer')}>
           <IconHamburgerMenu size={20} color={COLORS.TEXT.PRIMARY} />
         </TouchableOpacity>
         <View style={styles.searchBar}>

@@ -10,7 +10,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { DialogRoot } from './src/components/Dialog';
 import { ToastRoot } from './src/components/Toast';
-import { DrawerRoot } from './src/components/Drawer';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 
 function App() {
@@ -23,7 +22,6 @@ function App() {
           <AppNavigator />
           <DialogRoot />
           <ToastRoot />
-          <DrawerRoot />
         </NavigationContainer>
         </ThemeProvider>
       </SafeAreaProvider>

@@ -22,6 +22,22 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
+    public enum DataVisibility {
+        PUBLIC, FRIENDS, PRIVATE
+    }
+
+    public enum UserStatus {
+        ACTIVE, DELETED
+    }
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "data_visibility", nullable = false, columnDefinition = "ENUM('PUBLIC','FRIENDS','PRIVATE') DEFAULT 'FRIENDS'")
+    private DataVisibility dataVisibility = DataVisibility.FRIENDS;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, columnDefinition = "ENUM('ACTIVE','DELETED') DEFAULT 'ACTIVE'")
+    private UserStatus status = UserStatus.ACTIVE;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

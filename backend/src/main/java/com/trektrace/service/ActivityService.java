@@ -2,11 +2,13 @@ package com.trektrace.service;
 
 import com.trektrace.dto.ActivityResponse;
 import com.trektrace.dto.ActivityUploadRequest;
+import com.trektrace.dto.DataSummaryResponse;
 import com.trektrace.dto.TrackPointDTO;
 import com.trektrace.entity.Activity;
 import com.trektrace.entity.TrackPoint;
 import com.trektrace.repository.ActivityRepository;
 import com.trektrace.repository.TrackPointRepository;
+import com.trektrace.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +18,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,11 +30,14 @@ public class ActivityService {
 
     private final ActivityRepository activityRepository;
     private final TrackPointRepository trackPointRepository;
+    private final UserRepository userRepository;
 
     public ActivityService(ActivityRepository activityRepository,
-                           TrackPointRepository trackPointRepository) {
+                           TrackPointRepository trackPointRepository,
+                           UserRepository userRepository) {
         this.activityRepository = activityRepository;
         this.trackPointRepository = trackPointRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -139,5 +146,47 @@ public class ActivityService {
         } catch (DateTimeParseException e) {
             return null;
         }
+    }
+
+    public DataSummaryResponse getDataSummary(Long userId) {
+        DataSummaryResponse summary = new DataSummaryResponse();
+        summary.setTotalActivities(activityRepository.countByUserId(userId));
+        BigDecimal dist = activityRepository.sumDistanceByUserId(userId);
+        summary.setTotalDistance(dist != null ? dist.doubleValue() : 0.0);
+        summary.setTotalDuration(activityRepository.sumDurationByUserId(userId));
+        BigDecimal elev = activityRepository.sumElevationGainByUserId(userId);
+        summary.setTotalElevationGain(elev != null ? elev.doubleValue() : 0.0);
+        return summary;
+    }
+
+    public List<Map<String, Object>> exportData(Long userId, String format) {
+        List<Activity> activities = activityRepository.findByUserIdOrderByStartTimeDesc(userId);
+        return activities.stream().map(a -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", a.getId());
+            map.put("type", a.getType().name());
+            map.put("startTime", a.getStartTime() != null ? a.getStartTime().toString() : null);
+            map.put("endTime", a.getEndTime() != null ? a.getEndTime().toString() : null);
+            map.put("duration", a.getDuration());
+            map.put("distance", a.getDistance() != null ? a.getDistance().doubleValue() : null);
+            map.put("elevationGain", a.getElevationGain() != null ? a.getElevationGain().doubleValue() : null);
+            map.put("status", a.getStatus().name());
+            return map;
+        }).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteAllByUserId(Long userId) {
+        List<Activity> activities = activityRepository.findByUserIdOrderByStartTimeDesc(userId);
+        for (Activity a : activities) {
+            trackPointRepository.deleteByActivityId(a.getId());
+        }
+        activityRepository.deleteByUserId(userId);
+    }
+
+    @Transactional
+    public void deleteAllActivitiesAndUser(Long userId) {
+        deleteAllByUserId(userId);
+        userRepository.deleteById(userId);
     }
 }
