@@ -145,6 +145,11 @@ export const DataChart: React.FC<DataChartProps> = ({
     y: PAD.top + chartH * (1 - (yMax > 0 ? v / yMax : 0)),
   }));
 
+  // X 轴标签范围：首尾对齐到第一个和最后一个数据点
+  const firstPtX = points[0].x;
+  const lastPtX = points[n - 1].x;
+  const labelRange = lastPtX - firstPtX || 1;
+
   const strokePath = chartType === 'curve' ? curvePath(points) : linePathFn(points);
   const areaPath = strokePath
     + ` L${points[n - 1].x},${bottomY} L${points[0].x},${bottomY} Z`;
@@ -204,9 +209,9 @@ export const DataChart: React.FC<DataChartProps> = ({
           </G>
         )}
 
-        {/* X 轴标签：均匀分布 */}
+        {/* X 轴标签：对齐数据点首尾位置 */}
         {xLabels.map((text, i) => {
-          const x = PAD.left + (i / (xLabels.length - 1 || 1)) * chartW;
+          const x = firstPtX + (i / (xLabels.length - 1 || 1)) * labelRange;
           return (
             <SvgText key={`x-${i}`} x={x} y={SVG_H - 2} textAnchor="middle"
               fontSize={10} fill={COLORS.TEXT.QUATERNARY}>
