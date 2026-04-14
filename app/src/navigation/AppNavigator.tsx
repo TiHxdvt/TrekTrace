@@ -1,10 +1,11 @@
 /**
  * 应用主导航器
  * 使用浮空导航栏代替系统底部 Tab
+ * Tab 切换时活跃指示器滑动动画（native driver translateY）
  */
 
-import React, { useRef, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useRef, useMemo, useEffect, useCallback } from 'react';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from '@react-native-community/blur';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -15,7 +16,7 @@ import { StatsScreen } from '../screens/StatsScreen';
 import { MessagesScreen } from '../screens/MessagesScreen';
 import { MainTabParamList } from './types';
 import { storageService, authServiceEvents } from '../services/storageService';
-import { COLORS, SHADOWS } from '../theme';
+import { COLORS, SHADOWS, ANIMATION } from '../theme';
 import {
   IconMapPoint,
   IconPlane,
@@ -32,17 +33,44 @@ const TAB_CONFIG = [
 ];
 
 const TAB_COUNT = TAB_CONFIG.length;
+const BUTTON_SIZE = 48;
 const BAR_PADDING = 8;
 
 // 主 Tab 导航器
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 
-// 自定义浮空 Tab Bar - 使用 BlurView 实现 backdrop-blur-xl + 滑动切换
+// 自定义浮空 Tab Bar - 先动画再切换页面
 const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
-  // 通过 onLayout 获取导航栏的实际位置，避免硬编码计算
-  const barLayoutRef = useRef({ x: 0, width: 0 });
+  const buttonXs = useRef<number[]>([]);
+  const indicatorTranslateX = useRef(new Animated.Value(0)).current;
+  const layoutReady = useRef(false);
+  // 点击触发的动画进行中时为 true，跳过 useEffect 的重复动画
+  const pressAnimating = useRef(false);
+
+  // 滑动指示器到指定 tab 的弹簧动画
+  const animateIndicatorTo = useCallback((index: number, callback?: () => void) => {
+    const targetX = buttonXs.current[index];
+    if (targetX === undefined) { callback?.(); return; }
+
+    Animated.spring(indicatorTranslateX, {
+      toValue: targetX,
+      useNativeDriver: true,
+      overshootClamping: true,
+      damping: 20,
+      stiffness: 200,
+    }).start(({ finished }) => {
+      if (finished) callback?.();
+    });
+  }, [indicatorTranslateX]);
+
+  // state.index 变化时（拖拽/外部触发），同步指示器
+  useEffect(() => {
+    if (pressAnimating.current) return; // 点击触发的，onPress 里已处理
+    animateIndicatorTo(state.index);
+  }, [state.index, animateIndicatorTo]);
 
   // 根据手指 X 坐标计算对应的 tab 索引
+  const barLayoutRef = useRef({ x: 0, width: 0 });
   const calculateIndexFromX = (absoluteX: number) => {
     const { x, width } = barLayoutRef.current;
     const effectiveTabWidth = (width - BAR_PADDING * 2) / TAB_COUNT;
@@ -50,7 +78,6 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
     return Math.max(0, Math.min(TAB_COUNT - 1, Math.floor(relativeX / effectiveTabWidth)));
   };
 
-  // 根据手指位置切换到对应 tab
   const navigateToTabAt = (absoluteX: number) => {
     const index = calculateIndexFromX(absoluteX);
     const targetRoute = state.routes[index];
@@ -59,15 +86,12 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
     }
   };
 
-  // 拖动手势：手指滑到哪个 tab 就选中哪个
-  // 只在 onUpdate 中触发导航，避免与 TouchableOpacity 的 tap 事件冲突
   const panGesture = useMemo(() =>
     Gesture.Pan()
       .activeOffsetX([-10, 10])
       .onUpdate((event) => {
         navigateToTabAt(event.absoluteX);
       }),
-    // navigateToTabAt 通过闭包引用 state/navigation，需要包含在依赖中
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state.index, state.routes, navigation],
   );
@@ -86,8 +110,7 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
           style={floatingStyles.barOuter}
           collapsable={false}
           onLayout={(e) => {
-            const { x, width } = e.nativeEvent.layout;
-            barLayoutRef.current = { x, width };
+            barLayoutRef.current = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
           }}
         >
           <BlurView
@@ -98,21 +121,38 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
             blurAmount={20}
           />
           <View style={floatingStyles.barContent}>
+            {/* 滑动指示器：活跃 tab 的背景圆 */}
+            <Animated.View
+              style={[
+                floatingStyles.indicator,
+                {
+                  transform: [{ translateX: indicatorTranslateX }],
+                },
+              ]}
+              pointerEvents="none"
+            />
+
             {state.routes.map((route: any, index: number) => {
               const isFocused = state.index === index;
               const config = TAB_CONFIG.find(t => t.name === route.name);
               if (!config) return null;
 
               const onPress = () => {
+                if (isFocused) return;
                 const event = navigation.emit({
                   type: 'tabPress',
                   target: route.key,
                   canPreventDefault: true,
                 });
+                if (event.defaultPrevented) return;
 
-                if (!isFocused && !event.defaultPrevented) {
+                // 先动画指示器，完成后再切换页面
+                // 重置 pressAnimating 防止快速连击时卡死
+                pressAnimating.current = true;
+                animateIndicatorTo(index, () => {
+                  pressAnimating.current = false;
                   navigation.navigate(route.name);
-                }
+                });
               };
 
               return (
@@ -120,10 +160,15 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
                   key={route.key}
                   onPress={onPress}
                   activeOpacity={0.7}
-                  style={[
-                    floatingStyles.button,
-                    isFocused && floatingStyles.buttonActive,
-                  ]}
+                  style={floatingStyles.button}
+                  onLayout={(e) => {
+                    buttonXs.current[index] = e.nativeEvent.layout.x;
+                    // 用 !== undefined 避免 x=0 时被 filter(Boolean) 误排除
+                    if (!layoutReady.current && buttonXs.current.filter(v => v !== undefined).length === TAB_COUNT) {
+                      layoutReady.current = true;
+                      indicatorTranslateX.setValue(buttonXs.current[state.index]);
+                    }
+                  }}
                 >
                   <config.Icon
                     size={20}
@@ -161,23 +206,31 @@ const floatingStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
+    paddingHorizontal: BAR_PADDING,
     height: 64,
   },
-  button: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonActive: {
+  // 滑动指示器：和按钮同尺寸，绝对定位在 barContent 左上角
+  // translateX = 按钮的 layout.x，所以 left=0
+  indicator: {
+    position: 'absolute',
+    left: 0,
+    top: 8,
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: BUTTON_SIZE / 2,
     backgroundColor: COLORS.PRIMARY,
     shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  button: {
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: BUTTON_SIZE / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

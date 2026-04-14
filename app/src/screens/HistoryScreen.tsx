@@ -3,7 +3,7 @@
  * 手风琴折叠布局，按运动类型分组展示活动数据
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,18 +25,23 @@ export const HistoryScreen: React.FC = () => {
   const [expandedType, setExpandedType] = useState<ActivityType | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<ActivityResponseDTO | null>(null);
 
+  const hasLoaded = useRef(false);
+
   useFocusEffect(
     useCallback(() => {
       const loadActivities = async () => {
+        const isFirstLoad = !hasLoaded.current;
         try {
-          setLoading(true);
+          // 只有首次加载才显示 loading spinner，后续静默刷新
+          if (isFirstLoad) setLoading(true);
           setError(null);
           const data = await activityService.getActivities();
           setActivities(data);
+          hasLoaded.current = true;
         } catch {
-          setError('加载失败，请重试');
+          if (isFirstLoad) setError('加载失败，请重试');
         } finally {
-          setLoading(false);
+          if (isFirstLoad) setLoading(false);
         }
       };
       loadActivities();

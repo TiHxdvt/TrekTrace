@@ -2,6 +2,12 @@
  * 活动详情底部弹窗
  * 使用 Modal 保证层级高于 TabBar
  * MapView 永远不卸载，关闭时只清空数据避免原生崩溃
+ *
+ * 动画策略（全部 native driver，0 JS bridge 开销）：
+ * - slideAnim: 0→1 控制整张 sheet 滑入/滑出（translateY）
+ * - contentSlideAnim: 0→SHEET_SLIDE_RANGE 控制展开/折叠（translateY + overflow:hidden）
+ *
+ * Modal 始终 visible，用 pointerEvents + translateY 控制交互，避免 Dialog 重建开销
  */
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
@@ -31,6 +37,7 @@ import type { ActivityResponseDTO, TrackPointUploadDTO } from '../types';
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT_COLLAPSED = 280;
 const SHEET_HEIGHT_EXPANDED = Math.round(SCREEN_HEIGHT * 0.75);
+const SHEET_SLIDE_RANGE = SHEET_HEIGHT_EXPANDED - SHEET_HEIGHT_COLLAPSED;
 const VELOCITY_THRESHOLD = 500;
 const CLOSE_THRESHOLD = 80;
 
@@ -50,15 +57,16 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
 
-  // Modal 始终挂载，用 slideAnim 控制显隐
   const [sheetVisible, setSheetVisible] = useState(false);
   const [visibleActivity, setVisibleActivity] = useState<ActivityResponseDTO | null>(null);
   const [sheetState, setSheetState] = useState<SheetState>('collapsed');
   const [trackPoints, setTrackPoints] = useState<TrackPointUploadDTO[] | null>(null);
   const [trackLoading, setTrackLoading] = useState(false);
 
+  // slideAnim: 0=屏幕外, 1=屏幕内
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const sheetHeightAnim = useRef(new Animated.Value(SHEET_HEIGHT_COLLAPSED)).current;
+  // contentSlideAnim: 0=展开, SHEET_SLIDE_RANGE=折叠
+  const contentSlideAnim = useRef(new Animated.Value(SHEET_SLIDE_RANGE)).current;
 
   const sheetStateRef = useRef<SheetState>('collapsed');
   useEffect(() => { sheetStateRef.current = sheetState; }, [sheetState]);
@@ -72,6 +80,7 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
   onCloseRef.current = onClose;
 
   // ---- 打开 ----
+  // 先让 Modal 挂载 + 内容渲染完一帧，再启动滑入动画
 
   useEffect(() => {
     if (!activity) return;
@@ -79,12 +88,17 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
     setVisibleActivity(activity);
     setSheetVisible(true);
     setSheetState('collapsed');
-    sheetHeightAnim.setValue(SHEET_HEIGHT_COLLAPSED);
-    Animated.timing(slideAnim, {
-      toValue: 1,
-      duration: ANIMATION.NORMAL,
-      useNativeDriver: true,
-    }).start();
+    contentSlideAnim.setValue(SHEET_SLIDE_RANGE);
+    slideAnim.setValue(0);
+
+    // 延迟一帧，给 Modal 原生 Dialog 创建 + 内容首次渲染留时间
+    const rafId = requestAnimationFrame(() => {
+      Animated.timing(slideAnim, {
+        toValue: 1,
+        duration: ANIMATION.NORMAL,
+        useNativeDriver: true,
+      }).start();
+    });
 
     // 预加载轨迹数据
     let stale = false;
@@ -108,48 +122,63 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
           if (!stale) setTrackLoading(false);
         });
     }
-    return () => { stale = true; };
-  }, [activity, slideAnim, sheetHeightAnim]);
+    return () => {
+      stale = true;
+      cancelAnimationFrame(rafId);
+    };
+  }, [activity, slideAnim, contentSlideAnim]);
 
-  // ---- 关闭：只动画隐藏，不卸载 Modal 内的 MapView ----
+  // ---- 关闭 ----
+  // 动画跑完后才销毁 Modal，避免销毁开销和动画同时发生
 
   const animateClose = useCallback(() => {
-    setSheetState('collapsed');
+    // sheetState 延迟到动画结束后再改，避免重渲染干扰动画
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: ANIMATION.FAST,
       useNativeDriver: true,
-    }).start(() => {
+    }).start(({ finished }) => {
+      if (!finished) return;
+      setSheetState('collapsed');
       setSheetVisible(false);
-      // 不 setVisibleActivity(null)！保持挂载避免 MapView 崩溃
-      // 只清空轨迹数据让地图不画线
       setTrackPoints(null);
       setTrackLoading(false);
+      contentSlideAnim.setValue(SHEET_SLIDE_RANGE);
       onCloseRef.current();
     });
-  }, [slideAnim]);
+  }, [slideAnim, contentSlideAnim]);
 
   const snapToCollapsed = useCallback(() => {
     setSheetState('collapsed');
-    Animated.timing(sheetHeightAnim, {
-      toValue: SHEET_HEIGHT_COLLAPSED,
-      duration: ANIMATION.NORMAL,
-      useNativeDriver: false,
-    }).start();
-  }, [sheetHeightAnim]);
+    Animated.parallel([
+      Animated.spring(contentSlideAnim, {
+        toValue: SHEET_SLIDE_RANGE,
+        useNativeDriver: true,
+        overshootClamping: true,
+      }),
+      // 恢复 slideAnim 到 1（sheet 回到屏幕内）
+      Animated.spring(slideAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        overshootClamping: true,
+      }),
+    ]).start();
+  }, [contentSlideAnim, slideAnim]);
 
   const snapToExpanded = useCallback(() => {
     const act = visibleActivityRef.current;
     if (!act) return;
     setSheetState('expanded');
-    Animated.timing(sheetHeightAnim, {
-      toValue: SHEET_HEIGHT_EXPANDED,
-      duration: ANIMATION.NORMAL,
-      useNativeDriver: false,
+    Animated.spring(contentSlideAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      overshootClamping: true,
     }).start();
-  }, [sheetHeightAnim]);
+  }, [contentSlideAnim]);
 
   // ---- 拖拽手势 ----
+  // 关键改动：向下拖关闭时，sheet 跟手移动（通过 slideAnim）
+  // 展开态向下拖超过折叠距离后，也无缝过渡到关闭拖动
 
   const panGesture = useMemo(() => {
     let rafId: number | null = null;
@@ -161,18 +190,42 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
       const event = pendingEvent;
       pendingEvent = null;
       const current = sheetStateRef.current;
+      const dy = event.translationY;
+
       if (current === 'collapsed') {
-        const newHeight = Math.max(
-          SHEET_HEIGHT_COLLAPSED * 0.6,
-          Math.min(SHEET_HEIGHT_EXPANDED, SHEET_HEIGHT_COLLAPSED - event.translationY),
-        );
-        sheetHeightAnim.setValue(newHeight);
+        if (dy >= 0) {
+          // 折叠态向下拖 → 关闭：用 slideAnim 移动整张 sheet
+          contentSlideAnim.setValue(SHEET_SLIDE_RANGE);
+          // dy 映射到 slideAnim: 0 → 1 范围，1=屏幕内，0=屏幕外
+          const slideOffset = Math.max(0, 1 - dy / (SCREEN_HEIGHT * 0.5));
+          slideAnim.setValue(slideOffset);
+        } else {
+          // 折叠态向上拖 → 展开
+          contentSlideAnim.setValue(
+            Math.max(0, SHEET_SLIDE_RANGE + dy),
+          );
+          slideAnim.setValue(1);
+        }
       } else {
-        const newHeight = Math.max(
-          SHEET_HEIGHT_COLLAPSED,
-          Math.min(SHEET_HEIGHT_EXPANDED, SHEET_HEIGHT_EXPANDED - event.translationY),
-        );
-        sheetHeightAnim.setValue(newHeight);
+        // expanded
+        if (dy > 0) {
+          // 展开态向下拖
+          if (dy <= SHEET_SLIDE_RANGE) {
+            // 阶段1：折叠（contentSlideAnim）
+            contentSlideAnim.setValue(Math.min(SHEET_SLIDE_RANGE, dy));
+            slideAnim.setValue(1);
+          } else {
+            // 阶段2：已完全折叠，继续向下 → 关闭（slideAnim）
+            contentSlideAnim.setValue(SHEET_SLIDE_RANGE);
+            const excess = dy - SHEET_SLIDE_RANGE;
+            const slideOffset = Math.max(0, 1 - excess / (SCREEN_HEIGHT * 0.5));
+            slideAnim.setValue(slideOffset);
+          }
+        } else {
+          // 展开态向上拖 → 保持展开
+          contentSlideAnim.setValue(0);
+          slideAnim.setValue(1);
+        }
       }
     };
 
@@ -185,12 +238,10 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
         }
       })
       .onEnd((event) => {
-        // Flush any pending rAF update and cancel future ones
         if (rafId) {
           cancelAnimationFrame(rafId);
           rafId = null;
         }
-        // Apply final position immediately
         pendingEvent = null;
         const { translationY, velocityY } = event;
         const current = sheetStateRef.current;
@@ -200,34 +251,42 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
           snapToExpanded();
           return;
         }
-        // 快速向下 → 折叠或关闭
+        // 快速向下 → 关闭或折叠
         if (velocityY > VELOCITY_THRESHOLD) {
           if (current === 'collapsed') {
             animateClose();
           } else {
-            snapToCollapsed();
+            // 展开态快速向下：如果已经超过折叠范围则关闭，否则折叠
+            if (translationY > SHEET_SLIDE_RANGE) {
+              animateClose();
+            } else {
+              snapToCollapsed();
+            }
           }
           return;
         }
 
-        // 慢速拖拽
+        // 慢速拖拽 → 根据位置判断
         if (current === 'collapsed') {
-          if (translationY < -50) {
-            snapToExpanded();
-          } else if (translationY > CLOSE_THRESHOLD) {
+          if (translationY > CLOSE_THRESHOLD) {
             animateClose();
+          } else if (translationY < -50) {
+            snapToExpanded();
           } else {
             snapToCollapsed();
           }
         } else {
-          if (translationY > 80) {
+          // expanded
+          if (translationY > SHEET_SLIDE_RANGE + CLOSE_THRESHOLD) {
+            animateClose();
+          } else if (translationY > 80) {
             snapToCollapsed();
           } else {
             snapToExpanded();
           }
         }
       });
-  }, [sheetHeightAnim, snapToCollapsed, snapToExpanded, animateClose]);
+  }, [contentSlideAnim, slideAnim, snapToCollapsed, snapToExpanded, animateClose]);
 
   // ---- 图表数据 ----
 
@@ -241,15 +300,19 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
     };
   }, [trackPoints]);
 
-  const translateY = slideAnim.interpolate({
+  const sheetSlideY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [SCREEN_HEIGHT, 0],
   });
 
-  // MapView 用空数据保持挂载，有数据时才画线
+  const topAreaHeight = SCREEN_HEIGHT - SHEET_HEIGHT_EXPANDED;
+  const topAreaTranslateY = contentSlideAnim.interpolate({
+    inputRange: [0, SHEET_SLIDE_RANGE],
+    outputRange: [-topAreaHeight, 0],
+  });
+
   const mapPoints = trackPoints && trackPoints.length >= 2 ? trackPoints : EMPTY_POINTS;
   const showContent = sheetVisible && visibleActivity !== null;
-
   const meta = visibleActivity ? ACTIVITY_TYPE_META[visibleActivity.type as keyof typeof ACTIVITY_TYPE_META] : null;
   const TypeIcon = meta?.icon;
   const startDate = visibleActivity ? new Date(visibleActivity.startTime) : new Date();
@@ -264,26 +327,28 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
             <Animated.View
               style={[
                 styles.topArea,
-                { height: sheetHeightAnim.interpolate({
-                  inputRange: [0, SCREEN_HEIGHT],
-                  outputRange: [SCREEN_HEIGHT, 0],
-                })},
+                {
+                  height: topAreaHeight + SHEET_SLIDE_RANGE,
+                  transform: [{ translateY: topAreaTranslateY }],
+                },
               ]}
             />
           </TouchableWithoutFeedback>
 
-          <Animated.View style={{ transform: [{ translateY }] }}>
+          <Animated.View style={{ transform: [{ translateY: sheetSlideY }] }}>
             {/* 顶部阴影渐变 */}
             <View style={styles.topShadow} pointerEvents="none" />
+            {/* sheet 容器：固定 expanded 高度 + overflow:hidden 裁剪 */}
             <Animated.View
               style={[
                 styles.sheet,
                 {
-                  height: sheetHeightAnim,
+                  height: SHEET_HEIGHT_EXPANDED,
+                  transform: [{ translateY: contentSlideAnim }],
                 },
               ]}
             >
-              {/* 拖拽热区：GestureDetector 绑定到 dragZone */}
+              {/* 拖拽热区 */}
               <GestureDetector gesture={panGesture}>
                 <View style={styles.dragZone}>
                   <View style={styles.dragIndicator} />

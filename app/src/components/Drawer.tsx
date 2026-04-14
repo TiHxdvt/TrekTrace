@@ -14,6 +14,7 @@ import {
   ScrollView,
   Switch,
   Pressable,
+  InteractionManager,
 } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,6 +84,7 @@ export const DrawerRoot: React.FC = () => {
 
   const slideAnim = useRef(new Animated.Value(-500));
   const maskAnim = useRef(new Animated.Value(0));
+  const openRafRef = useRef<number | null>(null);
 
   // Load user info when drawer opens
   const loadUser = useCallback(async () => {
@@ -94,23 +96,37 @@ export const DrawerRoot: React.FC = () => {
   }, []);
 
   const openDrawer = useCallback(() => {
-    loadUser();
+    // 取消上一次未执行的 rAF
+    if (openRafRef.current !== null) {
+      cancelAnimationFrame(openRafRef.current);
+      openRafRef.current = null;
+    }
+
     setVisible(true);
     slideAnim.current.setValue(-500);
     maskAnim.current.setValue(0);
 
-    Animated.parallel([
-      Animated.timing(slideAnim.current, {
-        toValue: 0,
-        duration: ANIMATION.NORMAL,
-        useNativeDriver: true,
-      }),
-      Animated.timing(maskAnim.current, {
-        toValue: 1,
-        duration: ANIMATION.NORMAL,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // 延迟一帧再启动动画，让 pointerEvents 变化引起的重渲染先完成
+    openRafRef.current = requestAnimationFrame(() => {
+      openRafRef.current = null;
+      Animated.parallel([
+        Animated.timing(slideAnim.current, {
+          toValue: 0,
+          duration: ANIMATION.NORMAL,
+          useNativeDriver: true,
+        }),
+        Animated.timing(maskAnim.current, {
+          toValue: 1,
+          duration: ANIMATION.NORMAL,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+
+    // 将 loadUser 推迟到动画完成之后，避免与动画争抢 JS 线程
+    InteractionManager.runAfterInteractions(() => {
+      loadUser();
+    });
   }, [loadUser]);
 
   const closeDrawer = useCallback(() => {
@@ -125,8 +141,8 @@ export const DrawerRoot: React.FC = () => {
         duration: ANIMATION.NORMAL,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      setVisible(false);
+    ]).start(({ finished }) => {
+      if (finished) setVisible(false);
     });
   }, []);
 
@@ -164,10 +180,8 @@ export const DrawerRoot: React.FC = () => {
     Toast.show('功能开发中');
   };
 
-  if (!visible) return null;
-
   return (
-    <View style={styles.overlay} pointerEvents="box-none">
+    <View style={styles.overlay} pointerEvents={visible ? 'box-none' : 'none'}>
       {/* Static background layer (fades in/out) */}
       <Animated.View style={[styles.bgLayer, { opacity: maskAnim.current }]}>
         {/* Background glow orbs */}
