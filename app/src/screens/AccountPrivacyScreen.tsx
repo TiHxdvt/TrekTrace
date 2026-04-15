@@ -2,7 +2,7 @@
  * 账号隐私页面
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,14 +13,15 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
+import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { accountService } from '../services/accountService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
 import { storageService } from '../services/storageService';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 
-type NavProp = NativeStackNavigationProp<DrawerStackParamList, 'AccountPrivacy'>;
+type NavProp = StackNavigationProp<DrawerStackParamList, 'AccountPrivacy'>;
 
 type Visibility = 'PUBLIC' | 'FRIENDS' | 'PRIVATE';
 
@@ -36,6 +37,14 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
   const [changingPhone, setChangingPhone] = useState(false);
   const [selectedVisibility, setSelectedVisibility] = useState<Visibility>('FRIENDS');
   const [savingVisibility, setSavingVisibility] = useState(false);
+
+  useEffect(() => {
+    accountService.getVisibility().then(data => {
+      setSelectedVisibility(data.visibility as Visibility);
+    }).catch(() => {
+      // Use default FRIENDS on error
+    });
+  }, []);
 
   const handleChangePhone = async () => {
     if (!newPhone || !code) {
@@ -97,7 +106,7 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
   };
 
   return (
-    <View style={styles.container}>
+    <FeatureScreenLayout>
       <FeatureHeader title="账号隐私" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Change phone */}
@@ -168,12 +177,11 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </FeatureScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },
   sectionTitle: {
@@ -219,7 +227,11 @@ const styles = StyleSheet.create({
     gap: SPACING.MD,
     paddingVertical: SPACING.MD,
   },
-  visibilityOptionActive: {},
+  visibilityOptionActive: {
+    backgroundColor: COLORS.OVERLAY.MEDIUM,
+    borderRadius: BORDER_RADIUS.MD,
+    paddingHorizontal: SPACING.SM,
+  },
   radioOuter: {
     width: 20,
     height: 20,

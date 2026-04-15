@@ -18,4 +18,9 @@ export const accountService = {
     const response = await api.put<{ visibility: string }>('/account/visibility', { visibility });
     return response.data;
   },
+
+  getVisibility: async (): Promise<{ visibility: string }> => {
+    const response = await api.get<{ visibility: string }>('/account/visibility');
+    return response.data;
+  },
 };

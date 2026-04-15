@@ -13,14 +13,16 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
+import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { dataService, DataSummary } from '../services/dataService';
+import { storageService } from '../services/storageService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
 import { IconGraphUp, IconBolt, IconFlame, IconFire } from '../components/SolarIcons';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 
-type NavProp = NativeStackNavigationProp<DrawerStackParamList, 'DataManagement'>;
+type NavProp = StackNavigationProp<DrawerStackParamList, 'DataManagement'>;
 
 function formatDistance(meters: number): string {
   if (meters >= 1000) return (meters / 1000).toFixed(1) + ' km';
@@ -56,8 +58,7 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
   const handleExport = async () => {
     try {
       const data = await dataService.exportData('json');
-      // For now just show success - actual share integration later
-      const json = JSON.stringify(data, null, 2);
+      // TODO: share integration later
       Toast.show(`导出成功，共 ${data.length} 条记录`);
     } catch {
       Toast.show('导出失败');
@@ -104,6 +105,7 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
           onPress: async () => {
             try {
               await dataService.deleteAccount();
+              await storageService.clearAuthData();
               Toast.show('账户已注销');
             } catch {
               Toast.show('注销失败');
@@ -116,17 +118,17 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <FeatureScreenLayout>
         <FeatureHeader title="数据管理" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
           <ActivityIndicator color={COLORS.PRIMARY} />
         </View>
-      </View>
+      </FeatureScreenLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <FeatureScreenLayout>
       <FeatureHeader title="数据管理" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Summary cards */}
@@ -177,12 +179,11 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </FeatureScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },

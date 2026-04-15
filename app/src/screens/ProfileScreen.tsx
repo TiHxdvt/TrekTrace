@@ -12,16 +12,17 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
+import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { userService, ProfileData } from '../services/userService';
 import { storageService } from '../services/storageService';
 import { Toast } from '../components/Toast';
 import { IconUser } from '../components/SolarIcons';
 
-type NavProp = NativeStackNavigationProp<DrawerStackParamList, 'Profile'>;
+type NavProp = StackNavigationProp<DrawerStackParamList, 'Profile'>;
 
 export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation }) => {
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -70,17 +71,17 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <FeatureScreenLayout>
         <FeatureHeader title="个人信息" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
           <ActivityIndicator color={COLORS.PRIMARY} />
         </View>
-      </View>
+      </FeatureScreenLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <FeatureScreenLayout>
       <FeatureHeader title="个人信息" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Avatar */}
@@ -139,12 +140,11 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
           <Text style={styles.saveBtnText}>{saving ? '保存中...' : '保存'}</Text>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </FeatureScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },

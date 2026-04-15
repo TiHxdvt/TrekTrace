@@ -14,13 +14,14 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
+import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { notificationService, NotificationItem } from '../services/notificationService';
 import { Toast } from '../components/Toast';
 import { IconBell } from '../components/SolarIcons';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 
-type NavProp = NativeStackNavigationProp<DrawerStackParamList, 'Notification'>;
+type NavProp = StackNavigationProp<DrawerStackParamList, 'Notification'>;
 
 function getNotificationIcon(type: string): string {
   switch (type) {
@@ -100,17 +101,17 @@ export const NotificationScreen: React.FC<{ navigation: NavProp }> = ({ navigati
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <FeatureScreenLayout>
         <FeatureHeader title="系统通知" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
           <ActivityIndicator color={COLORS.PRIMARY} />
         </View>
-      </View>
+      </FeatureScreenLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <FeatureScreenLayout>
       <FeatureHeader title="系统通知" onBack={() => navigation.goBack()} right={rightEl} />
       <ScrollView
         style={styles.scrollView}
@@ -143,12 +144,11 @@ export const NotificationScreen: React.FC<{ navigation: NavProp }> = ({ navigati
           ))
         )}
       </ScrollView>
-    </View>
+    </FeatureScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },

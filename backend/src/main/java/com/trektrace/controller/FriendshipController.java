@@ -62,7 +62,7 @@ public class FriendshipController {
     }
 
     @GetMapping("/{userId}/stats")
-    public ResponseEntity<FriendDTO> getFriendStats(@PathVariable Long userId) {
-        return ResponseEntity.ok(friendshipService.getFriendStats(userId));
+    public ResponseEntity<FriendDTO> getFriendStats(@PathVariable Long userId, Authentication auth) {
+        return ResponseEntity.ok(friendshipService.getFriendStats(userId, getUserId(auth)));
     }
 }

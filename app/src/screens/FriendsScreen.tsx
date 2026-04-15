@@ -14,14 +14,15 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
+import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { friendService, FriendData, FriendRequestData } from '../services/friendService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
 import { IconUser, IconUsersGroupRounded } from '../components/SolarIcons';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 
-type NavProp = NativeStackNavigationProp<DrawerStackParamList, 'Friends'>;
+type NavProp = StackNavigationProp<DrawerStackParamList, 'Friends'>;
 
 type Tab = 'friends' | 'requests';
 
@@ -73,7 +74,7 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
     try {
       await friendService.acceptRequest(id);
       setRequests(prev => prev.filter(r => r.id !== id));
-      loadData(); // refresh friends list
+      await loadData(); // refresh friends list
       Toast.show('已接受好友请求');
     } catch {
       Toast.show('操作失败');
@@ -123,17 +124,17 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <FeatureScreenLayout>
         <FeatureHeader title="同行好友" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
           <ActivityIndicator color={COLORS.PRIMARY} />
         </View>
-      </View>
+      </FeatureScreenLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <FeatureScreenLayout>
       <FeatureHeader title="同行好友" onBack={() => navigation.goBack()} right={rightEl} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Add friend */}
@@ -249,12 +250,11 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
           </View>
         )}
       </ScrollView>
-    </View>
+    </FeatureScreenLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },

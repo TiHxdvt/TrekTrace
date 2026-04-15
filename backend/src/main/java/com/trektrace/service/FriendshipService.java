@@ -136,9 +136,17 @@ public class FriendshipService {
         friendshipRepository.delete(f);
     }
 
-    public FriendDTO getFriendStats(Long friendUserId) {
+    public FriendDTO getFriendStats(Long friendUserId, Long requestingUserId) {
         User friend = userRepository.findById(friendUserId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+
+        // Check that users are friends
+        boolean isFriend = friendshipRepository.findAcceptedFriends(requestingUserId).stream()
+                .anyMatch(f -> f.getRequesterId().equals(friendUserId) || f.getAddresseeId().equals(friendUserId));
+        if (!isFriend) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能查看好友的运动统计");
+        }
+
         FriendDTO dto = new FriendDTO();
         dto.setUserId(friend.getId());
         dto.setNickname(friend.getNickname());

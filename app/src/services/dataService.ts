@@ -27,6 +27,6 @@ export const dataService = {
   },
 
   deleteAccount: async (): Promise<void> => {
-    await api.delete('/data/account');
+    await api.delete('/account');
   },
 };

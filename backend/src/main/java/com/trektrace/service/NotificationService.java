@@ -3,8 +3,10 @@ package com.trektrace.service;
 import com.trektrace.dto.NotificationDTO;
 import com.trektrace.entity.Notification;
 import com.trektrace.repository.NotificationRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,9 +33,9 @@ public class NotificationService {
     @Transactional
     public void markAsRead(Long notificationId, Long userId) {
         Notification n = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("通知不存在"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "通知不存在"));
         if (!n.getUserId().equals(userId)) {
-            throw new RuntimeException("无权操作");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权操作");
         }
         n.setIsRead(true);
         notificationRepository.save(n);
