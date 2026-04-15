@@ -17,7 +17,7 @@ import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { notificationService, NotificationItem } from '../services/notificationService';
 import { Toast } from '../components/Toast';
-import { IconBell } from '../components/SolarIcons';
+import { IconBell, IconCheckCircle } from '../components/SolarIcons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 
@@ -97,7 +97,7 @@ export const NotificationScreen: React.FC<{ navigation: NavProp }> = ({ navigati
 
   const rightEl = (
     <TouchableOpacity onPress={handleReadAll} activeOpacity={0.7}>
-      <Text style={styles.readAllBtn}>全部已读</Text>
+      <IconCheckCircle size={22} color={COLORS.TEXT.TERTIARY} />
     </TouchableOpacity>
   );
 
@@ -154,11 +154,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },
-  readAllBtn: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.PRIMARY,
-    fontWeight: '500',
-  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',

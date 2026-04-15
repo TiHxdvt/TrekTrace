@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 public class UpdateProfileRequest {
-    @Size(max = 50, message = "昵称最长50个字符")
+    @Size(max = 14, message = "昵称最长14个字符")
     private String nickname;
 
     @Size(max = 500, message = "头像URL最长500个字符")

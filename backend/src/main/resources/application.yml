@@ -13,6 +13,11 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 5MB
 
 server:
   port: 8080
@@ -31,6 +36,10 @@ sms:
     accessKeySecret: ${ALIYUN_ACCESS_KEY_SECRET:}
     signName: ${ALIYUN_SMS_SIGN_NAME:}
     templateCode: ${ALIYUN_SMS_TEMPLATE_CODE:}
+
+app:
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
 
 ---
 spring:

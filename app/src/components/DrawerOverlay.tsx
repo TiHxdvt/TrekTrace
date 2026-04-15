@@ -26,9 +26,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
 import { storageService } from '../services/storageService';
 import { Dialog } from '../components/Dialog';
-import { Toast } from '../components/Toast';
+import { Avatar } from '../components/Avatar';
 import {
-  IconUser,
   IconLogout,
   IconGraphUp,
   IconCloseCircle,
@@ -48,7 +47,7 @@ type NavigateFn = (screen: string) => void;
 
 // 模块级状态
 let _navigate: NavigateFn | null = null;
-let _setVisible: ((v: boolean) => void) | null = null;
+let _refreshDrawerData: (() => void) | null = null;
 
 function maskPhone(phone: string): string {
   if (phone.length >= 7) return phone.slice(0, 3) + '****' + phone.slice(-4);
@@ -60,18 +59,29 @@ function maskPhone(phone: string): string {
 const DrawerContent: React.FC = () => {
   const [userName, setUserName] = useState('用户');
   const [userPhone, setUserPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const { isDarkMode, toggleDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    InteractionManager.runAfterInteractions(async () => {
+  const loadUserData = useCallback(async () => {
+    try {
       const user = await storageService.getUser();
       if (user) {
         setUserName(user.nickname || '用户');
         setUserPhone(user.phone ? maskPhone(user.phone) : '');
+        setAvatarUrl(user.avatarUrl || null);
       }
-    });
+    } catch {
+      // 静默失败，保持默认值
+    }
   }, []);
+
+  useEffect(() => {
+    InteractionManager.runAfterInteractions(loadUserData);
+    // 注册刷新函数，每次抽屉打开时调用
+    _refreshDrawerData = loadUserData;
+    return () => { _refreshDrawerData = null; };
+  }, [loadUserData]);
 
   const handleLogout = () => {
     Dialog.show('退出登录', '确定要退出登录吗？', [
@@ -97,9 +107,7 @@ const DrawerContent: React.FC = () => {
       {/* 头部 */}
       <View style={styles.header}>
         <View style={styles.userArea}>
-          <View style={styles.avatar}>
-            <IconUser size={36} color={COLORS.TEXT.SECONDARY} />
-          </View>
+          <Avatar uri={avatarUrl} size={64} />
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{userName}</Text>
             {userPhone ? <Text style={styles.userPhone}>{userPhone}</Text> : null}
@@ -160,7 +168,7 @@ const DrawerContent: React.FC = () => {
           />
         </View>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => Toast.show('功能开发中')} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => go('Permission')} activeOpacity={0.7}>
           <View style={styles.menuIconWrap}><IconSettingsMinimalistic size={22} color={COLORS.TEXT.SECONDARY} /></View>
           <Text style={styles.menuLabel}>系统权限</Text>
           <IconAltArrowRight size={20} color={COLORS.TEXT.QUINARY} />
@@ -186,7 +194,6 @@ export const DrawerOverlayRoot: React.FC = () => {
   const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-  _setVisible = setVisible;
 
   // iOS 风格弹簧动画参数
   const springConfig = {
@@ -201,6 +208,7 @@ export const DrawerOverlayRoot: React.FC = () => {
     DrawerOverlay._animateOpen = () => {
       setVisible(true);
       isOpenRef.current = true;
+      _refreshDrawerData?.();
       Animated.parallel([
         Animated.spring(translateX, { toValue: 0, ...springConfig }),
         Animated.spring(backdropOpacity, { toValue: 1, ...springConfig }),
@@ -246,7 +254,6 @@ export const DrawerOverlayRoot: React.FC = () => {
 export const DrawerOverlay = {
   open(navigateFn?: NavigateFn) {
     if (navigateFn) _navigate = navigateFn;
-    _setVisible?.(true);
     // Use InteractionManager to wait for the component to mount and register _animateOpen
     InteractionManager.runAfterInteractions(() => {
       this._animateOpen?.();
@@ -286,12 +293,6 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.XL,
   },
   userArea: { flexDirection: 'row', alignItems: 'center', gap: SPACING.LG, flex: 1 },
-  avatar: {
-    width: 64, height: 64, borderRadius: 32,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
-    justifyContent: 'center', alignItems: 'center',
-  },
   userName: { fontSize: TYPOGRAPHY.FONT_SIZE.XXL, fontWeight: '700', color: COLORS.TEXT.PRIMARY },
   userInfo: { flex: 1, gap: 4 },
   userPhone: { fontSize: TYPOGRAPHY.FONT_SIZE.BASE, color: COLORS.TEXT.TERTIARY },

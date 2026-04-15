@@ -55,6 +55,8 @@ import SvgCupStar from '../icons/solar-cup-star-bold.svg';
 import SvgChart from '../icons/solar-chart-2-linear.svg';
 import SvgFlame from '../icons/solar-flame-linear.svg';
 import SvgChecklistMinimalistic from '../icons/solar-checklist-minimalistic-linear.svg';
+import SvgCheckCircle from '../icons/solar-check-circle-linear.svg';
+import SvgShieldCross from '../icons/solar-shield-cross-linear.svg';
 
 // ==================== 导航栏图标 ====================
 export const IconMapPoint = createIcon(SvgMapPoint);
@@ -132,3 +134,9 @@ export const IconCupStar = createIcon(SvgCupStar);
 export const IconChart = createIcon(SvgChart);
 export const IconFlame = createIcon(SvgFlame);
 export const IconChecklistMinimalistic = createIcon(SvgChecklistMinimalistic);
+
+// ==================== 通知操作图标 ====================
+export const IconCheckCircle = createIcon(SvgCheckCircle);
+
+// ==================== 权限图标 ====================
+export const IconShieldCross = createIcon(SvgShieldCross);

@@ -18,7 +18,8 @@ import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { friendService, FriendData, FriendRequestData } from '../services/friendService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
-import { IconUser, IconUsersGroupRounded } from '../components/SolarIcons';
+import { IconUsersGroupRounded } from '../components/SolarIcons';
+import { Avatar } from '../components/Avatar';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 
@@ -198,9 +199,7 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
                   activeOpacity={0.7}
                   delayLongPress={500}
                 >
-                  <View style={styles.friendAvatar}>
-                    <IconUser size={24} color={COLORS.TEXT.SECONDARY} />
-                  </View>
+                  <Avatar uri={friend.avatarUrl} size={44} />
                   <View style={styles.friendInfo}>
                     <Text style={styles.friendName}>{friend.nickname || '用户'}</Text>
                     <Text style={styles.friendPhone}>{friend.phone}</Text>
@@ -222,9 +221,7 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
             ) : (
               requests.map(req => (
                 <View key={req.id} style={styles.requestItem}>
-                  <View style={styles.friendAvatar}>
-                    <IconUser size={24} color={COLORS.TEXT.SECONDARY} />
-                  </View>
+                  <Avatar uri={req.requesterAvatarUrl} size={44} />
                   <View style={styles.friendInfo}>
                     <Text style={styles.friendName}>{req.requesterNickname || '用户'}</Text>
                   </View>
@@ -356,14 +353,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.SM,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BORDER.LIGHT,
-  },
-  friendAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   friendInfo: {
     flex: 1,

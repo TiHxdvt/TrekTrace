@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
-import { IconChatRoundDots, IconChecklistMinimalistic } from '../components/SolarIcons';
+import { IconChatRoundDots, IconCheckCircle, IconMagnifer } from '../components/SolarIcons';
 import { Toast } from '../components/Toast';
 import { notificationService } from '../services/notificationService';
 
@@ -46,13 +46,22 @@ export const MessagesScreen: React.FC = () => {
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>消息</Text>
-          <TouchableOpacity
-            style={styles.readAllBtn}
-            onPress={handleMarkAllRead}
-            activeOpacity={0.7}
-          >
-            <IconChecklistMinimalistic size={20} color={COLORS.TEXT.TERTIARY} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={handleMarkAllRead}
+              activeOpacity={0.7}
+            >
+              <IconCheckCircle size={20} color={COLORS.TEXT.PRIMARY} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => Toast.show('功能开发中')}
+              activeOpacity={0.7}
+            >
+              <IconMagnifer size={20} color={COLORS.TEXT.PRIMARY} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -137,7 +146,11 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     color: COLORS.TEXT.QUATERNARY,
   },
-  readAllBtn: {
+  headerActions: {
+    flexDirection: 'row',
+    gap: SPACING.SM,
+  },
+  headerIconBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,

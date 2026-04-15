@@ -10,6 +10,7 @@ export interface ProfileData {
   nickname: string;
   avatarUrl: string;
   createdAt: string;
+  nicknameUpdatedAt: string | null;
 }
 
 export const userService = {
@@ -21,5 +22,20 @@ export const userService = {
   updateProfile: async (data: { nickname?: string; avatarUrl?: string }): Promise<ProfileData> => {
     const response = await api.put<ProfileData>('/user/profile', data);
     return response.data;
+  },
+
+  uploadAvatar: async (fileUri: string, mimeType: string): Promise<string> => {
+    const formData = new FormData();
+    formData.append('avatar', {
+      uri: fileUri,
+      type: mimeType,
+      name: 'avatar.' + (mimeType.split('/')[1] || 'jpg'),
+    } as any);
+
+    const response = await api.post<{ avatarUrl: string }>('/user/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000,
+    });
+    return response.data.avatarUrl;
   },
 };

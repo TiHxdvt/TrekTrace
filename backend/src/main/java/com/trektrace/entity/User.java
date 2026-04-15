@@ -22,6 +22,9 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
+    @Column(name = "nickname_updated_at")
+    private LocalDateTime nicknameUpdatedAt;
+
     public enum DataVisibility {
         PUBLIC, FRIENDS, PRIVATE
     }
