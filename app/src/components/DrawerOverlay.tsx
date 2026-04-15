@@ -38,6 +38,7 @@ import {
   IconSettingsMinimalistic,
   IconUserId,
   IconAltArrowRight,
+  IconQrCode,
 } from '../components/SolarIcons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -58,6 +59,7 @@ function maskPhone(phone: string): string {
 
 const DrawerContent: React.FC = () => {
   const [userName, setUserName] = useState('用户');
+  const [userAccount, setUserAccount] = useState<number | null>(null);
   const [userPhone, setUserPhone] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const { isDarkMode, toggleDarkMode } = useTheme();
@@ -68,6 +70,7 @@ const DrawerContent: React.FC = () => {
       const user = await storageService.getUser();
       if (user) {
         setUserName(user.nickname || '用户');
+        setUserAccount(user.account ?? null);
         setUserPhone(user.phone ? maskPhone(user.phone) : '');
         setAvatarUrl(user.avatarUrl || null);
       }
@@ -110,7 +113,12 @@ const DrawerContent: React.FC = () => {
           <Avatar uri={avatarUrl} size={64} />
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{userName}</Text>
-            {userPhone ? <Text style={styles.userPhone}>{userPhone}</Text> : null}
+            {userAccount ? (
+              <View style={styles.accountRow}>
+                <Text style={styles.userAccount}>途迹账号：{userAccount}</Text>
+                <IconQrCode size={14} color={COLORS.TEXT.QUATERNARY} />
+              </View>
+            ) : null}
           </View>
         </View>
         <TouchableOpacity
@@ -294,7 +302,9 @@ const styles = StyleSheet.create({
   },
   userArea: { flexDirection: 'row', alignItems: 'center', gap: SPACING.LG, flex: 1 },
   userName: { fontSize: TYPOGRAPHY.FONT_SIZE.XXL, fontWeight: '700', color: COLORS.TEXT.PRIMARY },
+  userAccount: { fontSize: TYPOGRAPHY.FONT_SIZE.SM, color: COLORS.TEXT.QUATERNARY },
   userInfo: { flex: 1, gap: 4 },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   userPhone: { fontSize: TYPOGRAPHY.FONT_SIZE.BASE, color: COLORS.TEXT.TERTIARY },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL },

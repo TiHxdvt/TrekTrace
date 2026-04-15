@@ -17,12 +17,14 @@ public class LoginResponse {
     @Data
     public static class UserDTO {
         private Long id;
+        private Long account;
         private String phone;
         private String nickname;
         private String avatarUrl;
-        
+
         public UserDTO(User user) {
             this.id = user.getId();
+            this.account = user.getAccount();
             this.phone = user.getPhone();
             this.nickname = user.getNickname();
             this.avatarUrl = user.getAvatarUrl();

@@ -82,17 +82,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     };
   }, [countdownActive]);
 
-  // 切换模式时清空表单和错误
+  // 切换模式时保留手机号，清空其他字段和错误
   const handleSwitchMode = (mode: LoginMode) => {
+    const currentPhone = loginMode === 'sms' ? phone : account;
     setLoginMode(mode);
     setPhoneError('');
     setCodeError('');
     setAccountError('');
     setPasswordError('');
     if (mode === 'sms') {
-      setAccount('');
+      setPhone(currentPhone);
+      setCode('');
       setPassword('');
     } else {
+      setAccount(currentPhone);
       setPhone('');
       setCode('');
     }

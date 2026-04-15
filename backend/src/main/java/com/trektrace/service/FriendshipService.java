@@ -37,6 +37,7 @@ public class FriendshipService {
                     FriendDTO dto = new FriendDTO();
                     dto.setFriendshipId(f.getId());
                     dto.setUserId(friend.getId());
+                    dto.setAccount(friend.getAccount());
                     dto.setNickname(friend.getNickname());
                     dto.setAvatarUrl(friend.getAvatarUrl());
                     dto.setPhone(maskPhone(friend.getPhone()));

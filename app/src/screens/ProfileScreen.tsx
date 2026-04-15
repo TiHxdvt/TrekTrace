@@ -226,6 +226,12 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
           />
         </View>
 
+        {/* Account ID (read-only) */}
+        <View style={styles.fieldGroup}>
+          <Text style={[styles.label, styles.labelMargin]}>账号</Text>
+          <Text style={styles.valueText}>{profile ? profile.account : '-'}</Text>
+        </View>
+
         {/* Phone (read-only) */}
         <View style={styles.fieldGroup}>
           <Text style={[styles.label, styles.labelMargin]}>手机号</Text>

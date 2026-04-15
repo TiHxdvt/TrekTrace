@@ -6,6 +6,7 @@ import lombok.Data;
 public class FriendDTO {
     private Long friendshipId;
     private Long userId;
+    private Long account;
     private String nickname;
     private String avatarUrl;
     private String phone;

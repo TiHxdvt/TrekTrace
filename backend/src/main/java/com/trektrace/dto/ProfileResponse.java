@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Data
 public class ProfileResponse {
     private Long id;
+    private Long account;
     private String phone;
     private String nickname;
     private String avatarUrl;
@@ -16,6 +17,7 @@ public class ProfileResponse {
 
     public ProfileResponse(User user) {
         this.id = user.getId();
+        this.account = user.getAccount();
         this.phone = maskPhone(user.getPhone());
         this.nickname = user.getNickname();
         this.avatarUrl = user.getAvatarUrl();

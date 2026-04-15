@@ -57,6 +57,7 @@ import SvgFlame from '../icons/solar-flame-linear.svg';
 import SvgChecklistMinimalistic from '../icons/solar-checklist-minimalistic-linear.svg';
 import SvgCheckCircle from '../icons/solar-check-circle-linear.svg';
 import SvgShieldCross from '../icons/solar-shield-cross-linear.svg';
+import SvgQrCode from '../icons/solar-qr-code-linear.svg';
 
 // ==================== 导航栏图标 ====================
 export const IconMapPoint = createIcon(SvgMapPoint);
@@ -140,3 +141,6 @@ export const IconCheckCircle = createIcon(SvgCheckCircle);
 
 // ==================== 权限图标 ====================
 export const IconShieldCross = createIcon(SvgShieldCross);
+
+// ==================== 二维码图标 ====================
+export const IconQrCode = createIcon(SvgQrCode);

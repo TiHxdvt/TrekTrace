@@ -5,6 +5,7 @@
 // 用户类型
 export interface User {
   id: number;
+  account: number;
   phone: string;
   nickname?: string;
   avatarUrl?: string;

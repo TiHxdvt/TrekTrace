@@ -70,7 +70,9 @@ public class UserService {
         newUser.setPhone(phone);
         newUser.setNickname(generateRandomNickname());
         newUser.setAvatarUrl("https://api.dicebear.com/9.x/thumbs/png?seed=" + phone);
-        return userRepository.save(newUser);
+        User saved = userRepository.save(newUser);
+        saved.setAccount(100000L + saved.getId());
+        return userRepository.save(saved);
     }
 
     public String generateToken(Long userId) {

@@ -6,6 +6,7 @@ import api from './api';
 
 export interface ProfileData {
   id: number;
+  account: number;
   phone: string;
   nickname: string;
   avatarUrl: string;
