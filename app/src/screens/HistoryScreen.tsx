@@ -12,7 +12,6 @@ import { IconBonfire, IconFlame, IconMedalStar } from '../components/SolarIcons'
 import { FullScreenBlur } from '../components/FullScreenBlur';
 import { AccordionSection } from '../components/AccordionSection';
 import { ActivityDetailSheet } from '../components/ActivityDetailSheet';
-import { EmptyState } from '../components/EmptyState';
 import { DateFilterDropdown } from '../components/DateFilterDropdown';
 import { ACTIVITY_TYPES } from '../constants/activityMeta';
 import { activityService } from '../services/activityService';
@@ -131,7 +130,7 @@ export const HistoryScreen: React.FC = () => {
       <FullScreenBlur />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>历史记录</Text>
           <DateFilterDropdown
@@ -163,7 +162,7 @@ export const HistoryScreen: React.FC = () => {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={isEmpty || error ? styles.scrollContentEmpty : styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
@@ -172,17 +171,21 @@ export const HistoryScreen: React.FC = () => {
             <Text style={styles.loadingText}>加载中...</Text>
           </View>
         ) : error ? (
-          <EmptyState
-            icon={<IconBonfire size={24} color={COLORS.TEXT.QUATERNARY} />}
-            title={error}
-            subtitle="下拉刷新或检查网络连接"
-          />
+          <View style={styles.emptyState}>
+            <View style={styles.iconWrap}>
+              <IconBonfire size={48} color={COLORS.TEXT.QUATERNARY} />
+            </View>
+            <Text style={styles.emptyTitle}>{error}</Text>
+            <Text style={styles.emptySubtitle}>下拉刷新或检查网络连接</Text>
+          </View>
         ) : isEmpty ? (
-          <EmptyState
-            icon={<IconBonfire size={24} color={COLORS.TEXT.QUATERNARY} />}
-            title="暂无运动记录"
-            subtitle="完成一次运动后，记录会出现在这里"
-          />
+          <View style={styles.emptyState}>
+            <View style={styles.iconWrap}>
+              <IconBonfire size={48} color={COLORS.TEXT.QUATERNARY} />
+            </View>
+            <Text style={styles.emptyTitle}>暂无记录</Text>
+            <Text style={styles.emptySubtitle}>完成一次运动后，记录会出现在这里</Text>
+          </View>
         ) : (
           ACTIVITY_TYPES.map(type => (
             <AccordionSection
@@ -227,8 +230,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.GRADIENT.PURPLE_LIGHT,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: SPACING.XL,
+    paddingBottom: SPACING.MD,
     zIndex: 20,
   },
   headerRow: {
@@ -250,7 +253,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   statsArea: {
-    paddingHorizontal: 20,
+    paddingHorizontal: SPACING.XL,
     marginBottom: SPACING.MD,
     alignItems: 'center',
   },
@@ -277,9 +280,15 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: SPACING.XL,
     paddingBottom: 140,
     gap: 12,
+  },
+  scrollContentEmpty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 120,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -289,6 +298,30 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+    color: COLORS.TEXT.QUATERNARY,
+  },
+  emptyState: {
+    alignItems: 'center',
+  },
+  iconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.OVERLAY.LIGHT,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.XXL,
+  },
+  emptyTitle: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.XL,
+    fontWeight: '600',
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: SPACING.SM,
+  },
+  emptySubtitle: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     color: COLORS.TEXT.QUATERNARY,
   },
 });

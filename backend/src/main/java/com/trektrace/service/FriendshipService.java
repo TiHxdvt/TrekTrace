@@ -6,6 +6,7 @@ import com.trektrace.entity.Friendship;
 import com.trektrace.entity.User;
 import com.trektrace.repository.FriendshipRepository;
 import com.trektrace.repository.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,7 +91,12 @@ public class FriendshipService {
         friendship.setRequesterId(requesterId);
         friendship.setAddresseeId(target.getId());
         friendship.setStatus(Friendship.FriendshipStatus.PENDING);
-        friendshipRepository.save(friendship);
+        try {
+            friendshipRepository.save(friendship);
+        } catch (DataIntegrityViolationException e) {
+            // Concurrent request hit the unique constraint — treat as duplicate
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "已发送过好友请求");
+        }
 
         // Send notification to target
         User requester = userRepository.findById(requesterId)
@@ -134,24 +140,6 @@ public class FriendshipService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权操作");
         }
         friendshipRepository.delete(f);
-    }
-
-    public FriendDTO getFriendStats(Long friendUserId, Long requestingUserId) {
-        User friend = userRepository.findById(friendUserId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
-
-        // Check that users are friends
-        boolean isFriend = friendshipRepository.findAcceptedFriends(requestingUserId).stream()
-                .anyMatch(f -> f.getRequesterId().equals(friendUserId) || f.getAddresseeId().equals(friendUserId));
-        if (!isFriend) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能查看好友的运动统计");
-        }
-
-        FriendDTO dto = new FriendDTO();
-        dto.setUserId(friend.getId());
-        dto.setNickname(friend.getNickname());
-        dto.setAvatarUrl(friend.getAvatarUrl());
-        return dto;
     }
 
     private String maskPhone(String phone) {

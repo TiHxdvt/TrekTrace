@@ -4,6 +4,7 @@ import com.trektrace.dto.FriendDTO;
 import com.trektrace.dto.FriendRequestDTO;
 import com.trektrace.dto.SendFriendRequestDTO;
 import com.trektrace.service.FriendshipService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -37,7 +38,7 @@ public class FriendshipController {
 
     @PostMapping("/request")
     public ResponseEntity<Void> sendRequest(
-            @RequestBody SendFriendRequestDTO request,
+            @Valid @RequestBody SendFriendRequestDTO request,
             Authentication auth) {
         friendshipService.sendRequest(getUserId(auth), request.getPhone());
         return ResponseEntity.status(HttpStatus.CREATED).build();
@@ -59,10 +60,5 @@ public class FriendshipController {
     public ResponseEntity<Void> deleteFriend(@PathVariable Long id, Authentication auth) {
         friendshipService.deleteFriend(id, getUserId(auth));
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/{userId}/stats")
-    public ResponseEntity<FriendDTO> getFriendStats(@PathVariable Long userId, Authentication auth) {
-        return ResponseEntity.ok(friendshipService.getFriendStats(userId, getUserId(auth)));
     }
 }

@@ -5,6 +5,9 @@ import com.trektrace.dto.ActivityUploadRequest;
 import com.trektrace.dto.TrackPointDTO;
 import com.trektrace.service.ActivityService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -37,6 +40,16 @@ public class ActivityController {
     @GetMapping
     public ResponseEntity<List<ActivityResponse>> getUserActivities(Authentication auth) {
         return ResponseEntity.ok(activityService.getUserActivities(getUserId(auth)));
+    }
+
+    @GetMapping("/paged")
+    public ResponseEntity<Page<ActivityResponse>> getUserActivitiesPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication auth) {
+        return ResponseEntity.ok(activityService.getUserActivities(
+                getUserId(auth),
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "startTime"))));
     }
 
     @GetMapping("/{id}")

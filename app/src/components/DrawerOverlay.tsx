@@ -247,9 +247,9 @@ export const DrawerOverlay = {
   open(navigateFn?: NavigateFn) {
     if (navigateFn) _navigate = navigateFn;
     _setVisible?.(true);
-    // Wait for next frame to ensure DrawerOverlayRoot has mounted and set _animateOpen
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => this._animateOpen?.());
+    // Use InteractionManager to wait for the component to mount and register _animateOpen
+    InteractionManager.runAfterInteractions(() => {
+      this._animateOpen?.();
     });
   },
   close(callback?: () => void) {

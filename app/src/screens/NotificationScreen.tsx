@@ -89,7 +89,9 @@ export const NotificationScreen: React.FC<{ navigation: NavProp }> = ({ navigati
         setNotifications(prev =>
           prev.map(n => (n.id === item.id ? { ...n, isRead: true } : n)),
         );
-      } catch {}
+      } catch {
+        Toast.show('标记已读失败');
+      }
     }
   };
 

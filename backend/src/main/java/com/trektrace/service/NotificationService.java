@@ -3,6 +3,8 @@ package com.trektrace.service;
 import com.trektrace.dto.NotificationDTO;
 import com.trektrace.entity.Notification;
 import com.trektrace.repository.NotificationRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,11 @@ public class NotificationService {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
                 .map(NotificationDTO::new)
                 .collect(Collectors.toList());
+    }
+
+    public Page<NotificationDTO> getUserNotifications(Long userId, Pageable pageable) {
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
+                .map(NotificationDTO::new);
     }
 
     public long getUnreadCount(Long userId) {

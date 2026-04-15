@@ -15,6 +15,7 @@ import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { dataService, DataSummary } from '../services/dataService';
+import { accountService } from '../services/accountService';
 import { storageService } from '../services/storageService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
@@ -104,7 +105,7 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
           style: 'destructive',
           onPress: async () => {
             try {
-              await dataService.deleteAccount();
+              await accountService.deleteAccount();
               await storageService.clearAuthData();
               Toast.show('账户已注销');
             } catch {

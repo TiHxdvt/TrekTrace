@@ -3,15 +3,26 @@
  * 玻璃拟态风格，后续实现聊天功能
  */
 
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
-import { IconChatRoundDots } from '../components/SolarIcons';
+import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
+import { IconChatRoundDots, IconChecklistMinimalistic } from '../components/SolarIcons';
+import { Toast } from '../components/Toast';
+import { notificationService } from '../services/notificationService';
 
 export const MessagesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+
+  const handleMarkAllRead = useCallback(async () => {
+    try {
+      await notificationService.markAllAsRead();
+      Toast.show('已全部标为已读');
+    } catch {
+      Toast.show('操作失败');
+    }
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -32,8 +43,17 @@ export const MessagesScreen: React.FC = () => {
       </View>
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.headerTitle}>消息</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>消息</Text>
+          <TouchableOpacity
+            style={styles.readAllBtn}
+            onPress={handleMarkAllRead}
+            activeOpacity={0.7}
+          >
+            <IconChecklistMinimalistic size={20} color={COLORS.TEXT.TERTIARY} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Empty State */}
@@ -75,8 +95,13 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: SPACING.XL,
-    paddingBottom: SPACING.XXL,
+    paddingBottom: SPACING.MD,
     zIndex: 20,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
@@ -111,5 +136,15 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     color: COLORS.TEXT.QUATERNARY,
+  },
+  readAllBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.OVERLAY.LIGHT,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

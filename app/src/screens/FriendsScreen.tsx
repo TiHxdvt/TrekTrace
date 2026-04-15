@@ -194,9 +194,9 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
                 <TouchableOpacity
                   key={friend.friendshipId}
                   style={styles.friendItem}
-                  onPress={() => {}}
                   onLongPress={() => handleDeleteFriend(friend)}
                   activeOpacity={0.7}
+                  delayLongPress={500}
                 >
                   <View style={styles.friendAvatar}>
                     <IconUser size={24} color={COLORS.TEXT.SECONDARY} />

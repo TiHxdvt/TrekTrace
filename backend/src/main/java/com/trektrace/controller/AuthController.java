@@ -82,9 +82,10 @@ public class AuthController {
         String phone = request.getPhone();
         String code = request.getCode();
 
-        // Validate verification code
+        // Validate verification code (atomic query checks both unused AND not expired)
         Optional<VerificationCode> vcOpt = verificationCodeRepository
-            .findTopByPhoneAndCodeAndUsedFalseOrderByCreatedAtDesc(phone, code);
+            .findTopByPhoneAndCodeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
+                phone, code, LocalDateTime.now());
 
         if (vcOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -92,10 +93,6 @@ public class AuthController {
         }
 
         VerificationCode vc = vcOpt.get();
-        if (vc.getExpiresAt().isBefore(LocalDateTime.now())) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", "验证码已过期"));
-        }
 
         // Mark code as used immediately to prevent reuse
         vc.setUsed(true);

@@ -25,8 +25,4 @@ export const dataService = {
   deleteAllActivities: async (): Promise<void> => {
     await api.delete('/data/activities');
   },
-
-  deleteAccount: async (): Promise<void> => {
-    await api.delete('/account');
-  },
 };

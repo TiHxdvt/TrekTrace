@@ -2,6 +2,9 @@ package com.trektrace.controller;
 
 import com.trektrace.dto.NotificationDTO;
 import com.trektrace.service.NotificationService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +29,16 @@ public class NotificationController {
     @GetMapping
     public ResponseEntity<List<NotificationDTO>> getNotifications(Authentication auth) {
         return ResponseEntity.ok(notificationService.getUserNotifications(getUserId(auth)));
+    }
+
+    @GetMapping("/paged")
+    public ResponseEntity<Page<NotificationDTO>> getNotificationsPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication auth) {
+        return ResponseEntity.ok(notificationService.getUserNotifications(
+                getUserId(auth),
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))));
     }
 
     @GetMapping("/unread-count")

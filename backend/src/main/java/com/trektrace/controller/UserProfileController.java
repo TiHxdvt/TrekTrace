@@ -4,6 +4,7 @@ import com.trektrace.dto.ProfileResponse;
 import com.trektrace.dto.UpdateProfileRequest;
 import com.trektrace.entity.User;
 import com.trektrace.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -30,7 +31,7 @@ public class UserProfileController {
 
     @PutMapping("/profile")
     public ResponseEntity<ProfileResponse> updateProfile(
-            @RequestBody UpdateProfileRequest request,
+            @Valid @RequestBody UpdateProfileRequest request,
             Authentication auth) {
         User user = userService.updateProfile(getUserId(auth), request.getNickname(), request.getAvatarUrl());
         return ResponseEntity.ok(new ProfileResponse(user));

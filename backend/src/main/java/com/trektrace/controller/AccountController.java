@@ -7,6 +7,7 @@ import com.trektrace.entity.VerificationCode;
 import com.trektrace.service.ActivityService;
 import com.trektrace.service.UserService;
 import com.trektrace.repository.VerificationCodeRepository;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -36,23 +37,16 @@ public class AccountController {
 
     @PostMapping("/change-phone")
     public ResponseEntity<?> changePhone(
-            @RequestBody ChangePhoneRequest request,
+            @Valid @RequestBody ChangePhoneRequest request,
             Authentication auth) {
         String phone = request.getPhone();
         String code = request.getCode();
 
-        if (phone == null || code == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "手机号和验证码不能为空");
-        }
-
-        // Verify SMS code
+        // Verify SMS code (uses atomic query that checks both unused AND not expired)
         VerificationCode vc = verificationCodeRepository
-                .findTopByPhoneAndCodeAndUsedFalseOrderByCreatedAtDesc(phone, code)
+                .findTopByPhoneAndCodeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
+                        phone, code, LocalDateTime.now())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码错误或已过期"));
-
-        if (vc.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码已过期");
-        }
 
         // Mark code as used
         vc.setUsed(true);
@@ -71,7 +65,7 @@ public class AccountController {
 
     @PutMapping("/visibility")
     public ResponseEntity<?> updateVisibility(
-            @RequestBody UpdateVisibilityRequest request,
+            @Valid @RequestBody UpdateVisibilityRequest request,
             Authentication auth) {
         User user = userService.updateVisibility(getUserId(auth), request.getVisibility());
         return ResponseEntity.ok(Map.of("visibility", user.getDataVisibility().name()));

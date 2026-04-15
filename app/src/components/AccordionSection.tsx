@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, ANIMATION } from '../theme';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
 import { IconArrowDown } from './SolarIcons';
 import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
 import { formatDistance, formatDuration } from '../utils/format';
@@ -40,10 +40,12 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
   const expandAnim = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.timing(expandAnim, {
+    Animated.spring(expandAnim, {
       toValue: isExpanded ? 1 : 0,
-      duration: ANIMATION.NORMAL,
       useNativeDriver: true,
+      overshootClamping: true,
+      damping: 24,
+      stiffness: 400,
     }).start();
   }, [isExpanded, expandAnim]);
 
@@ -71,10 +73,12 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
   const contentMaxH = useRef(new Animated.Value(isExpanded ? CONTENT_MAX_HEIGHT : 0)).current;
 
   useEffect(() => {
-    Animated.timing(contentMaxH, {
+    Animated.spring(contentMaxH, {
       toValue: isExpanded ? CONTENT_MAX_HEIGHT : 0,
-      duration: ANIMATION.NORMAL,
       useNativeDriver: false,
+      overshootClamping: true,
+      damping: 24,
+      stiffness: 400,
     }).start();
   }, [isExpanded, contentMaxH]);
 
@@ -165,12 +169,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: SPACING.LG,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: SPACING.SM + 2,
     flex: 1,
   },
   typeIconWrapper: {
@@ -192,8 +196,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   arrowWrapper: {
-    width: 24,
-    height: 24,
+    width: SPACING.XL + 4,
+    height: SPACING.XL + 4,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -202,8 +206,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   content: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: SPACING.LG,
+    paddingBottom: SPACING.MD,
     borderTopWidth: 1,
     borderTopColor: COLORS.BORDER.LIGHT,
   },
@@ -211,13 +215,13 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.TEXT.QUATERNARY,
     textAlign: 'center',
-    paddingVertical: 16,
+    paddingVertical: SPACING.LG,
   },
   activityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    gap: 8,
+    paddingVertical: SPACING.MD,
+    gap: SPACING.SM,
   },
   rowDivider: {
     height: StyleSheet.hairlineWidth,

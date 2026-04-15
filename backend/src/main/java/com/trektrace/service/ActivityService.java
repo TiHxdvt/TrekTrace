@@ -6,9 +6,12 @@ import com.trektrace.dto.DataSummaryResponse;
 import com.trektrace.dto.TrackPointDTO;
 import com.trektrace.entity.Activity;
 import com.trektrace.entity.TrackPoint;
+import com.trektrace.entity.User;
 import com.trektrace.repository.ActivityRepository;
 import com.trektrace.repository.TrackPointRepository;
 import com.trektrace.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,6 +86,11 @@ public class ActivityService {
         return activityRepository.findByUserIdOrderByStartTimeDesc(userId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    public Page<ActivityResponse> getUserActivities(Long userId, Pageable pageable) {
+        return activityRepository.findByUserIdOrderByStartTimeDesc(userId, pageable)
+                .map(this::toResponse);
     }
 
     public ActivityResponse getActivity(Long id, Long userId) {
@@ -187,6 +195,10 @@ public class ActivityService {
     @Transactional
     public void deleteAllActivitiesAndUser(Long userId) {
         deleteAllByUserId(userId);
-        userRepository.deleteById(userId);
+        User user = userRepository.findById(userId).orElse(null);
+        if (user != null) {
+            user.setStatus(User.UserStatus.DELETED);
+            userRepository.save(user);
+        }
     }
 }

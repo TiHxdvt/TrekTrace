@@ -18,6 +18,7 @@ import { accountService } from '../services/accountService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
 import { storageService } from '../services/storageService';
+import api from '../services/api';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 
@@ -35,6 +36,7 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
   const [newPhone, setNewPhone] = useState('');
   const [code, setCode] = useState('');
   const [changingPhone, setChangingPhone] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
   const [selectedVisibility, setSelectedVisibility] = useState<Visibility>('FRIENDS');
   const [savingVisibility, setSavingVisibility] = useState(false);
 
@@ -45,6 +47,22 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
       // Use default FRIENDS on error
     });
   }, []);
+
+  const handleSendCode = async () => {
+    if (!newPhone || !/^1[3-9]\d{9}$/.test(newPhone)) {
+      Toast.show('请输入正确的手机号');
+      return;
+    }
+    setSendingCode(true);
+    try {
+      await api.post('/auth/send-code', { phone: newPhone });
+      Toast.show('验证码已发送');
+    } catch {
+      Toast.show('发送验证码失败');
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   const handleChangePhone = async () => {
     if (!newPhone || !code) {
@@ -112,15 +130,25 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
         {/* Change phone */}
         <Text style={styles.sectionTitle}>换绑手机号</Text>
         <View style={styles.card}>
-          <TextInput
-            style={styles.input}
-            value={newPhone}
-            onChangeText={setNewPhone}
-            placeholder="新手机号"
-            placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
-            keyboardType="phone-pad"
-            maxLength={11}
-          />
+          <View style={styles.inputRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={newPhone}
+              onChangeText={setNewPhone}
+              placeholder="新手机号"
+              placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+              keyboardType="phone-pad"
+              maxLength={11}
+            />
+            <TouchableOpacity
+              style={[styles.sendCodeBtn, sendingCode && styles.btnDisabled]}
+              onPress={handleSendCode}
+              disabled={sendingCode}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sendCodeBtnText}>{sendingCode ? '发送中...' : '获取验证码'}</Text>
+            </TouchableOpacity>
+          </View>
           <TextInput
             style={styles.input}
             value={code}
@@ -208,6 +236,23 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.MD,
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     color: COLORS.TEXT.PRIMARY,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: SPACING.SM,
+  },
+  sendCodeBtn: {
+    backgroundColor: COLORS.OVERLAY.MEDIUM,
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY,
+    borderRadius: BORDER_RADIUS.MD,
+    paddingHorizontal: SPACING.MD,
+    justifyContent: 'center',
+  },
+  sendCodeBtnText: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+    fontWeight: '500',
+    color: COLORS.PRIMARY,
   },
   btn: {
     backgroundColor: COLORS.PRIMARY,

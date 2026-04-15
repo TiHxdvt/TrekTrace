@@ -11,7 +11,7 @@ import { format, startOfWeek, addDays } from 'date-fns';
 import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
 import { FullScreenBlur } from '../components/FullScreenBlur';
 import { ActivityDetailSheet } from '../components/ActivityDetailSheet';
-import { EmptyState } from '../components/EmptyState';
+import { IconChart } from '../components/SolarIcons';
 import { activityService } from '../services/activityService';
 import {
   computeLifetimeStats,
@@ -243,7 +243,7 @@ export const StatsScreen: React.FC = () => {
       <FullScreenBlur />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>数据统计</Text>
           <StatsTypeFilter
@@ -260,9 +260,21 @@ export const StatsScreen: React.FC = () => {
           <Text style={styles.loadingText}>加载中...</Text>
         </View>
       ) : error ? (
-        <EmptyState title={error} subtitle="下拉刷新或检查网络连接" />
+        <View style={styles.emptyState}>
+          <View style={styles.iconWrap}>
+            <IconChart size={48} color={COLORS.TEXT.QUATERNARY} />
+          </View>
+          <Text style={styles.emptyTitle}>{error}</Text>
+          <Text style={styles.emptySubtitle}>下拉刷新或检查网络连接</Text>
+        </View>
       ) : isEmpty ? (
-        <EmptyState title="暂无运动记录" subtitle="完成一次运动后，数据统计会出现在这里" />
+        <View style={styles.emptyState}>
+          <View style={styles.iconWrap}>
+            <IconChart size={48} color={COLORS.TEXT.QUATERNARY} />
+          </View>
+          <Text style={styles.emptyTitle}>暂无数据</Text>
+          <Text style={styles.emptySubtitle}>完成一次运动后，数据会出现在这里</Text>
+        </View>
       ) : (
         <View style={styles.body}>
           {/* Tab 选择器 */}
@@ -401,7 +413,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: SPACING.XL,
-    paddingBottom: SPACING.LG,
+    paddingBottom: SPACING.MD,
     zIndex: 20,
   },
   headerRow: {
@@ -421,6 +433,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.MD,
     zIndex: 10,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    paddingBottom: 120,
+  },
+  iconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.OVERLAY.LIGHT,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.XXL,
+  },
+  emptyTitle: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.XL,
+    fontWeight: '600',
+    color: COLORS.TEXT.SECONDARY,
+    marginBottom: SPACING.SM,
+  },
+  emptySubtitle: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+    color: COLORS.TEXT.QUATERNARY,
   },
   loadingText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
