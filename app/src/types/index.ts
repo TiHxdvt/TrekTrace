@@ -203,3 +203,32 @@ export interface ActivityResponseDTO {
   status: string;
   createdAt: string;
 }
+
+// ========== 聊天相关类型 ==========
+
+export interface Conversation {
+  id: number;
+  type: string;
+  name?: string;
+  otherUser?: {
+    userId: number;
+    nickname?: string;
+    avatarUrl?: string;
+  };
+  lastMessage?: {
+    content: string;
+    createdAt: string;
+  };
+  unreadCount: number;
+}
+
+export interface ChatMessage {
+  id: number;
+  conversationId: number;
+  senderId: number;
+  senderNickname?: string;
+  senderAvatarUrl?: string;
+  content: string;
+  type: string;
+  createdAt: string;
+}

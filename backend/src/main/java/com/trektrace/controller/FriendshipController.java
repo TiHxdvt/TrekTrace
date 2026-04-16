@@ -2,6 +2,7 @@ package com.trektrace.controller;
 
 import com.trektrace.dto.FriendDTO;
 import com.trektrace.dto.FriendRequestDTO;
+import com.trektrace.dto.SendFriendRequestByAccountDTO;
 import com.trektrace.dto.SendFriendRequestDTO;
 import com.trektrace.service.FriendshipService;
 import jakarta.validation.Valid;
@@ -41,6 +42,14 @@ public class FriendshipController {
             @Valid @RequestBody SendFriendRequestDTO request,
             Authentication auth) {
         friendshipService.sendRequest(getUserId(auth), request.getPhone());
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @PostMapping("/request-by-account")
+    public ResponseEntity<Void> sendRequestByAccount(
+            @Valid @RequestBody SendFriendRequestByAccountDTO request,
+            Authentication auth) {
+        friendshipService.sendRequestByAccount(getUserId(auth), request.getAccount());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 

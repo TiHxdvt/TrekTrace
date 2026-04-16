@@ -7,6 +7,7 @@ import api from './api';
 export interface FriendData {
   friendshipId: number;
   userId: number;
+  account: number;
   nickname: string;
   avatarUrl: string;
   phone: string;
@@ -34,6 +35,10 @@ export const friendService = {
 
   sendRequest: async (phone: string): Promise<void> => {
     await api.post('/friends/request', { phone });
+  },
+
+  sendRequestByAccount: async (account: number): Promise<void> => {
+    await api.post('/friends/request-by-account', { account });
   },
 
   acceptRequest: async (id: number): Promise<void> => {

@@ -16,23 +16,27 @@ import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { friendService, FriendData, FriendRequestData } from '../services/friendService';
+import { chatService } from '../services/chatService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
-import { IconUsersGroupRounded } from '../components/SolarIcons';
+import { IconUsersGroupRounded, IconChatRoundDots } from '../components/SolarIcons';
 import { Avatar } from '../components/Avatar';
+import { websocketService } from '../services/websocketService';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 
 type NavProp = StackNavigationProp<DrawerStackParamList, 'Friends'>;
 
 type Tab = 'friends' | 'requests';
+type AddMode = 'account' | 'phone';
 
 export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation }) => {
   const [tab, setTab] = useState<Tab>('friends');
+  const [addMode, setAddMode] = useState<AddMode>('account');
   const [friends, setFriends] = useState<FriendData[]>([]);
   const [requests, setRequests] = useState<FriendRequestData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [addPhone, setAddPhone] = useState('');
+  const [addInput, setAddInput] = useState('');
   const [sending, setSending] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -54,18 +58,34 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
     loadData();
   }, [loadData]);
 
+  // WebSocket: real-time friend request notifications
+  useEffect(() => {
+    websocketService.subscribe('/user/queue/friend-requests', () => {
+      loadData();
+    });
+    return () => {
+      websocketService.unsubscribe('/user/queue/friend-requests');
+    };
+  }, [loadData]);
+
   const handleSendRequest = async () => {
-    if (!addPhone) {
-      Toast.show('请输入手机号');
+    if (!addInput) {
+      Toast.show(addMode === 'account' ? '请输入账号' : '请输入手机号');
       return;
     }
     setSending(true);
     try {
-      await friendService.sendRequest(addPhone);
+      if (addMode === 'account') {
+        const accountNum = Number(addInput);
+        if (isNaN(accountNum)) { Toast.show('请输入有效的账号'); return; }
+        await friendService.sendRequestByAccount(accountNum);
+      } else {
+        await friendService.sendRequest(addInput);
+      }
       Toast.show('好友请求已发送');
-      setAddPhone('');
-    } catch {
-      Toast.show('发送请求失败');
+      setAddInput('');
+    } catch (e: any) {
+      Toast.show(e?.response?.data?.error || '发送请求失败');
     } finally {
       setSending(false);
     }
@@ -115,6 +135,20 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
     );
   };
 
+  const handleChatFriend = async (friend: FriendData) => {
+    try {
+      const res = await chatService.getOrCreateConversation(friend.userId);
+      navigation.navigate('Chat', {
+        conversationId: res.conversationId,
+        friendNickname: friend.nickname,
+        friendAvatarUrl: friend.avatarUrl,
+        friendUserId: friend.userId,
+      });
+    } catch {
+      Toast.show('无法发起聊天');
+    }
+  };
+
   const rightEl = requests.length > 0 ? (
     <TouchableOpacity onPress={() => setTab('requests')} activeOpacity={0.7}>
       <View style={styles.badge}>
@@ -138,18 +172,33 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
     <FeatureScreenLayout>
       <FeatureHeader title="同行好友" onBack={() => navigation.goBack()} right={rightEl} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Add friend */}
+        {/* 添加好友 */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>添加好友</Text>
+          <View style={styles.addModeRow}>
+            <TouchableOpacity
+              style={[styles.addModeBtn, addMode === 'account' && styles.addModeBtnActive]}
+              onPress={() => { setAddMode('account'); setAddInput(''); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.addModeText, addMode === 'account' && styles.addModeTextActive]}>账号</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addModeBtn, addMode === 'phone' && styles.addModeBtnActive]}
+              onPress={() => { setAddMode('phone'); setAddInput(''); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.addModeText, addMode === 'phone' && styles.addModeTextActive]}>手机号</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.addRow}>
             <TextInput
               style={styles.addInput}
-              value={addPhone}
-              onChangeText={setAddPhone}
-              placeholder="输入手机号"
+              value={addInput}
+              onChangeText={setAddInput}
+              placeholder={addMode === 'account' ? '输入途迹账号' : '输入手机号'}
               placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
-              keyboardType="phone-pad"
-              maxLength={11}
+              keyboardType="number-pad"
+              maxLength={addMode === 'account' ? 15 : 11}
             />
             <TouchableOpacity
               style={[styles.addBtn, sending && styles.addBtnDisabled]}
@@ -184,67 +233,79 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
 
         {/* Friends list */}
         {tab === 'friends' && (
-          <View>
-            {friends.length === 0 ? (
-              <View style={styles.emptyState}>
-                <IconUsersGroupRounded size={48} color={COLORS.TEXT.QUINARY} />
-                <Text style={styles.emptyText}>暂无好友</Text>
-              </View>
-            ) : (
-              friends.map(friend => (
-                <TouchableOpacity
-                  key={friend.friendshipId}
-                  style={styles.friendItem}
-                  onLongPress={() => handleDeleteFriend(friend)}
-                  activeOpacity={0.7}
-                  delayLongPress={500}
-                >
-                  <Avatar uri={friend.avatarUrl} size={44} />
-                  <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{friend.nickname || '用户'}</Text>
-                    <Text style={styles.friendPhone}>{friend.phone}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
+          friends.length === 0 ? (
+            <View style={styles.emptyState}>
+              <IconUsersGroupRounded size={48} color={COLORS.TEXT.QUINARY} />
+              <Text style={styles.emptyText}>暂无好友</Text>
+            </View>
+          ) : (
+            <View style={styles.card}>
+              {friends.map((friend, index) => (
+                <React.Fragment key={friend.friendshipId}>
+                  <TouchableOpacity
+                    style={styles.friendItem}
+                    onLongPress={() => handleDeleteFriend(friend)}
+                    activeOpacity={0.7}
+                    delayLongPress={500}
+                  >
+                    <Avatar uri={friend.avatarUrl} size={44} />
+                    <View style={styles.friendInfo}>
+                      <Text style={styles.friendName}>{friend.nickname || '用户'}</Text>
+                      <Text style={styles.friendAccount}>途迹账号：{friend.account ?? '-'}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.chatBtn}
+                      onPress={() => handleChatFriend(friend)}
+                      activeOpacity={0.7}
+                    >
+                      <IconChatRoundDots size={20} color={COLORS.TEXT.PRIMARY} />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                  {index < friends.length - 1 && <View style={styles.divider} />}
+                </React.Fragment>
+              ))}
+            </View>
+          )
         )}
 
         {/* Requests list */}
         {tab === 'requests' && (
-          <View>
-            {requests.length === 0 ? (
-              <View style={styles.emptyState}>
-                <IconUsersGroupRounded size={48} color={COLORS.TEXT.QUINARY} />
-                <Text style={styles.emptyText}>暂无好友请求</Text>
-              </View>
-            ) : (
-              requests.map(req => (
-                <View key={req.id} style={styles.requestItem}>
-                  <Avatar uri={req.requesterAvatarUrl} size={44} />
-                  <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{req.requesterNickname || '用户'}</Text>
+          requests.length === 0 ? (
+            <View style={styles.emptyState}>
+              <IconUsersGroupRounded size={48} color={COLORS.TEXT.QUINARY} />
+              <Text style={styles.emptyText}>暂无好友请求</Text>
+            </View>
+          ) : (
+            <View style={styles.card}>
+              {requests.map((req, index) => (
+                <React.Fragment key={req.id}>
+                  <View style={styles.requestItem}>
+                    <Avatar uri={req.requesterAvatarUrl} size={44} />
+                    <View style={styles.friendInfo}>
+                      <Text style={styles.friendName}>{req.requesterNickname || '用户'}</Text>
+                    </View>
+                    <View style={styles.requestActions}>
+                      <TouchableOpacity
+                        style={styles.acceptBtn}
+                        onPress={() => handleAccept(req.id)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.acceptBtnText}>接受</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.declineBtn}
+                        onPress={() => handleDecline(req.id)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.declineBtnText}>拒绝</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.requestActions}>
-                    <TouchableOpacity
-                      style={styles.acceptBtn}
-                      onPress={() => handleAccept(req.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.acceptBtnText}>接受</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.declineBtn}
-                      onPress={() => handleDecline(req.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.declineBtnText}>拒绝</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
+                  {index < requests.length - 1 && <View style={styles.divider} />}
+                </React.Fragment>
+              ))}
+            </View>
+          )
         )}
       </ScrollView>
     </FeatureScreenLayout>
@@ -274,18 +335,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.LG,
-    padding: SPACING.LG,
+    paddingHorizontal: SPACING.LG,
     marginTop: SPACING.MD,
   },
-  cardTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '500',
-    color: COLORS.TEXT.SECONDARY,
+  addModeRow: {
+    flexDirection: 'row',
+    gap: SPACING.SM,
     marginBottom: SPACING.MD,
+    paddingTop: SPACING.LG,
+  },
+  addModeBtn: {
+    paddingVertical: SPACING.SM,
+    paddingHorizontal: SPACING.LG,
+    borderRadius: BORDER_RADIUS.SM,
+    backgroundColor: COLORS.OVERLAY.MEDIUM,
+  },
+  addModeBtnActive: {
+    backgroundColor: COLORS.PRIMARY,
+  },
+  addModeText: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+    color: COLORS.TEXT.QUATERNARY,
+    fontWeight: '500',
+  },
+  addModeTextActive: {
+    color: COLORS.TEXT.PRIMARY,
   },
   addRow: {
     flexDirection: 'row',
     gap: SPACING.SM,
+    paddingBottom: SPACING.LG,
   },
   addInput: {
     flex: 1,
@@ -350,9 +429,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.MD,
     paddingVertical: SPACING.LG,
-    paddingHorizontal: SPACING.SM,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER.LIGHT,
   },
   friendInfo: {
     flex: 1,
@@ -362,19 +438,30 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: COLORS.TEXT.SECONDARY,
   },
-  friendPhone: {
+  friendAccount: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.TEXT.QUATERNARY,
     marginTop: 2,
+  },
+  chatBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.OVERLAY.MEDIUM,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.MEDIUM,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.BORDER.LIGHT,
   },
   requestItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.MD,
     paddingVertical: SPACING.LG,
-    paddingHorizontal: SPACING.SM,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER.LIGHT,
   },
   requestActions: {
     flexDirection: 'row',

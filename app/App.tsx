@@ -2,6 +2,15 @@
  * 途迹 TrekTrace - 主应用入口
  */
 
+// Polyfill: @stomp/stompjs 依赖 TextDecoder，Hermes 引擎未内置
+import { TextDecoder, TextEncoder } from 'text-encoding';
+if (typeof global.TextDecoder === 'undefined') {
+  (global as any).TextDecoder = TextDecoder;
+}
+if (typeof global.TextEncoder === 'undefined') {
+  (global as any).TextEncoder = TextEncoder;
+}
+
 import React from 'react';
 import { StatusBar, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';

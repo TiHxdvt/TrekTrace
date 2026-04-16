@@ -17,6 +17,7 @@ import { MessagesScreen } from '../screens/MessagesScreen';
 import { DrawerStack } from './DrawerStack';
 import { MainTabParamList } from './types';
 import { storageService, authServiceEvents } from '../services/storageService';
+import { websocketService } from '../services/websocketService';
 import { COLORS, SHADOWS, ANIMATION } from '../theme';
 import {
   IconMapPoint,
@@ -102,7 +103,12 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
   const currentDescriptor = descriptors[currentRoute.key];
   const tabBarVisible = currentDescriptor?.options?.tabBarVisible !== false;
 
-  if (!tabBarVisible) return null;
+  // Check nested navigator: hide bar when Chat screen is active in DrawerStack
+  const nestedState = (currentRoute as any).state;
+  const nestedRoute = nestedState?.routes?.[nestedState.index];
+  const hideForNestedScreen = nestedRoute?.name === 'Chat';
+
+  if (!tabBarVisible || hideForNestedScreen) return null;
 
   return (
     <View style={floatingStyles.container}>
@@ -250,6 +256,15 @@ export const AppNavigator: React.FC = () => {
     });
     return unsubscribe;
   }, []);
+
+  // Connect WebSocket when authenticated, disconnect on logout
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      websocketService.connect();
+    } else {
+      websocketService.disconnect();
+    }
+  }, [isAuthenticated]);
 
   if (isAuthenticated === null) {
     return (

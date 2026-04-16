@@ -8,11 +8,12 @@ import com.trektrace.repository.FriendshipRepository;
 import com.trektrace.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
+import.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,13 +22,16 @@ public class FriendshipService {
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final WebSocketService webSocketService;
 
     public FriendshipService(FriendshipRepository friendshipRepository,
                               UserRepository userRepository,
-                              NotificationService notificationService) {
+                              NotificationService notificationService,
+                              WebSocketService webSocketService) {
         this.friendshipRepository = friendshipRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.webSocketService = webSocketService;
     }
 
     public List<FriendDTO> getFriends(Long userId) {
@@ -63,30 +67,23 @@ public class FriendshipService {
     public void sendRequest(Long requesterId, String targetPhone) {
         User target = userRepository.findByPhone(targetPhone)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+        sendFriendRequest(requesterId, target);
+    }
 
+    @Transactional
+    public void sendRequestByAccount(Long requesterId, Long targetAccount) {
+        User target = userRepository.findByAccount(targetAccount)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+        sendFriendRequest(requesterId, target);
+    }
+
+    /** Shared logic for sending a friend request — eliminates duplicate code */
+    private void sendFriendRequest(Long requesterId, User target) {
         if (target.getId().equals(requesterId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不能添加自己为好友");
         }
 
-        // Check existing friendship
-        friendshipRepository.findByRequesterIdAndAddresseeId(requesterId, target.getId())
-                .ifPresent(f -> {
-                    if (f.getStatus() == Friendship.FriendshipStatus.PENDING ||
-                        f.getStatus() == Friendship.FriendshipStatus.ACCEPTED) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "已发送过好友请求");
-                    }
-                    // DECLINED: allow re-sending by deleting old record
-                    friendshipRepository.delete(f);
-                });
-        friendshipRepository.findByRequesterIdAndAddresseeId(target.getId(), requesterId)
-                .ifPresent(f -> {
-                    if (f.getStatus() == Friendship.FriendshipStatus.PENDING ||
-                        f.getStatus() == Friendship.FriendshipStatus.ACCEPTED) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "对方已发送过好友请求");
-                    }
-                    // DECLINED: allow re-sending by deleting old record
-                    friendshipRepository.delete(f);
-                });
+        checkExistingFriendship(requesterId, target.getId());
 
         Friendship friendship = new Friendship();
         friendship.setRequesterId(requesterId);
@@ -95,20 +92,48 @@ public class FriendshipService {
         try {
             friendshipRepository.save(friendship);
         } catch (DataIntegrityViolationException e) {
-            // Concurrent request hit the unique constraint — treat as duplicate
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "已发送过好友请求");
         }
 
-        // Send notification to target
+        // Send notification
         User requester = userRepository.findById(requesterId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+        String requesterName = requester.getNickname() != null ? requester.getNickname() : "用户";
+
         notificationService.createNotification(
                 target.getId(),
                 com.trektrace.entity.Notification.NotificationType.FRIEND_REQUEST,
                 "好友请求",
-                (requester.getNickname() != null ? requester.getNickname() : "用户") + " 请求添加你为好友",
+                requesterName + " 请求添加你为好友",
                 friendship.getId()
         );
+
+        // WebSocket push to target user
+        webSocketService.sendToUser(target.getId(), "/queue/friend-requests", Map.of(
+                "type", "FRIEND_REQUEST",
+                "fromUserId", requesterId,
+                "fromNickname", requesterName,
+                "friendshipId", friendship.getId()
+        ));
+    }
+
+    private void checkExistingFriendship(Long userId1, Long userId2) {
+        friendshipRepository.findByRequesterIdAndAddresseeId(userId1, userId2)
+                .ifPresent(f -> {
+                    if (f.getStatus() == Friendship.FriendshipStatus.PENDING ||
+                        f.getStatus() == Friendship.FriendshipStatus.ACCEPTED) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "已发送过好友请求");
+                    }
+                    friendshipRepository.delete(f);
+                });
+        friendshipRepository.findByRequesterIdAndAddresseeId(userId2, userId1)
+                .ifPresent(f -> {
+                    if (f.getStatus() == Friendship.FriendshipStatus.PENDING ||
+                        f.getStatus() == Friendship.FriendshipStatus.ACCEPTED) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "对方已发送过好友请求");
+                    }
+                    friendshipRepository.delete(f);
+                });
     }
 
     @Transactional
@@ -120,6 +145,16 @@ public class FriendshipService {
         }
         f.setStatus(Friendship.FriendshipStatus.ACCEPTED);
         friendshipRepository.save(f);
+
+        // Notify requester that their request was accepted
+        User accepter = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+        webSocketService.sendToUser(f.getRequesterId(), "/queue/friend-requests", Map.of(
+                "type", "FRIEND_ACCEPTED",
+                "fromUserId", userId,
+                "fromNickname", accepter.getNickname() != null ? accepter.getNickname() : "用户",
+                "friendshipId", friendshipId
+        ));
     }
 
     @Transactional

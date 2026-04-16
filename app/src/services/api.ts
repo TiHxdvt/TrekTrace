@@ -19,7 +19,7 @@ export function setCachedToken(token: string | null): void {
 }
 
 /** Retrieve the cached token, falling back to Keychain then AsyncStorage */
-async function getToken(): Promise<string | null> {
+export async function getToken(): Promise<string | null> {
   if (_cachedToken !== null) return _cachedToken;
   try {
     // 优先从 Keychain 读取（与 storageService 一致）

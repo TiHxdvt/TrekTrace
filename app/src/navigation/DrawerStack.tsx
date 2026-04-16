@@ -21,6 +21,7 @@ import { NotificationScreen } from '../screens/NotificationScreen';
 import { AccountPrivacyScreen } from '../screens/AccountPrivacyScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
 import { PermissionScreen } from '../screens/PermissionScreen';
+import { ChatScreen } from '../screens/ChatScreen';
 
 export type DrawerStackParamList = {
   Home: undefined;
@@ -30,6 +31,7 @@ export type DrawerStackParamList = {
   AccountPrivacy: undefined;
   Friends: undefined;
   Permission: undefined;
+  Chat: { conversationId: number; friendNickname?: string; friendAvatarUrl?: string; friendUserId: number };
 };
 
 const Stack = createStackNavigator<DrawerStackParamList>();
@@ -68,6 +70,7 @@ export const DrawerStack: React.FC = () => {
       <Stack.Screen name="AccountPrivacy" component={AccountPrivacyScreen} options={subScreenOptions} />
       <Stack.Screen name="Friends" component={FriendsScreen} options={subScreenOptions} />
       <Stack.Screen name="Permission" component={PermissionScreen} options={subScreenOptions} />
+      <Stack.Screen name="Chat" component={ChatScreen} options={subScreenOptions} />
     </Stack.Navigator>
   );
 };
