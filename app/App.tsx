@@ -12,15 +12,27 @@ if (typeof global.TextEncoder === 'undefined') {
 }
 
 import React from 'react';
-import { StatusBar, StyleSheet } from 'react-native';
+import { StatusBar, StyleSheet, BackHandler } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { DialogRoot } from './src/components/Dialog';
 import { ToastRoot } from './src/components/Toast';
-import { DrawerOverlayRoot } from './src/components/DrawerOverlay';
+import { DrawerOverlayRoot, DrawerOverlay } from './src/components/DrawerOverlay';
+import { ChatOverlayRoot, ChatOverlay } from './src/components/ChatOverlay';
+import { SubScreenOverlayRoot, SubScreenOverlay } from './src/components/SubScreenOverlay';
 import { ThemeProvider } from './src/contexts/ThemeContext';
+
+// 模块顶层注册 BackHandler：在所有组件 useEffect 之前注册
+// BackHandler FIFO 触发，先注册的先执行
+// 这样 overlay 拦截一定在 React Navigation 的 useBackButton 之前
+BackHandler.addEventListener('hardwareBackPress', () => {
+  if (ChatOverlay.isOpen) { ChatOverlay.close(); return true; }
+  if (SubScreenOverlay.isOpen) { SubScreenOverlay.close(); return true; }
+  if (DrawerOverlay.isOpen) { DrawerOverlay.close(); return true; }
+  return false;
+});
 
 function App() {
   return (
@@ -33,6 +45,8 @@ function App() {
           <DialogRoot />
           <ToastRoot />
           <DrawerOverlayRoot />
+          <SubScreenOverlayRoot />
+          <ChatOverlayRoot />
         </NavigationContainer>
         </ThemeProvider>
       </SafeAreaProvider>

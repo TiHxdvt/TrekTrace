@@ -18,10 +18,8 @@ import { dataService, DataSummary } from '../services/dataService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
 import { IconGraphUp, IconBolt, IconFlame, IconFire, IconAltArrowRight } from '../components/SolarIcons';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { DrawerStackParamList } from '../navigation/DrawerStack';
 
-type NavProp = StackNavigationProp<DrawerStackParamList, 'DataManagement'>;
+type NavProp = { goBack: () => void };
 
 function formatDistance(meters: number): string {
   if (meters >= 1000) return (meters / 1000).toFixed(1) + ' km';

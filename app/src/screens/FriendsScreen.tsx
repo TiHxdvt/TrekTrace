@@ -22,10 +22,9 @@ import { Toast } from '../components/Toast';
 import { IconUsersGroupRounded, IconChatRoundDots } from '../components/SolarIcons';
 import { Avatar } from '../components/Avatar';
 import { websocketService } from '../services/websocketService';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { DrawerStackParamList } from '../navigation/DrawerStack';
+import { ChatOverlay } from '../components/ChatOverlay';
 
-type NavProp = StackNavigationProp<DrawerStackParamList, 'Friends'>;
+type NavProp = { goBack: () => void };
 
 type Tab = 'friends' | 'requests';
 type AddMode = 'account' | 'phone';
@@ -138,7 +137,7 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
   const handleChatFriend = async (friend: FriendData) => {
     try {
       const res = await chatService.getOrCreateConversation(friend.userId);
-      navigation.navigate('Chat', {
+      ChatOverlay.open({
         conversationId: res.conversationId,
         friendNickname: friend.nickname,
         friendAvatarUrl: friend.avatarUrl,

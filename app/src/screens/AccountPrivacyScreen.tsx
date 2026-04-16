@@ -19,11 +19,9 @@ import { userService } from '../services/userService';
 import { storageService } from '../services/storageService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { DrawerStackParamList } from '../navigation/DrawerStack';
 import { IconAltArrowRight } from '../components/SolarIcons';
 
-type NavProp = StackNavigationProp<DrawerStackParamList, 'AccountPrivacy'>;
+type NavProp = { goBack: () => void };
 
 // --- 设置密码弹窗 ---
 const SetPasswordModal: React.FC<{

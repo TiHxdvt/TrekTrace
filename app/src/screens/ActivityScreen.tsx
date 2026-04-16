@@ -24,8 +24,8 @@ import { MapView, AMapSdk, MapType, Polyline } from 'react-native-amap3d';
 import type { NativeSyntheticEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
-import type { DrawerStackParamList } from '../navigation/DrawerStack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { MainTabParamList } from '../navigation/types';
 import { DrawerOverlay } from '../components/DrawerOverlay';
 import Svg, { Circle, Polyline as SvgPolyline } from 'react-native-svg';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
@@ -106,7 +106,7 @@ function samplePoints(coords: Array<{latitude: number; longitude: number}>, maxC
 }
 
 export const ActivityScreen: React.FC = () => {
-  const navigation = useNavigation<StackNavigationProp<DrawerStackParamList, 'Home'>>();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, 'ActivityTab'>>();
   const [activityIndex, setActivityIndex] = useState(1); // 默认跑步
   const insets = useSafeAreaInsets();
   const mapViewRef = useRef<MapView>(null);
@@ -246,10 +246,7 @@ export const ActivityScreen: React.FC = () => {
 
   // Hide/show floating tab bar when summary is visible
   useEffect(() => {
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.setOptions({ tabBarVisible: !showSummary } as any);
-    }
+    navigation.setOptions({ tabBarVisible: !showSummary } as any);
   }, [navigation, showSummary]);
 
   // Derive colored segments from polyline data + session type (computed only when data changes)
@@ -982,7 +979,7 @@ export const ActivityScreen: React.FC = () => {
       {/* Header — hidden during summary */}
       {!showSummary && (
       <View style={[styles.headerBar, { paddingTop: insets.top + 16 }]}>
-        <TouchableOpacity style={styles.headerIconButton} onPress={() => DrawerOverlay.open((screen) => navigation.navigate(screen as any))}>
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => DrawerOverlay.open()}>
           <IconHamburgerMenu size={20} color={COLORS.TEXT.PRIMARY} />
         </TouchableOpacity>
         <View style={styles.searchBar}>

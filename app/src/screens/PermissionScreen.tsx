@@ -14,15 +14,13 @@ import {
   PermissionsAndroid,
   Linking,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { DrawerStackParamList } from '../navigation/DrawerStack';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { Dialog } from '../components/Dialog';
 import { IconShieldCheck, IconShieldCross } from '../components/SolarIcons';
 
-type NavProp = StackNavigationProp<DrawerStackParamList, 'Permission'>;
+type NavProp = { goBack: () => void };
 
 interface PermItem {
   key: string;

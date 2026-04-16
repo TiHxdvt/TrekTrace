@@ -14,7 +14,6 @@ import { ActivityScreen } from '../screens/ActivityScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { StatsScreen } from '../screens/StatsScreen';
 import { MessagesScreen } from '../screens/MessagesScreen';
-import { DrawerStack } from './DrawerStack';
 import { MainTabParamList } from './types';
 import { storageService, authServiceEvents } from '../services/storageService';
 import { websocketService } from '../services/websocketService';
@@ -103,12 +102,7 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
   const currentDescriptor = descriptors[currentRoute.key];
   const tabBarVisible = currentDescriptor?.options?.tabBarVisible !== false;
 
-  // Check nested navigator: hide bar when Chat screen is active in DrawerStack
-  const nestedState = (currentRoute as any).state;
-  const nestedRoute = nestedState?.routes?.[nestedState.index];
-  const hideForNestedScreen = nestedRoute?.name === 'Chat';
-
-  if (!tabBarVisible || hideForNestedScreen) return null;
+  if (!tabBarVisible) return null;
 
   return (
     <View style={floatingStyles.container}>
@@ -284,11 +278,12 @@ export const AppNavigator: React.FC = () => {
     <MainTab.Navigator
       // eslint-disable-next-line react/no-unstable-nested-components
       tabBar={props => <FloatingTabBar {...props} />}
+      backBehavior="none"
       screenOptions={{
         headerShown: false,
       }}
     >
-      <MainTab.Screen name="ActivityTab" component={DrawerStack} />
+      <MainTab.Screen name="ActivityTab" component={ActivityScreen} />
       <MainTab.Screen name="HistoryTab" component={HistoryScreen} />
       <MainTab.Screen name="StatsTab" component={StatsScreen} />
       <MainTab.Screen name="MessagesTab" component={MessagesScreen} />

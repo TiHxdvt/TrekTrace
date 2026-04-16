@@ -17,8 +17,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { DrawerStackParamList } from '../navigation/DrawerStack';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { Avatar } from '../components/Avatar';
 import { Toast } from '../components/Toast';
@@ -28,7 +26,7 @@ import { websocketService } from '../services/websocketService';
 import { ChatMessage, User } from '../types';
 import { IconAltArrowRight } from '../components/SolarIcons';
 
-type NavProp = StackNavigationProp<DrawerStackParamList, 'Chat'>;
+type NavProp = { goBack: () => void };
 
 interface ChatScreenParams {
   conversationId: number;
@@ -67,19 +65,6 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       if (user?.avatarUrl) setMyAvatarUrl(user.avatarUrl);
     });
   }, []);
-
-  // Hide the floating tab bar when Chat screen is active
-  useEffect(() => {
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.setOptions({ tabBarVisible: false });
-    }
-    return () => {
-      if (parent) {
-        parent.setOptions({ tabBarVisible: true });
-      }
-    };
-  }, [navigation]);
 
   const loadMessages = useCallback(async (pageNum: number = 0) => {
     try {

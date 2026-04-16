@@ -18,10 +18,8 @@ import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { notificationService, NotificationItem } from '../services/notificationService';
 import { Toast } from '../components/Toast';
 import { IconBell, IconCheckCircle } from '../components/SolarIcons';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { DrawerStackParamList } from '../navigation/DrawerStack';
 
-type NavProp = StackNavigationProp<DrawerStackParamList, 'Notification'>;
+type NavProp = { goBack: () => void };
 
 function getNotificationIcon(type: string): string {
   switch (type) {

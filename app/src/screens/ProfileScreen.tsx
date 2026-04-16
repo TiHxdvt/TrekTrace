@@ -14,9 +14,7 @@ import {
   Platform,
   PermissionsAndroid,
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import { DrawerStackParamList } from '../navigation/DrawerStack';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
@@ -26,7 +24,7 @@ import { Toast } from '../components/Toast';
 import { Dialog } from '../components/Dialog';
 import { Avatar } from '../components/Avatar';
 
-type NavProp = StackNavigationProp<DrawerStackParamList, 'Profile'>;
+type NavProp = { goBack: () => void };
 
 const IMAGE_PICKER_OPTIONS = {
   mediaType: 'photo' as const,

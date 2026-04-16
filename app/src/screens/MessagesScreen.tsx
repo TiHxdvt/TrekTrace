@@ -6,9 +6,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { IconChatRoundDots, IconCheckCircle, IconMagnifer } from '../components/SolarIcons';
+import { ChatOverlay } from '../components/ChatOverlay';
 import { Toast } from '../components/Toast';
 import { Avatar } from '../components/Avatar';
 import { notificationService } from '../services/notificationService';
@@ -38,7 +38,6 @@ function truncateContent(content: string, maxLen = 30): string {
 
 export const MessagesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,16 +74,13 @@ export const MessagesScreen: React.FC = () => {
   }, []);
 
   const handleConversationPress = useCallback((item: Conversation) => {
-    navigation.navigate('ActivityTab', {
-      screen: 'Chat',
-      params: {
-        conversationId: item.id,
-        friendNickname: item.otherUser?.nickname,
-        friendAvatarUrl: item.otherUser?.avatarUrl,
-        friendUserId: item.otherUser?.userId ?? 0,
-      },
+    ChatOverlay.open({
+      conversationId: item.id,
+      friendNickname: item.otherUser?.nickname,
+      friendAvatarUrl: item.otherUser?.avatarUrl,
+      friendUserId: item.otherUser?.userId ?? 0,
     });
-  }, [navigation]);
+  }, []);
 
   const renderItem = useCallback(({ item }: { item: Conversation }) => (
     <TouchableOpacity

@@ -20,13 +20,13 @@ import {
   Animated,
   Dimensions,
   InteractionManager,
-  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
 import { storageService } from '../services/storageService';
 import { Dialog } from '../components/Dialog';
 import { Avatar } from '../components/Avatar';
+import { SubScreenOverlay, SubScreenName } from '../components/SubScreenOverlay';
 import {
   IconLogout,
   IconGraphUp,
@@ -44,10 +44,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type NavigateFn = (screen: string) => void;
-
 // 模块级状态
-let _navigate: NavigateFn | null = null;
 let _refreshDrawerData: (() => void) | null = null;
 
 function maskPhone(phone: string): string {
@@ -100,9 +97,9 @@ const DrawerContent: React.FC = () => {
     ]);
   };
 
-  // 关闭菜单，完成后跳转子页面
-  const go = (screen: string) => {
-    DrawerOverlay.close(() => _navigate?.(screen));
+  // 关闭菜单，完成后打开子页面 overlay
+  const go = (screen: SubScreenName) => {
+    DrawerOverlay.close(() => SubScreenOverlay.open(screen));
   };
 
   return (
@@ -216,6 +213,7 @@ export const DrawerOverlayRoot: React.FC = () => {
     DrawerOverlay._animateOpen = () => {
       setVisible(true);
       isOpenRef.current = true;
+      DrawerOverlay.isOpen = true;
       _refreshDrawerData?.();
       Animated.parallel([
         Animated.spring(translateX, { toValue: 0, ...springConfig }),
@@ -223,25 +221,12 @@ export const DrawerOverlayRoot: React.FC = () => {
       ]).start();
     };
     DrawerOverlay._animateClose = (cb?: () => void) => {
-      isOpenRef.current = false;
       Animated.parallel([
         Animated.spring(translateX, { toValue: -SCREEN_WIDTH, ...springConfig }),
         Animated.spring(backdropOpacity, { toValue: 0, ...springConfig }),
-      ]).start(({ finished }) => { if (finished) { setVisible(false); cb?.(); } });
+      ]).start(({ finished }) => { if (finished) { isOpenRef.current = false; DrawerOverlay.isOpen = false; setVisible(false); cb?.(); } });
     };
   }, [translateX, backdropOpacity]);
-
-  // 物理返回键：菜单打开时关闭菜单而不是退出 app
-  useEffect(() => {
-    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (isOpenRef.current) {
-        DrawerOverlay.close();
-        return true; // 拦截，不退出
-      }
-      return false;
-    });
-    return () => handler.remove();
-  }, []);
 
   if (!visible) return null;
 
@@ -260,8 +245,8 @@ export const DrawerOverlayRoot: React.FC = () => {
 // ─── 静态 API ───
 
 export const DrawerOverlay = {
-  open(navigateFn?: NavigateFn) {
-    if (navigateFn) _navigate = navigateFn;
+  isOpen: false,
+  open() {
     // Use InteractionManager to wait for the component to mount and register _animateOpen
     InteractionManager.runAfterInteractions(() => {
       this._animateOpen?.();
