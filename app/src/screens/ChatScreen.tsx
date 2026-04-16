@@ -4,7 +4,7 @@
  * 延续 glassmorphism 设计风格
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -23,8 +23,9 @@ import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { Avatar } from '../components/Avatar';
 import { Toast } from '../components/Toast';
 import { chatService } from '../services/chatService';
+import { storageService } from '../services/storageService';
 import { websocketService } from '../services/websocketService';
-import { ChatMessage } from '../types';
+import { ChatMessage, User } from '../types';
 import { IconAltArrowRight } from '../components/SolarIcons';
 
 type NavProp = StackNavigationProp<DrawerStackParamList, 'Chat'>;
@@ -57,7 +58,15 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   const [sending, setSending] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [myAvatarUrl, setMyAvatarUrl] = useState<string | undefined>();
   const flatListRef = useRef<FlatList>(null);
+
+  // Load current user's avatar
+  useEffect(() => {
+    storageService.getUser().then((user: User | null) => {
+      if (user?.avatarUrl) setMyAvatarUrl(user.avatarUrl);
+    });
+  }, []);
 
   // Hide the floating tab bar when Chat screen is active
   useEffect(() => {
@@ -78,7 +87,6 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       const newMessages = res.content.reverse();
       if (pageNum === 0) {
         setMessages(newMessages);
-        // Mark the latest message as read
         if (newMessages.length > 0) {
           const latestMsg = newMessages[newMessages.length - 1];
           if (latestMsg.senderId !== friendUserId) {
@@ -107,7 +115,6 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         if (prev.some(m => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
-      // Mark as read if from other user
       if (msg.senderId === friendUserId) {
         chatService.markAsRead(conversationId, msg.id).catch(() => {});
       }
@@ -156,7 +163,6 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
     }
   };
 
-  // Determine "mine" by checking if sender is NOT the friend
   const renderItem = useCallback(({ item }: { item: ChatMessage }) => {
     const isMine = item.senderId !== friendUserId;
     return (
@@ -172,9 +178,12 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
             {formatMessageTime(item.createdAt)}
           </Text>
         </View>
+        {isMine && (
+          <Avatar uri={myAvatarUrl} size={32} />
+        )}
       </View>
     );
-  }, [friendUserId, friendAvatarUrl]);
+  }, [friendUserId, friendAvatarUrl, myAvatarUrl]);
 
   if (loading) {
     return (
@@ -190,7 +199,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={insets.top}
     >
-      {/* Header */}
+      {/* Header - centered title */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -199,10 +208,10 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         >
           <IconAltArrowRight size={20} color={COLORS.TEXT.PRIMARY} />
         </TouchableOpacity>
-        <Avatar uri={friendAvatarUrl} size={32} />
         <Text style={styles.headerTitle} numberOfLines={1}>
           {friendNickname || '用户'}
         </Text>
+        <View style={styles.headerRight} />
       </View>
 
       {/* Messages */}
@@ -261,7 +270,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.LG,
     paddingBottom: SPACING.MD,
-    gap: SPACING.SM,
     backgroundColor: COLORS.OVERLAY.NAV,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BORDER.LIGHT,
@@ -277,14 +285,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
+    flex: 1,
     fontSize: TYPOGRAPHY.FONT_SIZE.LG,
     fontWeight: '600',
     color: COLORS.TEXT.PRIMARY,
-    flex: 1,
-    marginLeft: SPACING.SM,
+    textAlign: 'center',
+  },
+  headerRight: {
+    width: 36,
   },
   messageList: {
-    paddingHorizontal: SPACING.LG,
+    paddingHorizontal: SPACING.MD,
     paddingVertical: SPACING.MD,
     paddingBottom: SPACING.XL,
   },
@@ -295,26 +306,27 @@ const styles = StyleSheet.create({
   },
   messageRowMine: {
     justifyContent: 'flex-end',
+    gap: SPACING.SM,
   },
   messageRowOther: {
     justifyContent: 'flex-start',
     gap: SPACING.SM,
   },
   messageBubble: {
-    maxWidth: '70%',
+    maxWidth: '65%',
     borderRadius: BORDER_RADIUS.LG,
     paddingHorizontal: SPACING.MD,
     paddingVertical: SPACING.SM,
   },
   bubbleMine: {
     backgroundColor: COLORS.PRIMARY,
-    borderBottomRightRadius: BORDER_RADIUS.SM,
+    borderBottomRightRadius: 4,
   },
   bubbleOther: {
     backgroundColor: COLORS.OVERLAY.MEDIUM,
     borderWidth: 1,
     borderColor: COLORS.BORDER.MEDIUM,
-    borderBottomLeftRadius: BORDER_RADIUS.SM,
+    borderBottomLeftRadius: 4,
   },
   messageText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
@@ -331,7 +343,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   messageTimeMine: {
-    color: 'rgba(255,255,255,0.6)',
+    color: COLORS.TEXT.TERTIARY,
     textAlign: 'right',
   },
   messageTimeOther: {
@@ -354,7 +366,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.OVERLAY.MEDIUM,
     borderWidth: 1,
     borderColor: COLORS.BORDER.MEDIUM,
-    borderRadius: BORDER_RADIUS.LG,
+    borderRadius: BORDER_RADIUS.XL,
     paddingHorizontal: SPACING.LG,
     paddingVertical: SPACING.SM,
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
@@ -363,7 +375,7 @@ const styles = StyleSheet.create({
   },
   sendBtn: {
     backgroundColor: COLORS.PRIMARY,
-    borderRadius: BORDER_RADIUS.LG,
+    borderRadius: BORDER_RADIUS.XL,
     paddingHorizontal: SPACING.LG,
     paddingVertical: SPACING.SM,
     justifyContent: 'center',
