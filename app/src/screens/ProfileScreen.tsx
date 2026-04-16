@@ -210,40 +210,50 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
           <Avatar uri={avatarUrl} size={96} onPress={handleAvatarPress} loading={uploading} />
         </View>
 
-        {/* Nickname */}
-        <View style={styles.fieldGroup}>
-          <View style={styles.labelRow}>
-            <Text style={styles.label}>昵称</Text>
-            {cooldownDesc && <Text style={styles.cooldownText}>{cooldownDesc}</Text>}
+        {/* 基本信息 */}
+        <Text style={styles.sectionTitle}>基本信息</Text>
+        <View style={styles.card}>
+          {/* 昵称（可编辑） */}
+          <View style={styles.editSection}>
+            <View style={styles.editLabelRow}>
+              <Text style={styles.itemTitle}>昵称</Text>
+              {cooldownDesc && <Text style={styles.cooldownText}>{cooldownDesc}</Text>}
+            </View>
+            <TextInput
+              style={styles.input}
+              value={nickname}
+              onChangeText={(text) => setNickname(truncateToWidth(text, NICKNAME_MAX_LENGTH))}
+              placeholder="中文、字母、数字、下划线，最长7个中文"
+              placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+              editable={!cooldownDesc}
+            />
           </View>
-          <TextInput
-            style={styles.input}
-            value={nickname}
-            onChangeText={(text) => setNickname(truncateToWidth(text, NICKNAME_MAX_LENGTH))}
-            placeholder="中文、字母、数字、下划线，最长7个中文"
-            placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
-            editable={!cooldownDesc}
-          />
-        </View>
 
-        {/* Account ID (read-only) */}
-        <View style={styles.fieldGroup}>
-          <Text style={[styles.label, styles.labelMargin]}>账号</Text>
-          <Text style={styles.valueText}>{profile ? profile.account : '-'}</Text>
-        </View>
+          <View style={styles.divider} />
 
-        {/* Phone (read-only) */}
-        <View style={styles.fieldGroup}>
-          <Text style={[styles.label, styles.labelMargin]}>手机号</Text>
-          <Text style={styles.valueText}>{profile?.phone || '-'}</Text>
-        </View>
+          {/* 账号 */}
+          <View style={styles.item}>
+            <Text style={styles.itemTitle}>途迹账号</Text>
+            <Text style={styles.itemValue}>{profile?.account != null ? profile.account : '-'}</Text>
+          </View>
 
-        {/* Registration date */}
-        <View style={styles.fieldGroup}>
-          <Text style={[styles.label, styles.labelMargin]}>注册时间</Text>
-          <Text style={styles.valueText}>
-            {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('zh-CN') : '-'}
-          </Text>
+          <View style={styles.divider} />
+
+          {/* 手机号 */}
+          <View style={styles.item}>
+            <Text style={styles.itemTitle}>手机号</Text>
+            <Text style={styles.itemValue}>{profile?.phone || '-'}</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* 注册时间 */}
+          <View style={styles.item}>
+            <Text style={styles.itemTitle}>注册时间</Text>
+            <Text style={styles.itemValue}>
+              {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('zh-CN') : '-'}
+            </Text>
+          </View>
         </View>
 
         {/* Save button */}
@@ -265,24 +275,31 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },
   avatarSection: { alignItems: 'center', marginVertical: SPACING.XXL },
-  fieldGroup: {
-    marginBottom: SPACING.XL,
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+    fontWeight: '500',
+    color: COLORS.TEXT.QUATERNARY,
+    marginBottom: SPACING.MD,
+    marginTop: SPACING.SM,
   },
-  labelRow: {
+  card: {
+    backgroundColor: COLORS.OVERLAY.LIGHT,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.LIGHT,
+    borderRadius: BORDER_RADIUS.LG,
+    paddingHorizontal: SPACING.LG,
+  },
+  editSection: {
+    paddingVertical: SPACING.LG,
+  },
+  editLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: SPACING.SM,
   },
-  label: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  labelMargin: {
-    marginBottom: SPACING.SM,
-  },
   input: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
+    backgroundColor: COLORS.OVERLAY.MEDIUM,
     borderWidth: 1,
     borderColor: COLORS.BORDER.MEDIUM,
     borderRadius: BORDER_RADIUS.MD,
@@ -295,10 +312,23 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.WARNING,
   },
-  valueText: {
+  item: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.LG,
+  },
+  itemTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     color: COLORS.TEXT.SECONDARY,
-    paddingVertical: SPACING.SM,
+  },
+  itemValue: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+    color: COLORS.TEXT.QUATERNARY,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.BORDER.LIGHT,
   },
   saveBtn: {
     backgroundColor: COLORS.PRIMARY,
