@@ -15,11 +15,9 @@ import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { dataService, DataSummary } from '../services/dataService';
-import { accountService } from '../services/accountService';
-import { storageService } from '../services/storageService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
-import { IconGraphUp, IconBolt, IconFlame, IconFire } from '../components/SolarIcons';
+import { IconGraphUp, IconBolt, IconFlame, IconFire, IconAltArrowRight } from '../components/SolarIcons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 
@@ -94,29 +92,6 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
     );
   };
 
-  const handleDeleteAccount = () => {
-    Dialog.show(
-      '注销账户',
-      '此操作将永久删除你的账户和所有数据，且不可恢复。确定继续吗？',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '注销账户',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await accountService.deleteAccount();
-              await storageService.clearAuthData();
-              Toast.show('账户已注销');
-            } catch {
-              Toast.show('注销失败');
-            }
-          },
-        },
-      ],
-    );
-  };
-
   if (loading) {
     return (
       <FeatureScreenLayout>
@@ -132,7 +107,7 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
     <FeatureScreenLayout>
       <FeatureHeader title="数据管理" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Summary cards */}
+        {/* 数据概览 */}
         <View style={styles.summaryGrid}>
           <View style={styles.summaryCard}>
             <IconGraphUp size={20} color={COLORS.PRIMARY} />
@@ -156,33 +131,32 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
           </View>
         </View>
 
-        {/* Export */}
-        <TouchableOpacity style={styles.actionBtn} onPress={handleExport} activeOpacity={0.7}>
-          <Text style={styles.actionBtnText}>导出运动数据</Text>
-        </TouchableOpacity>
+        {/* 数据操作 */}
+        <Text style={styles.sectionTitle}>数据操作</Text>
+        <View style={styles.card}>
+          <SectionItem title="导出运动数据" onPress={handleExport} />
+        </View>
 
-        {/* Danger zone */}
-        <View style={styles.dangerZone}>
-          <Text style={styles.dangerTitle}>危险操作</Text>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.dangerBtn]}
-            onPress={handleDeleteAll}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.dangerBtnText}>删除全部活动</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.dangerBtn]}
-            onPress={handleDeleteAccount}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.dangerBtnText}>注销账户</Text>
-          </TouchableOpacity>
+        {/* 危险操作 */}
+        <Text style={[styles.sectionTitle, { color: COLORS.ERROR }]}>危险操作</Text>
+        <View style={styles.card}>
+          <SectionItem title="删除全部活动" danger onPress={handleDeleteAll} />
         </View>
       </ScrollView>
     </FeatureScreenLayout>
   );
 };
+
+const SectionItem: React.FC<{
+  title: string;
+  danger?: boolean;
+  onPress: () => void;
+}> = ({ title, danger, onPress }) => (
+  <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.7}>
+    <Text style={[styles.itemTitle, danger && styles.dangerText]}>{title}</Text>
+    <IconAltArrowRight size={18} color={danger ? COLORS.ERROR : COLORS.TEXT.QUINARY} />
+  </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -213,39 +187,31 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     color: COLORS.TEXT.QUATERNARY,
   },
-  actionBtn: {
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    borderRadius: BORDER_RADIUS.LG,
-    paddingVertical: SPACING.LG,
-    alignItems: 'center',
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+    fontWeight: '500',
+    color: COLORS.TEXT.QUATERNARY,
+    marginBottom: SPACING.MD,
     marginTop: SPACING.XXL,
   },
-  actionBtnText: {
+  card: {
+    backgroundColor: COLORS.OVERLAY.LIGHT,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER.LIGHT,
+    borderRadius: BORDER_RADIUS.LG,
+    paddingHorizontal: SPACING.LG,
+  },
+  item: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.LG,
+  },
+  itemTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '500',
     color: COLORS.TEXT.SECONDARY,
   },
-  dangerZone: {
-    marginTop: SPACING.XXXL,
-    paddingTop: SPACING.XL,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER.LIGHT,
-  },
-  dangerTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.ERROR,
-    fontWeight: '500',
-    marginBottom: SPACING.MD,
-  },
-  dangerBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-  },
-  dangerBtnText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '500',
+  dangerText: {
     color: COLORS.ERROR,
   },
 });
