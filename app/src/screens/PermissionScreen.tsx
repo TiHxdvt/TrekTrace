@@ -13,13 +13,13 @@ import {
   Platform,
   PermissionsAndroid,
   Linking,
-  Alert,
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerStackParamList } from '../navigation/DrawerStack';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
+import { Dialog } from '../components/Dialog';
 import { IconShieldCheck, IconShieldCross } from '../components/SolarIcons';
 
 type NavProp = StackNavigationProp<DrawerStackParamList, 'Permission'>;
@@ -88,7 +88,7 @@ export const PermissionScreen: React.FC<{ navigation: NavProp }> = ({ navigation
     const result = await PermissionsAndroid.request(perm.androidPerm as any);
     setGranted(prev => ({ ...prev, [perm.key]: result === PermissionsAndroid.RESULTS.GRANTED }));
     if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-      Alert.alert('权限被拒绝', `"${perm.label}"已被设为拒绝且不再询问，请在系统设置中手动开启`, [
+      Dialog.show('权限被拒绝', `"${perm.label}"已被设为拒绝且不再询问，请在系统设置中手动开启`, [
         { text: '取消', style: 'cancel' },
         { text: '去设置', onPress: () => Linking.openSettings() },
       ]);
