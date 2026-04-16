@@ -15,6 +15,7 @@ import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { accountService } from '../services/accountService';
+import { userService } from '../services/userService';
 import { storageService } from '../services/storageService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
@@ -28,7 +29,8 @@ type NavProp = StackNavigationProp<DrawerStackParamList, 'AccountPrivacy'>;
 const SetPasswordModal: React.FC<{
   visible: boolean;
   onClose: () => void;
-}> = ({ visible, onClose }) => {
+  onSuccess: () => void;
+}> = ({ visible, onClose, onSuccess }) => {
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,8 +43,12 @@ const SetPasswordModal: React.FC<{
     if (newPwd.length < 6) { Toast.show('密码长度至少6位'); return; }
     setLoading(true);
     try {
-      Toast.show('功能开发中');
+      await accountService.setPassword(newPwd);
+      Toast.show('密码设置成功');
+      onSuccess();
       onClose();
+    } catch (e: any) {
+      Toast.show(e?.response?.data?.error || '设置失败');
     } finally {
       setLoading(false);
       setNewPwd('');
@@ -69,7 +75,8 @@ const SetPasswordModal: React.FC<{
 const ChangePasswordModal: React.FC<{
   visible: boolean;
   onClose: () => void;
-}> = ({ visible, onClose }) => {
+  onSuccess: () => void;
+}> = ({ visible, onClose, onSuccess }) => {
   const [curPwd, setCurPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
@@ -83,8 +90,12 @@ const ChangePasswordModal: React.FC<{
     if (newPwd.length < 6) { Toast.show('密码长度至少6位'); return; }
     setLoading(true);
     try {
-      Toast.show('功能开发中');
+      await accountService.changePassword(curPwd, newPwd);
+      Toast.show('密码修改成功');
+      onSuccess();
       onClose();
+    } catch (e: any) {
+      Toast.show(e?.response?.data?.error || '修改失败');
     } finally {
       setLoading(false);
       setCurPwd('');
@@ -116,10 +127,16 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
   const [showSetPwd, setShowSetPwd] = useState(false);
   const [showChangePwd, setShowChangePwd] = useState(false);
 
+  const loadProfile = async () => {
+    try {
+      const profile = await userService.getProfile();
+      setPhone(profile.phone || '');
+      setHasPassword(profile.hasPassword);
+    } catch {}
+  };
+
   useEffect(() => {
-    storageService.getUser().then(user => {
-      if (user) setPhone(user.phone || '');
-    }).catch(() => {});
+    loadProfile();
   }, []);
 
   const handlePasswordPress = () => {
@@ -195,8 +212,8 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
         </View>
       </ScrollView>
 
-      <SetPasswordModal visible={showSetPwd} onClose={() => setShowSetPwd(false)} />
-      <ChangePasswordModal visible={showChangePwd} onClose={() => setShowChangePwd(false)} />
+      <SetPasswordModal visible={showSetPwd} onClose={() => setShowSetPwd(false)} onSuccess={loadProfile} />
+      <ChangePasswordModal visible={showChangePwd} onClose={() => setShowChangePwd(false)} onSuccess={loadProfile} />
     </FeatureScreenLayout>
   );
 };

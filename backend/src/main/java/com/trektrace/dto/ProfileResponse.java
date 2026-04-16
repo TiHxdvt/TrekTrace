@@ -14,6 +14,7 @@ public class ProfileResponse {
     private String avatarUrl;
     private LocalDateTime createdAt;
     private LocalDateTime nicknameUpdatedAt;
+    private boolean hasPassword;
 
     public ProfileResponse(User user) {
         this.id = user.getId();
@@ -23,6 +24,7 @@ public class ProfileResponse {
         this.avatarUrl = user.getAvatarUrl();
         this.createdAt = user.getCreatedAt();
         this.nicknameUpdatedAt = user.getNicknameUpdatedAt();
+        this.hasPassword = user.getPassword() != null;
     }
 
     private static String maskPhone(String phone) {

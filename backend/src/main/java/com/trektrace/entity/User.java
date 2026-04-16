@@ -25,6 +25,9 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
+    @Column(name = "password")
+    private String password;
+
     @Column(name = "nickname_updated_at")
     private LocalDateTime nicknameUpdatedAt;
 

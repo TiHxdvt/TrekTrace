@@ -12,6 +12,7 @@ export interface ProfileData {
   avatarUrl: string;
   createdAt: string;
   nicknameUpdatedAt: string | null;
+  hasPassword: boolean;
 }
 
 export const userService = {

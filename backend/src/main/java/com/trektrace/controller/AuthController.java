@@ -106,4 +106,19 @@ public class AuthController {
 
         return ResponseEntity.ok(new LoginResponse(token, user));
     }
+
+    @PostMapping("/login-password")
+    public ResponseEntity<?> loginWithPassword(@RequestBody LoginRequest request) {
+        String phone = request.getPhone();
+        String password = request.getPassword();
+
+        if (phone == null || password == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "手机号和密码不能为空"));
+        }
+
+        User user = userService.authenticatePassword(phone, password);
+        String token = userService.generateToken(user.getId());
+        return ResponseEntity.ok(new LoginResponse(token, user));
+    }
 }

@@ -4,6 +4,7 @@ import com.trektrace.entity.User;
 import com.trektrace.repository.UserRepository;
 import com.trektrace.util.JwtUtil;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -53,6 +54,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
+    private static final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository, JwtUtil jwtUtil) {
         this.userRepository = userRepository;
@@ -148,6 +150,39 @@ public class UserService {
         }
         user.setPhone(newPhone);
         return userRepository.save(user);
+    }
+
+    public User authenticatePassword(String phone, String rawPassword) {
+        User user = userRepository.findByPhone(phone)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "账号或密码错误"));
+        if (user.getPassword() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "账号或密码错误");
+        }
+        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "账号或密码错误");
+        }
+        return user;
+    }
+
+    public void setPassword(Long userId, String rawPassword) {
+        User user = getUserById(userId);
+        if (user.getPassword() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码已设置，请使用修改密码功能");
+        }
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        userRepository.save(user);
+    }
+
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        User user = getUserById(userId);
+        if (user.getPassword() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未设置密码，请先设置密码");
+        }
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "当前密码错误");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
     }
 
     public User updateVisibility(Long userId, String visibility) {

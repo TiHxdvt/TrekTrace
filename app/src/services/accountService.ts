@@ -23,4 +23,12 @@ export const accountService = {
     const response = await api.get<{ visibility: string }>('/account/visibility');
     return response.data;
   },
+
+  setPassword: async (password: string): Promise<void> => {
+    await api.post('/user/password', { password });
+  },
+
+  changePassword: async (oldPassword: string, newPassword: string): Promise<void> => {
+    await api.put('/user/password', { oldPassword, newPassword });
+  },
 };

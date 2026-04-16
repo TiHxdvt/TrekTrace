@@ -1,6 +1,8 @@
 package com.trektrace.controller;
 
+import com.trektrace.dto.ChangePasswordRequest;
 import com.trektrace.dto.ProfileResponse;
+import com.trektrace.dto.SetPasswordRequest;
 import com.trektrace.dto.UpdateProfileRequest;
 import com.trektrace.entity.User;
 import com.trektrace.service.UserService;
@@ -35,5 +37,17 @@ public class UserProfileController {
             Authentication auth) {
         User user = userService.updateProfile(getUserId(auth), request.getNickname(), request.getAvatarUrl());
         return ResponseEntity.ok(new ProfileResponse(user));
+    }
+
+    @PostMapping("/password")
+    public ResponseEntity<?> setPassword(@Valid @RequestBody SetPasswordRequest request, Authentication auth) {
+        userService.setPassword(getUserId(auth), request.getPassword());
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/password")
+    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest request, Authentication auth) {
+        userService.changePassword(getUserId(auth), request.getOldPassword(), request.getNewPassword());
+        return ResponseEntity.ok().build();
     }
 }
