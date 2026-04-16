@@ -5,7 +5,6 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
-import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
@@ -121,22 +120,6 @@ export const MessagesScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Background Glow */}
-      <View style={styles.ambientGlow} pointerEvents="none">
-        <View style={styles.glowOrb} />
-      </View>
-
-      {/* Full screen blur layer */}
-      <View style={styles.fullScreenBlur} pointerEvents="none">
-        <BlurView
-          style={StyleSheet.absoluteFillObject}
-          blurRadius={20}
-          overlayColor={COLORS.OVERLAY.BLUR_DARK}
-          blurType="dark"
-          blurAmount={20}
-        />
-      </View>
-
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerRow}>
@@ -192,30 +175,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BACKGROUND,
   },
-  ambientGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  glowOrb: {
-    position: 'absolute',
-    top: -40,
-    right: '20%',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: COLORS.GRADIENT.BLUE,
-  },
-  fullScreenBlur: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-  },
   header: {
     paddingHorizontal: SPACING.XL,
     paddingBottom: SPACING.MD,
-    zIndex: 20,
   },
   headerRow: {
     flexDirection: 'row',
@@ -246,13 +208,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
     paddingBottom: 120,
   },
   iconWrap: {
@@ -279,7 +239,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: SPACING.XL,
     paddingBottom: 120,
-    zIndex: 10,
   },
   conversationItem: {
     flexDirection: 'row',
