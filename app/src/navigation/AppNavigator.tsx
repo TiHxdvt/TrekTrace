@@ -21,7 +21,7 @@ import { COLORS, SHADOWS, ANIMATION } from '../theme';
 import {
   IconMapPoint,
   IconPlane,
-  IconHeart,
+  IconChart,
   IconChatRoundLine,
 } from '../components/SolarIcons';
 
@@ -29,7 +29,7 @@ import {
 const TAB_CONFIG = [
   { name: 'ActivityTab' as const, Icon: IconMapPoint },
   { name: 'HistoryTab' as const, Icon: IconPlane },
-  { name: 'StatsTab' as const, Icon: IconHeart },
+  { name: 'StatsTab' as const, Icon: IconChart },
   { name: 'MessagesTab' as const, Icon: IconChatRoundLine },
 ];
 

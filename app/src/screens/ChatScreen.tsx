@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
@@ -24,7 +25,7 @@ import { chatService } from '../services/chatService';
 import { storageService } from '../services/storageService';
 import { websocketService } from '../services/websocketService';
 import { ChatMessage, User } from '../types';
-import { IconAltArrowRight } from '../components/SolarIcons';
+import { IconAltArrowLeft } from '../components/SolarIcons';
 
 type NavProp = { goBack: () => void };
 
@@ -90,7 +91,10 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   }, [conversationId, friendUserId]);
 
   useEffect(() => {
-    loadMessages(0);
+    const handle = InteractionManager.runAfterInteractions(() => {
+      loadMessages(0);
+    });
+    return () => handle.cancel();
   }, [loadMessages]);
 
   useEffect(() => {
@@ -191,7 +195,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <IconAltArrowRight size={20} color={COLORS.TEXT.PRIMARY} />
+          <IconAltArrowLeft size={20} color={COLORS.TEXT.PRIMARY} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {friendNickname || '用户'}

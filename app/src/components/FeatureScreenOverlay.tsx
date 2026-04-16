@@ -11,7 +11,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
-import { IconArrowLeft } from './SolarIcons';
+import { IconAltArrowLeft } from './SolarIcons';
 
 export const FeatureHeader: React.FC<{
   title: string;
@@ -25,7 +25,7 @@ export const FeatureHeader: React.FC<{
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       style={styles.backBtn}
     >
-      <IconArrowLeft size={24} color={COLORS.TEXT.SECONDARY} />
+      <IconAltArrowLeft size={24} color={COLORS.TEXT.SECONDARY} />
     </TouchableOpacity>
     <Text style={styles.title}>{title}</Text>
     {right ? <View style={styles.rightArea}>{right}</View> : null}

@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
-import { IconChatRoundDots, IconCheckCircle, IconMagnifer } from '../components/SolarIcons';
+import { IconChatRoundLine, IconCheckCircle, IconMagnifer } from '../components/SolarIcons';
 import { ChatOverlay } from '../components/ChatOverlay';
 import { Toast } from '../components/Toast';
 import { Avatar } from '../components/Avatar';
@@ -147,7 +147,7 @@ export const MessagesScreen: React.FC = () => {
       ) : conversations.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.iconWrap}>
-            <IconChatRoundDots size={48} color={COLORS.TEXT.QUATERNARY} />
+            <IconChatRoundLine size={48} color={COLORS.TEXT.QUATERNARY} />
           </View>
           <Text style={styles.emptyTitle}>暂无消息</Text>
           <Text style={styles.emptySubtitle}>在好友页面点击"发消息"开始聊天</Text>

@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
-import { IconBonfire, IconFlame, IconMedalStar } from '../components/SolarIcons';
+import { IconPlane, IconFlame, IconMedalStar } from '../components/SolarIcons';
 import { FullScreenBlur } from '../components/FullScreenBlur';
 import { AccordionSection } from '../components/AccordionSection';
 import { ActivityDetailSheet } from '../components/ActivityDetailSheet';
@@ -173,7 +173,7 @@ export const HistoryScreen: React.FC = () => {
         ) : error ? (
           <View style={styles.emptyState}>
             <View style={styles.iconWrap}>
-              <IconBonfire size={48} color={COLORS.TEXT.QUATERNARY} />
+              <IconPlane size={48} color={COLORS.TEXT.QUATERNARY} />
             </View>
             <Text style={styles.emptyTitle}>{error}</Text>
             <Text style={styles.emptySubtitle}>下拉刷新或检查网络连接</Text>
@@ -181,7 +181,7 @@ export const HistoryScreen: React.FC = () => {
         ) : isEmpty ? (
           <View style={styles.emptyState}>
             <View style={styles.iconWrap}>
-              <IconBonfire size={48} color={COLORS.TEXT.QUATERNARY} />
+              <IconPlane size={48} color={COLORS.TEXT.QUATERNARY} />
             </View>
             <Text style={styles.emptyTitle}>暂无记录</Text>
             <Text style={styles.emptySubtitle}>完成一次运动后，记录会出现在这里</Text>
