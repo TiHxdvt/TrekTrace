@@ -16,10 +16,11 @@ import {
 } from '../types';
 import { activityService } from './activityService';
 import { haversineDistance } from '../utils/geo';
+import { GpsKalmanFilter } from '../utils/gpsKalmanFilter';
 
 // ======================== 过滤常量 ========================
-const DISTANCE_FILTER = 2; // 米 - 两点间最小距离（去重）
-const ACCURACY_FILTER = 50; // 米 - 最大允许精度
+const OUTLIER_ACCURACY_THRESHOLD = 200; // 米 - 精度差于此值直接丢弃（极端漂移）
+const OUTLIER_JUMP_SPEED = 150;         // m/s - 超过此速度视为异常跳跃
 const ELEVATION_BUFFER_SIZE = 5; // 滑动平均窗口
 
 const NOTIFY_THROTTLE_MS = 500; // notify 节流间隔
@@ -49,6 +50,7 @@ class TrackRecordingServiceImpl {
   private session: RecordingSession | null = null;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private lastAcceptedPoint: ProcessedPoint | null = null;
+  private lastAcceptedTimestampMs = 0; // 缓存原始毫秒时间戳，避免重复解析 ISO
   private elevationBuffer: number[] = [];
   private elevationGainAccum = 0;
   private lastSmoothedAltitude: number | null = null;
@@ -57,6 +59,7 @@ class TrackRecordingServiceImpl {
   private notifyPending = false;
   private persistTimer: ReturnType<typeof setInterval> | null = null;
   private pointsSinceLastPersist = 0;
+  private kalmanFilter: GpsKalmanFilter = new GpsKalmanFilter();
 
   // 真实时间计时
   private recordingStartWallTime = 0; // 当前 recording 段开始的 Date.now()
@@ -103,6 +106,14 @@ class TrackRecordingServiceImpl {
         const allPoints = this.getAllPoints();
         if (allPoints.length > 0) {
           this.lastAcceptedPoint = allPoints[allPoints.length - 1];
+          this.lastAcceptedTimestampMs = new Date(this.lastAcceptedPoint.timestamp).getTime();
+        }
+
+        // Reset Kalman filter and seed from last persisted point
+        this.kalmanFilter.reset();
+        if (allPoints.length > 0) {
+          const last = allPoints[allPoints.length - 1];
+          this.kalmanFilter.seedPosition(last.latitude, last.longitude, 10);
         }
 
         // Restore elevation state from persisted data
@@ -165,11 +176,13 @@ class TrackRecordingServiceImpl {
     };
 
     this.lastAcceptedPoint = null;
+    this.lastAcceptedTimestampMs = 0;
     this.elevationBuffer = [];
     this.elevationGainAccum = 0;
     this.lastSmoothedAltitude = null;
     this.recordingStartWallTime = 0;
     this.pausedAccum = 0;
+    this.kalmanFilter.reset();
 
     this.pointsSinceLastPersist = 0;
     this.startTimer();
@@ -182,34 +195,58 @@ class TrackRecordingServiceImpl {
   async processLocation(raw: RawLocationPoint): Promise<boolean> {
     if (!this.session || this.session.status !== 'recording') return false;
 
-    // Filter 1: accuracy
-    if (raw.accuracy > ACCURACY_FILTER) return false;
+    // Pre-filter 1: extreme accuracy — discard GPS in very bad conditions
+    if (raw.accuracy > OUTLIER_ACCURACY_THRESHOLD) return false;
 
-    // Filter 2: distance dedup
+    // Pre-filter 2: sudden jump with unreasonable speed
+    if (this.lastAcceptedTimestampMs > 0) {
+      const jumpDist = haversineDistance(
+        this.lastAcceptedPoint!.latitude,
+        this.lastAcceptedPoint!.longitude,
+        raw.latitude,
+        raw.longitude,
+      );
+      const timeDiff = (raw.timestamp - this.lastAcceptedTimestampMs) / 1000;
+      if (timeDiff > 0 && jumpDist / timeDiff > OUTLIER_JUMP_SPEED) {
+        return false;
+      }
+    }
+
+    // Kalman filter smoothing
+    const filtered = this.kalmanFilter.process({
+      latitude: raw.latitude,
+      longitude: raw.longitude,
+      accuracy: raw.accuracy,
+      timestamp: raw.timestamp,
+    });
+
+    // Discard outliers flagged by the Kalman filter
+    if (filtered.isOutlier) return false;
+
+    // Compute distance using smoothed coordinates
     let dist = 0;
     if (this.lastAcceptedPoint) {
       dist = haversineDistance(
         this.lastAcceptedPoint.latitude,
         this.lastAcceptedPoint.longitude,
-        raw.latitude,
-        raw.longitude,
+        filtered.latitude,
+        filtered.longitude,
       );
-      if (dist < DISTANCE_FILTER) return false;
     }
 
-    // Accept point
+    // Accept point with smoothed coordinates
     const altitude = this.smoothElevation(raw.altitude);
     this.lastSmoothedAltitude = altitude;
 
     const point: ProcessedPoint = {
-      latitude: raw.latitude,
-      longitude: raw.longitude,
+      latitude: filtered.latitude,
+      longitude: filtered.longitude,
       altitude,
       timestamp: normalizeTimestamp(raw.timestamp),
       speed: raw.speed,
     };
 
-    // Accumulate distance (reuse already computed value)
+    // Accumulate distance
     if (dist > 0) {
       this.session.totalDistance += dist;
     }
@@ -223,6 +260,7 @@ class TrackRecordingServiceImpl {
     currentSegment.endTime = point.timestamp;
 
     this.lastAcceptedPoint = point;
+    this.lastAcceptedTimestampMs = raw.timestamp;
 
     this.pointsSinceLastPersist++;
     this.schedulePersist();
@@ -255,7 +293,9 @@ class TrackRecordingServiceImpl {
     this.session.segments.push(newSegment);
     this.session.status = 'recording';
     this.lastAcceptedPoint = null;
+    this.lastAcceptedTimestampMs = 0;
     this.pointsSinceLastPersist = 0;
+    this.kalmanFilter.reset();
     this.startTimer();
     this.startPersistTimer();
     await this.persist();
@@ -297,11 +337,13 @@ class TrackRecordingServiceImpl {
   async discardRecording(): Promise<void> {
     this.session = null;
     this.lastAcceptedPoint = null;
+    this.lastAcceptedTimestampMs = 0;
     this.elevationBuffer = [];
     this.elevationGainAccum = 0;
     this.lastSmoothedAltitude = null;
     this.recordingStartWallTime = 0;
     this.pausedAccum = 0;
+    this.kalmanFilter.reset();
     this.stopTimer();
     await this.clearStorage();
     this.doNotify();
