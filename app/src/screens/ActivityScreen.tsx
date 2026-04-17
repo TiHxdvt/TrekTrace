@@ -50,7 +50,7 @@ import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
 import { trackRecordingService } from '../services/trackRecordingService';
 import { backgroundLocationService } from '../services/backgroundLocationService';
-import { mockLocationService, MOCK_ROUTES } from '../services/mockLocationService';
+import { mockLocationService, SIM_PROFILES, StartPosition } from '../services/mockLocationService';
 import { formatDuration, formatPace } from '../utils/format';
 import { haversineDistance } from '../utils/geo';
 import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
@@ -107,7 +107,7 @@ function samplePoints(coords: Array<{latitude: number; longitude: number}>, maxC
 
 export const ActivityScreen: React.FC = () => {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, 'ActivityTab'>>();
-  const [activityIndex, setActivityIndex] = useState(1); // 默认跑步
+  const [activityIndex, setActivityIndex] = useState(0); // 默认徒步
   const insets = useSafeAreaInsets();
   const mapViewRef = useRef<MapView>(null);
   const hasMovedToLocation = useRef(false);
@@ -231,7 +231,7 @@ export const ActivityScreen: React.FC = () => {
   }, [isSimulating]);
 
   // Refs for Drawer callbacks (avoid stale closures)
-  const startSimRef = useRef<(routeId: string) => void>(() => {});
+  const startSimRef = useRef<(profileKey: string, startPos: StartPosition | null) => void>(() => {});
   const stopSimRef = useRef<() => void>(() => {});
 
   // Subscribe to recording service
@@ -595,32 +595,38 @@ export const ActivityScreen: React.FC = () => {
   // ======================== Mock GPS Simulation (__DEV__) ========================
 
   const handleStartSim = () => {
-    const routeKeys = Object.keys(MOCK_ROUTES);
-    const routeOptions = routeKeys.map(key => MOCK_ROUTES[key].name);
+    const profileKeys = Object.keys(SIM_PROFILES);
+    const profileOptions = profileKeys.map(key => SIM_PROFILES[key].name);
+
+    // 用当前 GPS 位置或地图中心作为模拟起点
+    let startPos: StartPosition | null = null;
+    if (latestLocation.current) {
+      startPos = latestLocation.current;
+    }
 
     Dialog.show(
       'GPS 模拟',
-      '选择模拟路线：',
+      startPos
+        ? `从当前位置开始 (${startPos.latitude.toFixed(4)}, ${startPos.longitude.toFixed(4)})`
+        : '未获取到位置，将使用默认坐标',
       [
-        ...routeOptions.map((name, idx) => ({
+        ...profileOptions.map((name, idx) => ({
           text: name,
-          onPress: () => startSimWithRoute(routeKeys[idx]),
+          onPress: () => startSim(profileKeys[idx], startPos),
         })),
         { text: '取消', style: 'cancel' },
       ],
     );
   };
 
-  const startSimWithRoute = (routeKey: string) => {
-    const route = MOCK_ROUTES[routeKey];
+  const startSim = (profileKey: string, startPos: StartPosition | null) => {
     setIsSimulating(true);
 
-    // Simulate GPS being acquired
     setHasGps(true);
     gpsStrengthRef.current = 'strong';
     setGpsStrength('strong');
 
-    mockLocationService.start(routeKey, route.defaultSpeed, (point: RawLocationPoint) => {
+    mockLocationService.start(profileKey, startPos, (point: RawLocationPoint) => {
       // Update latestLocation
       latestLocation.current = { latitude: point.latitude, longitude: point.longitude };
 
@@ -644,7 +650,6 @@ export const ActivityScreen: React.FC = () => {
           );
         }
       } else if (!showSummaryRef.current) {
-        // Follow simulated position only when not showing summary
         mapViewRef.current?.moveCamera(
           { target: { latitude: point.latitude, longitude: point.longitude }, zoom: currentZoomRef.current },
           300,
@@ -659,7 +664,7 @@ export const ActivityScreen: React.FC = () => {
   };
 
   // Keep Drawer callback refs up to date
-  startSimRef.current = startSimWithRoute;
+  startSimRef.current = startSim;
   stopSimRef.current = handleStopSim;
 
   const handleSimButton = () => {
