@@ -177,7 +177,7 @@ class BackgroundLocationServiceImpl {
       },
       {
         enableHighAccuracy: true,
-        distanceFilter: 2,
+        distanceFilter: 0,
         interval: 1000,
         fastestInterval: 500,
         forceLocationManager: true, // 中国安卓设备兼容，不依赖 Google Play Services

@@ -17,7 +17,7 @@ export const dataService = {
     return response.data;
   },
 
-  exportData: async (format: string = 'json'): Promise<any[]> => {
+  exportData: async (format: string = 'json'): Promise<Record<string, unknown>[]> => {
     const response = await api.get('/data/export', { params: { format } });
     return response.data;
   },
