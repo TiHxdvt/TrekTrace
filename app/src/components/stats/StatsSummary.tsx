@@ -2,42 +2,74 @@
  * 总览统计面板 — 运动总结
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
 import { ACTIVITY_TYPE_META } from '../../constants/activityMeta';
 import type { LifetimeStats, ActivityType } from '../../utils/statsComputations';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface StatsSummaryProps {
   stats: LifetimeStats;
 }
 
 export const StatsSummary: React.FC<StatsSummaryProps> = ({ stats }) => {
+  const { colors } = useTheme();
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    row: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    cellValue: {
+      color: colors.TEXT.PRIMARY,
+    },
+    cellLabel: {
+      color: colors.TEXT.QUATERNARY,
+    },
+    divider: {
+      backgroundColor: colors.BORDER.LIGHT,
+    },
+    typeSection: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    typeDivider: {
+      backgroundColor: colors.BORDER.LIGHT,
+    },
+    typeName: {
+      color: colors.TEXT.PRIMARY,
+    },
+    typeStat: {
+      color: colors.TEXT.TERTIARY,
+    },
+  }), [colors]);
+
   const distKm = (stats.totalDistance / 1000).toFixed(1);
   const durH = (stats.totalDuration / 3600).toFixed(1);
 
   return (
     <View style={styles.container}>
       {/* 核心数据 */}
-      <View style={styles.row}>
+      <View style={[styles.row, dynamicStyles.row]}>
         <View style={styles.cell}>
-          <Text style={styles.cellValue}>{distKm}</Text>
-          <Text style={styles.cellLabel}>总距离 (km)</Text>
+          <Text style={[styles.cellValue, dynamicStyles.cellValue]}>{distKm}</Text>
+          <Text style={[styles.cellLabel, dynamicStyles.cellLabel]}>总距离 (km)</Text>
         </View>
-        <View style={styles.divider} />
+        <View style={[styles.divider, dynamicStyles.divider]} />
         <View style={styles.cell}>
-          <Text style={styles.cellValue}>{durH}</Text>
-          <Text style={styles.cellLabel}>总时长 (h)</Text>
+          <Text style={[styles.cellValue, dynamicStyles.cellValue]}>{durH}</Text>
+          <Text style={[styles.cellLabel, dynamicStyles.cellLabel]}>总时长 (h)</Text>
         </View>
-        <View style={styles.divider} />
+        <View style={[styles.divider, dynamicStyles.divider]} />
         <View style={styles.cell}>
-          <Text style={styles.cellValue}>{stats.estimatedCalories}</Text>
-          <Text style={styles.cellLabel}>总消耗 (kcal)</Text>
+          <Text style={[styles.cellValue, dynamicStyles.cellValue]}>{stats.estimatedCalories}</Text>
+          <Text style={[styles.cellLabel, dynamicStyles.cellLabel]}>总消耗 (kcal)</Text>
         </View>
-        <View style={styles.divider} />
+        <View style={[styles.divider, dynamicStyles.divider]} />
         <View style={styles.cell}>
-          <Text style={styles.cellValue}>{stats.totalActivities}</Text>
-          <Text style={styles.cellLabel}>总次数</Text>
+          <Text style={[styles.cellValue, dynamicStyles.cellValue]}>{stats.totalActivities}</Text>
+          <Text style={[styles.cellLabel, dynamicStyles.cellLabel]}>总次数</Text>
         </View>
       </View>
 
@@ -51,7 +83,7 @@ export const StatsSummary: React.FC<StatsSummaryProps> = ({ stats }) => {
         if (activeTypes.length === 0) return null;
 
         return (
-          <View style={styles.typeSection}>
+          <View style={[styles.typeSection, dynamicStyles.typeSection]}>
             {activeTypes.map((type, index) => {
               const meta = ACTIVITY_TYPE_META[type];
               const data = stats.byType[type];
@@ -61,17 +93,17 @@ export const StatsSummary: React.FC<StatsSummaryProps> = ({ stats }) => {
 
               return (
                 <React.Fragment key={type}>
-                  {index > 0 && <View style={styles.typeDivider} />}
+                  {index > 0 && <View style={[styles.typeDivider, dynamicStyles.typeDivider]} />}
                   <View style={styles.typeRow}>
                     <View style={styles.typeInfo}>
-                      <TypeIcon size={18} color={COLORS.TEXT.SECONDARY} />
-                      <Text style={styles.typeName}>{meta.label}</Text>
+                      <TypeIcon size={18} color={colors.TEXT.SECONDARY} />
+                      <Text style={[styles.typeName, dynamicStyles.typeName]}>{meta.label}</Text>
                     </View>
                     <View style={styles.typeStats}>
-                      <Text style={styles.typeStat}>{data.count}次</Text>
-                      <Text style={styles.typeStat}>{typeDist}km</Text>
-                      <Text style={styles.typeStat}>{typeDur}h</Text>
-                      <Text style={styles.typeStat}>{data.calories}kcal</Text>
+                      <Text style={[styles.typeStat, dynamicStyles.typeStat]}>{data.count}次</Text>
+                      <Text style={[styles.typeStat, dynamicStyles.typeStat]}>{typeDist}km</Text>
+                      <Text style={[styles.typeStat, dynamicStyles.typeStat]}>{typeDur}h</Text>
+                      <Text style={[styles.typeStat, dynamicStyles.typeStat]}>{data.calories}kcal</Text>
                     </View>
                   </View>
                 </React.Fragment>
@@ -90,9 +122,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.XXL,
     paddingVertical: SPACING.LG,
     paddingHorizontal: SPACING.SM,
@@ -107,27 +137,21 @@ const styles = StyleSheet.create({
   cellValue: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XL,
     fontWeight: '700',
-    color: COLORS.TEXT.PRIMARY,
   },
   cellLabel: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
   },
   divider: {
     width: 1,
     height: 32,
-    backgroundColor: COLORS.BORDER.LIGHT,
   },
   typeSection: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.XXL,
     paddingVertical: SPACING.SM,
   },
   typeDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: COLORS.BORDER.LIGHT,
     marginHorizontal: SPACING.MD,
   },
   typeRow: {
@@ -145,7 +169,6 @@ const styles = StyleSheet.create({
   typeName: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     fontWeight: '500',
-    color: COLORS.TEXT.PRIMARY,
   },
   typeStats: {
     flexDirection: 'row',
@@ -153,6 +176,5 @@ const styles = StyleSheet.create({
   },
   typeStat: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.TERTIARY,
   },
 });

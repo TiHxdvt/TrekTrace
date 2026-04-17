@@ -1,10 +1,11 @@
 /**
  * 主题 Context
  * 管理深色/浅色模式切换，持久化到 AsyncStorage
- * 目前只做状态管理，后续接入实际主题切换时扩展
+ * 提供动态 colors 对象供组件使用
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { THEMES, ThemeColors } from '../theme';
 import { storageService } from '../services/storageService';
 
 const SETTINGS_KEY_DARK_MODE = 'darkMode';
@@ -12,11 +13,13 @@ const SETTINGS_KEY_DARK_MODE = 'darkMode';
 interface ThemeContextValue {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  colors: ThemeColors;
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
   isDarkMode: true,
   toggleDarkMode: () => {},
+  colors: THEMES.dark,
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -40,8 +43,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await storageService.saveSettings(settings);
   }, [isDarkMode]);
 
+  const colors = useMemo(() => isDarkMode ? THEMES.dark : THEMES.light, [isDarkMode]);
+
   return (
-    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode }}>
+    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode, colors }}>
       {children}
     </ThemeContext.Provider>
   );

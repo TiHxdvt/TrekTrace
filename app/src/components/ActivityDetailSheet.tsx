@@ -25,7 +25,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { format } from 'date-fns';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, ANIMATION } from '../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, ANIMATION } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
 import { formatDuration, formatPaceFromDistance } from '../utils/format';
 import { prepareChartData, downsample } from '../utils/trackData';
@@ -56,6 +57,7 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
   onClose,
 }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const [sheetVisible, setSheetVisible] = useState(false);
   const [visibleActivity, setVisibleActivity] = useState<ActivityResponseDTO | null>(null);
@@ -316,6 +318,82 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
     };
   }, [trackPoints]);
 
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    sheet: {
+      backgroundColor: colors.BACKGROUND,
+      borderTopLeftRadius: BORDER_RADIUS.G2.LG,
+      borderTopRightRadius: BORDER_RADIUS.G2.LG,
+      borderWidth: 1,
+      borderBottomWidth: 0,
+      borderColor: colors.BORDER.MEDIUM,
+      overflow: 'hidden',
+    },
+    dragIndicator: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.TEXT.QUINARY,
+      marginBottom: 20,
+    },
+    typeBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      borderRadius: BORDER_RADIUS.FULL,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    typeBadgeText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '500',
+      color: colors.TEXT.SECONDARY,
+    },
+    sheetDate: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.TERTIARY,
+    },
+    statLabel: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+      color: colors.TEXT.QUATERNARY,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      fontWeight: '600',
+      marginBottom: 4,
+    },
+    statValue: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XL,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+      marginBottom: 2,
+    },
+    statUnit: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+      color: colors.TEXT.QUINARY,
+    },
+    sectionDivider: {
+      height: 1,
+      backgroundColor: colors.BORDER.LIGHT,
+      marginHorizontal: 20,
+      marginVertical: 16,
+    },
+    sectionTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '500',
+      color: colors.TEXT.TERTIARY,
+    },
+    sectionTime: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+      color: colors.TEXT.QUINARY,
+    },
+    loadingText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+    },
+  }), [colors]);
+
   const sheetSlideY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [SCREEN_HEIGHT, 0],
@@ -357,7 +435,7 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
             {/* sheet 容器：固定 expanded 高度 + overflow:hidden 裁剪 */}
             <Animated.View
               style={[
-                styles.sheet,
+                dynamicStyles.sheet,
                 {
                   height: SHEET_HEIGHT_EXPANDED,
                   transform: [{ translateY: contentSlideAnim }],
@@ -367,16 +445,16 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
               {/* 拖拽热区 */}
               <GestureDetector gesture={panGesture}>
                 <View style={styles.dragZone}>
-                  <View style={styles.dragIndicator} />
+                  <View style={dynamicStyles.dragIndicator} />
                   {/* 类型 + 日期标题 */}
                   <View style={styles.sheetHeader}>
-                    <View style={styles.typeBadge}>
-                      {TypeIcon && <TypeIcon size={16} color={COLORS.TEXT.SECONDARY} />}
-                      <Text style={styles.typeBadgeText}>
+                    <View style={dynamicStyles.typeBadge}>
+                      {TypeIcon && <TypeIcon size={16} color={colors.TEXT.SECONDARY} />}
+                      <Text style={dynamicStyles.typeBadgeText}>
                         {meta?.label ?? visibleActivity?.type}
                       </Text>
                     </View>
-                    <Text style={styles.sheetDate}>
+                    <Text style={dynamicStyles.sheetDate}>
                       {format(startDate, 'yyyy年M月d日')}
                     </Text>
                   </View>
@@ -394,28 +472,28 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
                 {/* 四格统计 */}
                 <View style={styles.statsGrid}>
                   <View style={styles.statCell}>
-                    <Text style={styles.statLabel}>距离</Text>
-                    <Text style={styles.statValue}>
+                    <Text style={dynamicStyles.statLabel}>距离</Text>
+                    <Text style={dynamicStyles.statValue}>
                       {(visibleActivity.distance / 1000).toFixed(2)}
                     </Text>
-                    <Text style={styles.statUnit}>km</Text>
+                    <Text style={dynamicStyles.statUnit}>km</Text>
                   </View>
                   <View style={styles.statCell}>
-                    <Text style={styles.statLabel}>时长</Text>
-                    <Text style={styles.statValue}>{formatDuration(visibleActivity.duration)}</Text>
-                    <Text style={styles.statUnit}> </Text>
+                    <Text style={dynamicStyles.statLabel}>时长</Text>
+                    <Text style={dynamicStyles.statValue}>{formatDuration(visibleActivity.duration)}</Text>
+                    <Text style={dynamicStyles.statUnit}> </Text>
                   </View>
                   <View style={styles.statCell}>
-                    <Text style={styles.statLabel}>配速</Text>
-                    <Text style={styles.statValue}>
+                    <Text style={dynamicStyles.statLabel}>配速</Text>
+                    <Text style={dynamicStyles.statValue}>
                       {formatPaceFromDistance(visibleActivity.distance, visibleActivity.duration)}
                     </Text>
-                    <Text style={styles.statUnit}>min/km</Text>
+                    <Text style={dynamicStyles.statUnit}>min/km</Text>
                   </View>
                   <View style={styles.statCell}>
-                    <Text style={styles.statLabel}>爬升</Text>
-                    <Text style={styles.statValue}>{Math.round(visibleActivity.elevationGain)}</Text>
-                    <Text style={styles.statUnit}>m</Text>
+                    <Text style={dynamicStyles.statLabel}>爬升</Text>
+                    <Text style={dynamicStyles.statValue}>{Math.round(visibleActivity.elevationGain)}</Text>
+                    <Text style={dynamicStyles.statUnit}>m</Text>
                   </View>
                 </View>
 
@@ -424,22 +502,22 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
                   <View style={styles.expandedContent}>
                     {trackLoading ? (
                       <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={COLORS.PRIMARY} />
-                        <Text style={styles.loadingText}>加载轨迹数据...</Text>
+                        <ActivityIndicator size="large" color={colors.PRIMARY} />
+                        <Text style={dynamicStyles.loadingText}>加载轨迹数据...</Text>
                       </View>
                     ) : (
                       <>
-                        <View style={styles.sectionDivider} />
+                        <View style={dynamicStyles.sectionDivider} />
                         <View style={styles.sectionTitleRow}>
-                          <Text style={styles.sectionTitle}>路线概览</Text>
-                          <Text style={styles.sectionTime}>
+                          <Text style={dynamicStyles.sectionTitle}>路线概览</Text>
+                          <Text style={dynamicStyles.sectionTime}>
                             {format(startDate, 'HH:mm')} → {format(endDate, 'HH:mm')}
                           </Text>
                         </View>
                         <RouteMiniMap points={mapPoints} />
                         {chartDataSets && (
                           <View style={styles.chartArea}>
-                            <View style={styles.sectionDivider} />
+                            <View style={dynamicStyles.sectionDivider} />
                             <DataChart
                               title="海拔剖面"
                               data={chartDataSets.elevation.data}
@@ -490,25 +568,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 16,
   },
-  sheet: {
-    backgroundColor: COLORS.BACKGROUND,
-    borderTopLeftRadius: BORDER_RADIUS.G2.LG,
-    borderTopRightRadius: BORDER_RADIUS.G2.LG,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: COLORS.BORDER.MEDIUM,
-    overflow: 'hidden',
-  },
   dragZone: {
     paddingTop: 12,
     alignItems: 'center',
-  },
-  dragIndicator: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.TEXT.QUINARY,
-    marginBottom: 20,
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -517,26 +579,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 24,
     width: '100%',
-  },
-  typeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    borderRadius: BORDER_RADIUS.FULL,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  typeBadgeText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '500',
-    color: COLORS.TEXT.SECONDARY,
-  },
-  sheetDate: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.TERTIARY,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -547,36 +589,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  statLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUATERNARY,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XL,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: 2,
-  },
-  statUnit: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUINARY,
-  },
   expandedContent: {
     paddingBottom: 16,
   },
   chartArea: {
     paddingHorizontal: 20,
     gap: 12,
-  },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: COLORS.BORDER.LIGHT,
-    marginHorizontal: 20,
-    marginVertical: 16,
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -585,27 +603,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '500',
-    color: COLORS.TEXT.TERTIARY,
-  },
-  sectionTime: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUINARY,
-  },
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 48,
     gap: 12,
-  },
-  loadingText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  errorText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.TERTIARY,
   },
 });

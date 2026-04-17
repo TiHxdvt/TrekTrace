@@ -22,7 +22,7 @@ import { ToastRoot } from './src/components/Toast';
 import { DrawerOverlayRoot, DrawerOverlay } from './src/components/DrawerOverlay';
 import { ChatOverlayRoot, ChatOverlay } from './src/components/ChatOverlay';
 import { SubScreenOverlayRoot, SubScreenOverlay } from './src/components/SubScreenOverlay';
-import { ThemeProvider } from './src/contexts/ThemeContext';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 
 // 模块顶层注册 BackHandler：在所有组件 useEffect 之前注册
 // BackHandler FIFO 触发，先注册的先执行
@@ -34,13 +34,23 @@ BackHandler.addEventListener('hardwareBackPress', () => {
   return false;
 });
 
+function ThemedStatusBar() {
+  const { colors, isDarkMode } = useTheme();
+  return (
+    <StatusBar
+      barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+      backgroundColor={colors.BACKGROUND}
+    />
+  );
+}
+
 function App() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <ThemeProvider>
-        <NavigationContainer>
-          <StatusBar barStyle="light-content" backgroundColor="#1c1e26" />
+        <NavigationContainer theme={{ colors: { background: 'transparent' } } as any}>
+          <ThemedStatusBar />
           <AppNavigator />
           <DialogRoot />
           <ToastRoot />

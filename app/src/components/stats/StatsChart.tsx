@@ -5,10 +5,11 @@
  * 导出 niceScale / niceXLabels 工具函数供调用方使用。
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle, Line, Text as SvgText, G, Path, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export type ChartType = 'bar' | 'line' | 'curve';
 
@@ -128,13 +129,28 @@ export const DataChart: React.FC<DataChartProps> = ({
   showDots = true,
   color,
 }) => {
+  const { colors } = useTheme();
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    title: {
+      color: colors.TEXT.PRIMARY,
+    },
+    unit: {
+      color: colors.TEXT.QUATERNARY,
+    },
+  }), [colors]);
+
   const n = data.length;
   if (n === 0) return null;
 
   const chartW = SVG_W - PAD.left - PAD.right;
   const chartH = SVG_H - PAD.top - PAD.bottom;
   const yMax = yTicks[yTicks.length - 1] || 1;
-  const c = color ?? COLORS.PRIMARY;
+  const c = color ?? colors.PRIMARY;
   const shouldShowArea = showArea ?? (chartType !== 'bar');
   const shouldShowDots = showDots && chartType !== 'bar';
   const gap = chartW / n;
@@ -155,10 +171,10 @@ export const DataChart: React.FC<DataChartProps> = ({
     + ` L${points[n - 1].x},${bottomY} L${points[0].x},${bottomY} Z`;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, dynamicStyles.container]}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.unit}>{unit}</Text>
+        <Text style={[styles.title, dynamicStyles.title]}>{title}</Text>
+        <Text style={[styles.unit, dynamicStyles.unit]}>{unit}</Text>
       </View>
 
       <Svg width="100%" height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`}>
@@ -175,9 +191,9 @@ export const DataChart: React.FC<DataChartProps> = ({
           return (
             <G key={`y-${i}`}>
               <Line x1={PAD.left} y1={y} x2={SVG_W - PAD.right} y2={y}
-                stroke={COLORS.BORDER.LIGHT} strokeWidth={0.5} />
+                stroke={colors.BORDER.LIGHT} strokeWidth={0.5} />
               <SvgText x={SVG_W - PAD.right + 2} y={y + 3} textAnchor="start"
-                fontSize={9} fill={COLORS.TEXT.QUATERNARY}>
+                fontSize={9} fill={colors.TEXT.QUATERNARY}>
                 {tick}
               </SvgText>
             </G>
@@ -214,7 +230,7 @@ export const DataChart: React.FC<DataChartProps> = ({
           const x = firstPtX + (i / (xLabels.length - 1 || 1)) * labelRange;
           return (
             <SvgText key={`x-${i}`} x={x} y={SVG_H - 2} textAnchor="middle"
-              fontSize={10} fill={COLORS.TEXT.QUATERNARY}>
+              fontSize={10} fill={colors.TEXT.QUATERNARY}>
               {text}
             </SvgText>
           );
@@ -229,9 +245,7 @@ export const StatsChart = DataChart;
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.XXL,
     padding: SPACING.LG,
     gap: SPACING.XS,
@@ -244,10 +258,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
   unit: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
   },
 });

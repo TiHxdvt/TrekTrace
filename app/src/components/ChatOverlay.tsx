@@ -5,7 +5,7 @@
  * 从右侧滑入全屏聊天页面，动画完全在原生 UI 线程驱动
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Animated,
   Dimensions,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { ChatScreen } from '../screens/ChatScreen';
-import { COLORS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -39,11 +39,20 @@ let _animateOpen: ((params: ChatOverlayParams) => void) | null = null;
 let _animateClose: ((cb?: () => void) => void) | null = null;
 
 export const ChatOverlayRoot: React.FC = () => {
+  const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const [params, setParams] = useState<ChatOverlayParams | null>(null);
   const isOpenRef = useRef(false);
   const startXRef = useRef(0);
   const translateX = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.BACKGROUND,
+      zIndex: 200,
+    },
+  }), [colors]);
 
   // 左边缘右滑关闭手势（只在起始点距左边缘 25px 内触发）
   const backGesture = useRef(
@@ -91,7 +100,7 @@ export const ChatOverlayRoot: React.FC = () => {
     <GestureDetector gesture={backGesture}>
       <Animated.View
         style={[
-          styles.overlay,
+          dynamicStyles.overlay,
           { transform: [{ translateX }] },
         ]}
         pointerEvents="auto"
@@ -104,14 +113,6 @@ export const ChatOverlayRoot: React.FC = () => {
     </GestureDetector>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.BACKGROUND,
-    zIndex: 200,
-  },
-});
 
 export const ChatOverlay = {
   isOpen: false,

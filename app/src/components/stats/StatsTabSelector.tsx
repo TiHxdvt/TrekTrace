@@ -2,9 +2,10 @@
  * 周/月/年/总 tab 切换 — 滑动指示器
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, LayoutChangeEvent } from 'react-native';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export type ViewMode = 'week' | 'month' | 'year' | 'total';
 
@@ -21,10 +22,27 @@ interface StatsTabSelectorProps {
 }
 
 export const StatsTabSelector: React.FC<StatsTabSelectorProps> = ({ mode, onChange }) => {
+  const { colors } = useTheme();
   const translateX = useRef(new Animated.Value(0)).current;
   const tabWidthRef = useRef(0);
   const [containerHeight, setContainerHeight] = useState(0);
   const index = TABS.findIndex(t => t.key === mode);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    indicator: {
+      backgroundColor: colors.PRIMARY,
+    },
+    tabLabel: {
+      color: colors.TEXT.TERTIARY,
+    },
+    tabLabelActive: {
+      color: '#ffffff',
+    },
+  }), [colors]);
 
   useEffect(() => {
     if (tabWidthRef.current > 0) {
@@ -50,11 +68,12 @@ export const StatsTabSelector: React.FC<StatsTabSelectorProps> = ({ mode, onChan
   const indicatorHeight = containerHeight > 0 ? containerHeight - indicatorPad * 2 : 0;
 
   return (
-    <View style={styles.container} onLayout={handleLayout}>
+    <View style={[styles.container, dynamicStyles.container]} onLayout={handleLayout}>
       {tabWidthRef.current > 0 && indicatorHeight > 0 && (
         <Animated.View
           style={[
             styles.indicator,
+            dynamicStyles.indicator,
             {
               width: tabWidthRef.current - indicatorPad * 2,
               height: indicatorHeight,
@@ -73,7 +92,8 @@ export const StatsTabSelector: React.FC<StatsTabSelectorProps> = ({ mode, onChan
           <Text
             style={[
               styles.tabLabel,
-              mode === tab.key && styles.tabLabelActive,
+              dynamicStyles.tabLabel,
+              mode === tab.key && dynamicStyles.tabLabelActive,
             ]}
           >
             {tab.label}
@@ -89,9 +109,7 @@ const indicatorPadStatic = 1;
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.XXL,
     padding: 2,
   },
@@ -99,7 +117,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: indicatorPadStatic,
     left: indicatorPadStatic,
-    backgroundColor: COLORS.PRIMARY,
     borderRadius: BORDER_RADIUS.XL,
   },
   tab: {
@@ -112,10 +129,8 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     fontWeight: '500',
-    color: COLORS.TEXT.TERTIARY,
   },
   tabLabelActive: {
-    color: COLORS.TEXT.PRIMARY,
     fontWeight: '600',
   },
 });

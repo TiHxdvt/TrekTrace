@@ -2,7 +2,7 @@
  * 日期筛选下拉 — 胶囊按钮 + Modal 年月选择器（无遮罩，带阴影 + 本月快捷按钮）
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING, SHADOWS } from '../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING, SHADOWS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { IconCalendar, IconArrowDown } from './SolarIcons';
 
 interface DateFilterDropdownProps {
@@ -33,6 +34,7 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
   minYear = 2020,
   maxYear = new Date().getFullYear(),
 }) => {
+  const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const [draftYear, setDraftYear] = useState(year);
   const [draftMonth, setDraftMonth] = useState(month);
@@ -62,15 +64,77 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
     setDraftMonth(currentMonth);
   };
 
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    btn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.XS,
+      paddingVertical: SPACING.XS + 2,
+      paddingHorizontal: SPACING.MD,
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.FULL,
+    },
+    label: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+    },
+    card: {
+      width: 280,
+      maxHeight: 420,
+      backgroundColor: colors.OVERLAY.SUMMARY,
+      borderRadius: BORDER_RADIUS.G2.LG,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      padding: SPACING.LG,
+      ...SHADOWS.LARGE,
+    },
+    optionSelected: {
+      backgroundColor: colors.PRIMARY,
+    },
+    optionText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      color: colors.TEXT.SECONDARY,
+    },
+    optionTextSelected: {
+      color: colors.TEXT.PRIMARY,
+      fontWeight: '600',
+    },
+    thisMonthBtn: {
+      paddingVertical: SPACING.SM + 2,
+      paddingHorizontal: SPACING.LG,
+      borderRadius: BORDER_RADIUS.MD,
+      backgroundColor: colors.OVERLAY.MEDIUM,
+    },
+    thisMonthText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      fontWeight: '600',
+      color: colors.TEXT.SECONDARY,
+    },
+    confirmBtn: {
+      paddingVertical: SPACING.SM + 2,
+      paddingHorizontal: SPACING.XL,
+      borderRadius: BORDER_RADIUS.MD,
+      backgroundColor: colors.PRIMARY,
+    },
+    confirmText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+    },
+  }), [colors]);
+
   return (
     <>
       {/* 胶囊按钮 */}
-      <Pressable style={styles.btn} onPress={openModal}>
-        <IconCalendar size={16} color={COLORS.TEXT.PRIMARY} />
-        <Text style={styles.label}>
+      <Pressable style={dynamicStyles.btn} onPress={openModal}>
+        <IconCalendar size={16} color={colors.TEXT.PRIMARY} />
+        <Text style={dynamicStyles.label}>
           {year}年 {month}月
         </Text>
-        <IconArrowDown size={14} color={COLORS.TEXT.TERTIARY} />
+        <IconArrowDown size={14} color={colors.TEXT.TERTIARY} />
       </Pressable>
 
       {/* 下拉选择器 Modal — 无遮罩 */}
@@ -84,7 +148,7 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
           style={styles.touchableArea}
           onPress={() => setVisible(false)}
         >
-          <Pressable style={styles.card} onPress={e => e.stopPropagation()}>
+          <Pressable style={dynamicStyles.card} onPress={e => e.stopPropagation()}>
             {/* 年月滚动选择 */}
             <View style={styles.pickerRow}>
               {/* 年份列 */}
@@ -98,14 +162,14 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
                     key={y}
                     style={[
                       styles.option,
-                      y === draftYear && styles.optionSelected,
+                      y === draftYear && dynamicStyles.optionSelected,
                     ]}
                     onPress={() => setDraftYear(y)}
                   >
                     <Text
                       style={[
-                        styles.optionText,
-                        y === draftYear && styles.optionTextSelected,
+                        dynamicStyles.optionText,
+                        y === draftYear && dynamicStyles.optionTextSelected,
                       ]}
                     >
                       {y}年
@@ -125,14 +189,14 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
                     key={m}
                     style={[
                       styles.option,
-                      m === draftMonth && styles.optionSelected,
+                      m === draftMonth && dynamicStyles.optionSelected,
                     ]}
                     onPress={() => setDraftMonth(m)}
                   >
                     <Text
                       style={[
-                        styles.optionText,
-                        m === draftMonth && styles.optionTextSelected,
+                        dynamicStyles.optionText,
+                        m === draftMonth && dynamicStyles.optionTextSelected,
                       ]}
                     >
                       {m}月
@@ -144,11 +208,11 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
 
             {/* 底部：左侧「本月」+ 右侧「确定」 */}
             <View style={styles.footerRow}>
-              <Pressable style={styles.thisMonthBtn} onPress={goThisMonth}>
-                <Text style={styles.thisMonthText}>本月</Text>
+              <Pressable style={dynamicStyles.thisMonthBtn} onPress={goThisMonth}>
+                <Text style={dynamicStyles.thisMonthText}>本月</Text>
               </Pressable>
-              <Pressable style={styles.confirmBtn} onPress={confirm}>
-                <Text style={styles.confirmText}>确定</Text>
+              <Pressable style={dynamicStyles.confirmBtn} onPress={confirm}>
+                <Text style={dynamicStyles.confirmText}>确定</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -159,39 +223,11 @@ export const DateFilterDropdown: React.FC<DateFilterDropdownProps> = ({
 };
 
 const styles = StyleSheet.create({
-  /* ---------- 胶囊按钮 ---------- */
-  btn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.XS,
-    paddingVertical: SPACING.XS + 2,
-    paddingHorizontal: SPACING.MD,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.FULL,
-  },
-  label: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
-
   /* ---------- Modal ---------- */
   touchableArea: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  card: {
-    width: 280,
-    maxHeight: 420,
-    backgroundColor: 'rgba(28, 30, 38, 0.95)',
-    borderRadius: BORDER_RADIUS.G2.LG,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    padding: SPACING.LG,
-    ...SHADOWS.LARGE,
   },
   pickerRow: {
     flexDirection: 'row',
@@ -210,17 +246,6 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.SM,
     alignItems: 'center',
   },
-  optionSelected: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  optionText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.SECONDARY,
-  },
-  optionTextSelected: {
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '600',
-  },
 
   /* ---------- 底部按钮行 ---------- */
   footerRow: {
@@ -228,27 +253,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: SPACING.MD,
-  },
-  thisMonthBtn: {
-    paddingVertical: SPACING.SM + 2,
-    paddingHorizontal: SPACING.LG,
-    borderRadius: BORDER_RADIUS.MD,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-  },
-  thisMonthText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    fontWeight: '600',
-    color: COLORS.TEXT.SECONDARY,
-  },
-  confirmBtn: {
-    paddingVertical: SPACING.SM + 2,
-    paddingHorizontal: SPACING.XL,
-    borderRadius: BORDER_RADIUS.MD,
-    backgroundColor: COLORS.PRIMARY,
-  },
-  confirmText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
 });

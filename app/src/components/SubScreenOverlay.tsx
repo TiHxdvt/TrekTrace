@@ -7,7 +7,7 @@
  * 用法：SubScreenOverlay.open('Profile') / SubScreenOverlay.close()
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Animated,
   Dimensions,
@@ -20,7 +20,7 @@ import { AccountPrivacyScreen } from '../screens/AccountPrivacyScreen';
 import { DataManagementScreen } from '../screens/DataManagementScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
 import { PermissionScreen } from '../screens/PermissionScreen';
-import { COLORS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -42,11 +42,20 @@ let _animateClose: ((cb?: () => void) => void) | null = null;
 const MOCK_NAV = { goBack: () => SubScreenOverlay.close() } as any;
 
 export const SubScreenOverlayRoot: React.FC = () => {
+  const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const [screen, setScreen] = useState<SubScreenName | null>(null);
   const isOpenRef = useRef(false);
   const startXRef = useRef(0);
   const translateX = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.BACKGROUND,
+      zIndex: 150,
+    },
+  }), [colors]);
 
   // 左边缘右滑关闭手势（只在起始点距左边缘 25px 内触发）
   const backGesture = useRef(
@@ -111,7 +120,7 @@ export const SubScreenOverlayRoot: React.FC = () => {
     <GestureDetector gesture={backGesture}>
       <Animated.View
         style={[
-          styles.overlay,
+          dynamicStyles.overlay,
           { transform: [{ translateX }] },
         ]}
         pointerEvents="auto"
@@ -121,14 +130,6 @@ export const SubScreenOverlayRoot: React.FC = () => {
     </GestureDetector>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.BACKGROUND,
-    zIndex: 150,
-  },
-});
 
 export const SubScreenOverlay = {
   isOpen: false,

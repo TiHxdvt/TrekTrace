@@ -2,7 +2,7 @@
  * 数据管理页面
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { dataService, DataSummary } from '../services/dataService';
@@ -34,8 +35,52 @@ function formatDuration(seconds: number): string {
 }
 
 export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ navigation }) => {
+  const { colors } = useTheme();
   const [summary, setSummary] = useState<DataSummary | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    summaryCard: {
+      width: '47%',
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.LG,
+      padding: SPACING.LG,
+      alignItems: 'center',
+      gap: SPACING.XS,
+    },
+    summaryValue: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XXL,
+      fontWeight: '700',
+      color: colors.TEXT.PRIMARY,
+    },
+    summaryLabel: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+    },
+    sectionTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      fontWeight: '500',
+      color: colors.TEXT.QUATERNARY,
+      marginBottom: SPACING.MD,
+      marginTop: SPACING.XXL,
+    },
+    card: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.LG,
+      paddingHorizontal: SPACING.LG,
+    },
+    itemTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.SECONDARY,
+    },
+    dangerText: {
+      color: colors.ERROR,
+    },
+  }), [colors]);
 
   const loadSummary = useCallback(async () => {
     try {
@@ -95,7 +140,7 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
       <FeatureScreenLayout>
         <FeatureHeader title="数据管理" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
-          <ActivityIndicator color={COLORS.PRIMARY} />
+          <ActivityIndicator color={colors.PRIMARY} />
         </View>
       </FeatureScreenLayout>
     );
@@ -107,37 +152,37 @@ export const DataManagementScreen: React.FC<{ navigation: NavProp }> = ({ naviga
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* 数据概览 */}
         <View style={styles.summaryGrid}>
-          <View style={styles.summaryCard}>
-            <IconGraphUp size={20} color={COLORS.PRIMARY} />
-            <Text style={styles.summaryValue}>{summary?.totalActivities ?? 0}</Text>
-            <Text style={styles.summaryLabel}>总活动</Text>
+          <View style={dynamicStyles.summaryCard}>
+            <IconGraphUp size={20} color={colors.PRIMARY} />
+            <Text style={dynamicStyles.summaryValue}>{summary?.totalActivities ?? 0}</Text>
+            <Text style={dynamicStyles.summaryLabel}>总活动</Text>
           </View>
-          <View style={styles.summaryCard}>
-            <IconBolt size={20} color={COLORS.SUCCESS} />
-            <Text style={styles.summaryValue}>{formatDistance(summary?.totalDistance ?? 0)}</Text>
-            <Text style={styles.summaryLabel}>总距离</Text>
+          <View style={dynamicStyles.summaryCard}>
+            <IconBolt size={20} color={colors.SUCCESS} />
+            <Text style={dynamicStyles.summaryValue}>{formatDistance(summary?.totalDistance ?? 0)}</Text>
+            <Text style={dynamicStyles.summaryLabel}>总距离</Text>
           </View>
-          <View style={styles.summaryCard}>
-            <IconFlame size={20} color={COLORS.WARNING} />
-            <Text style={styles.summaryValue}>{formatDuration(summary?.totalDuration ?? 0)}</Text>
-            <Text style={styles.summaryLabel}>总时长</Text>
+          <View style={dynamicStyles.summaryCard}>
+            <IconFlame size={20} color={colors.WARNING} />
+            <Text style={dynamicStyles.summaryValue}>{formatDuration(summary?.totalDuration ?? 0)}</Text>
+            <Text style={dynamicStyles.summaryLabel}>总时长</Text>
           </View>
-          <View style={styles.summaryCard}>
-            <IconFire size={20} color={COLORS.ERROR} />
-            <Text style={styles.summaryValue}>{((summary?.totalElevationGain ?? 0)).toFixed(0)} m</Text>
-            <Text style={styles.summaryLabel}>总爬升</Text>
+          <View style={dynamicStyles.summaryCard}>
+            <IconFire size={20} color={colors.ERROR} />
+            <Text style={dynamicStyles.summaryValue}>{((summary?.totalElevationGain ?? 0)).toFixed(0)} m</Text>
+            <Text style={dynamicStyles.summaryLabel}>总爬升</Text>
           </View>
         </View>
 
         {/* 数据操作 */}
-        <Text style={styles.sectionTitle}>数据操作</Text>
-        <View style={styles.card}>
+        <Text style={dynamicStyles.sectionTitle}>数据操作</Text>
+        <View style={dynamicStyles.card}>
           <SectionItem title="导出运动数据" onPress={handleExport} />
         </View>
 
         {/* 危险操作 */}
-        <Text style={[styles.sectionTitle, { color: COLORS.ERROR }]}>危险操作</Text>
-        <View style={styles.card}>
+        <Text style={[dynamicStyles.sectionTitle, { color: colors.ERROR }]}>危险操作</Text>
+        <View style={dynamicStyles.card}>
           <SectionItem title="删除全部活动" danger onPress={handleDeleteAll} />
         </View>
       </ScrollView>
@@ -149,12 +194,26 @@ const SectionItem: React.FC<{
   title: string;
   danger?: boolean;
   onPress: () => void;
-}> = ({ title, danger, onPress }) => (
-  <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.7}>
-    <Text style={[styles.itemTitle, danger && styles.dangerText]}>{title}</Text>
-    <IconAltArrowRight size={18} color={danger ? COLORS.ERROR : COLORS.TEXT.QUINARY} />
-  </TouchableOpacity>
-);
+}> = ({ title, danger, onPress }) => {
+  const { colors } = useTheme();
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    itemTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.SECONDARY,
+    },
+    dangerText: {
+      color: colors.ERROR,
+    },
+  }), [colors]);
+
+  return (
+    <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.7}>
+      <Text style={[dynamicStyles.itemTitle, danger && dynamicStyles.dangerText]}>{title}</Text>
+      <IconAltArrowRight size={18} color={danger ? colors.ERROR : colors.TEXT.QUINARY} />
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -166,50 +225,10 @@ const styles = StyleSheet.create({
     gap: SPACING.MD,
     marginTop: SPACING.LG,
   },
-  summaryCard: {
-    width: '47%',
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.LG,
-    padding: SPACING.LG,
-    alignItems: 'center',
-    gap: SPACING.XS,
-  },
-  summaryValue: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XXL,
-    fontWeight: '700',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  summaryLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    fontWeight: '500',
-    color: COLORS.TEXT.QUATERNARY,
-    marginBottom: SPACING.MD,
-    marginTop: SPACING.XXL,
-  },
-  card: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.LG,
-    paddingHorizontal: SPACING.LG,
-  },
   item: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: SPACING.LG,
-  },
-  itemTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    color: COLORS.TEXT.SECONDARY,
-  },
-  dangerText: {
-    color: COLORS.ERROR,
   },
 });

@@ -8,7 +8,8 @@
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { MapView, MapType, Polyline } from 'react-native-amap3d';
-import { COLORS, BORDER_RADIUS } from '../theme';
+import { BORDER_RADIUS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { IconLayersBold, IconPlaybackSpeedBold, IconWalkingBold } from './SolarIcons';
 import { haversineDistance } from '../utils/trackData';
 import { wgs84ToGcj02 } from '../utils/geo';
@@ -30,6 +31,7 @@ const SPEED_COLORS = ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'];
 const ELEVATION_COLORS = ['#3b82f6', '#06b6d4', '#22c55e', '#f97316', '#fbbf24'];
 
 export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
+  const { colors, isDarkMode } = useTheme();
   const mapViewRef = useRef<MapView>(null);
   const replayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const replayEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -212,15 +214,44 @@ export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
     }, REPLAY_INTERVAL);
   }, [coords, stopReplay]);
 
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      height: MAP_HEIGHT,
+      marginHorizontal: 20,
+      borderRadius: BORDER_RADIUS.MD,
+      overflow: 'hidden',
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    btn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.OVERLAY.BLUR_LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    styleLabelBg: {
+      backgroundColor: colors.OVERLAY.BLUR_LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      borderRadius: 6,
+      padding: 4,
+    },
+  }), [colors]);
+
   if (coords.length < 2 || !cameraTarget) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       <MapView
         ref={mapViewRef}
         style={StyleSheet.absoluteFillObject}
         pointerEvents="none"
-        mapType={MapType.Night}
+        mapType={isDarkMode ? MapType.Night : MapType.Standard}
         initialCameraPosition={{
           target: { latitude: cameraTarget.latitude, longitude: cameraTarget.longitude },
           zoom: cameraTarget.zoom,
@@ -249,7 +280,7 @@ export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
 
       {/* 左上角颜色条 */}
       <View style={styles.styleLabel} pointerEvents="none">
-        <View style={styles.styleLabelBg}>
+        <View style={dynamicStyles.styleLabelBg}>
           <View style={styles.styleGradientCol}>
             {(trailStyle === 'speed' ? SPEED_COLORS : ELEVATION_COLORS).map((c, i) => (
               <View key={i} style={[styles.styleGradSeg, { backgroundColor: c }]} />
@@ -265,25 +296,25 @@ export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
       <View style={styles.controls} pointerEvents="box-none">
         {/* 样式切换：速度 / 海拔 */}
         <Pressable
-          style={styles.btn}
+          style={dynamicStyles.btn}
           onPress={() => setTrailStyle(prev => prev === 'speed' ? 'elevation' : 'speed')}
           hitSlop={6}
         >
           {trailStyle === 'speed' ? (
-            <IconWalkingBold size={18} color={COLORS.TEXT.SECONDARY} />
+            <IconWalkingBold size={18} color={colors.TEXT.SECONDARY} />
           ) : (
-            <IconLayersBold size={18} color={COLORS.TEXT.SECONDARY} />
+            <IconLayersBold size={18} color={colors.TEXT.SECONDARY} />
           )}
         </Pressable>
         {/* 回放 */}
         <Pressable
-          style={styles.btn}
+          style={dynamicStyles.btn}
           onPress={replaying ? stopReplay : startReplay}
           hitSlop={6}
         >
           <IconPlaybackSpeedBold
             size={18}
-            color={replaying ? COLORS.PRIMARY : COLORS.TEXT.SECONDARY}
+            color={replaying ? colors.PRIMARY : colors.TEXT.SECONDARY}
           />
         </Pressable>
       </View>
@@ -292,31 +323,12 @@ export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    height: MAP_HEIGHT,
-    marginHorizontal: 20,
-    borderRadius: BORDER_RADIUS.MD,
-    overflow: 'hidden',
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-  },
   controls: {
     position: 'absolute',
     right: 8,
     top: 8,
     gap: 6,
     zIndex: 50,
-  },
-  btn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(28, 30, 38, 0.8)',
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   styleLabel: {
     position: 'absolute',
@@ -330,13 +342,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-  },
-  styleLabelBg: {
-    backgroundColor: 'rgba(28, 30, 38, 0.8)',
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    borderRadius: 6,
-    padding: 4,
   },
   styleGradientCol: {
     flexDirection: 'column',

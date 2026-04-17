@@ -5,7 +5,8 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { format, addDays, addWeeks, addMonths, addYears, startOfWeek } from 'date-fns';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import type { ViewMode } from './StatsTabSelector';
 
 /** 全局最早日期 */
@@ -86,6 +87,7 @@ export const StatsTimeRange: React.FC<StatsTimeRangeProps> = ({
   getHasData,
   totalRangeLabel,
 }) => {
+  const { colors } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const prevModeRef = useRef<ViewMode>(mode);
 
@@ -112,10 +114,27 @@ export const StatsTimeRange: React.FC<StatsTimeRangeProps> = ({
     });
   }, [selectedKey, items, mode]);
 
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    itemLabel: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '500',
+      color: colors.TEXT.TERTIARY,
+    },
+    itemLabelSelected: {
+      color: colors.PRIMARY,
+      fontWeight: '600',
+    },
+    totalLabel: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      fontWeight: '500',
+      color: colors.TEXT.SECONDARY,
+    },
+  }), [colors]);
+
   if (mode === 'total') {
     return (
       <View style={styles.totalContainer}>
-        <Text style={styles.totalLabel}>{totalRangeLabel ?? '今日为止'}</Text>
+        <Text style={dynamicStyles.totalLabel}>{totalRangeLabel ?? '今日为止'}</Text>
       </View>
     );
   }
@@ -139,8 +158,8 @@ export const StatsTimeRange: React.FC<StatsTimeRangeProps> = ({
             >
               <Text
                 style={[
-                  styles.itemLabel,
-                  isSelected && styles.itemLabelSelected,
+                  dynamicStyles.itemLabel,
+                  isSelected && dynamicStyles.itemLabelSelected,
                   !item.hasData && styles.itemLabelDisabled,
                 ]}
                 numberOfLines={1}
@@ -176,15 +195,6 @@ const styles = StyleSheet.create({
   },
   itemSelected: {
   },
-  itemLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '500',
-    color: COLORS.TEXT.TERTIARY,
-  },
-  itemLabelSelected: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
   itemLabelDisabled: {
     opacity: 0.3,
   },
@@ -192,10 +202,5 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  totalLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    fontWeight: '500',
-    color: COLORS.TEXT.SECONDARY,
   },
 });

@@ -8,7 +8,8 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { format, startOfWeek, addDays } from 'date-fns';
-import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
+import { TYPOGRAPHY, SPACING } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { FullScreenBlur } from '../components/FullScreenBlur';
 import { ActivityDetailSheet } from '../components/ActivityDetailSheet';
 import { IconChart } from '../components/SolarIcons';
@@ -43,6 +44,7 @@ function toActivityItem(dto: ActivityResponseDTO): ActivityItem {
 }
 
 export const StatsScreen: React.FC = () => {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   const [activities, setActivities] = useState<ActivityResponseDTO[]>([]);
@@ -54,6 +56,53 @@ export const StatsScreen: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('ALL');
   const [selectedActivity, setSelectedActivity] = useState<ActivityResponseDTO | null>(null);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.BACKGROUND,
+    },
+    glowOrb: {
+      position: 'absolute',
+      top: -40,
+      right: '20%',
+      width: 250,
+      height: 250,
+      borderRadius: 125,
+      backgroundColor: colors.GRADIENT.BLUE_LIGHT,
+    },
+    headerTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+      letterSpacing: -0.5,
+    },
+    loadingText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+    },
+    iconWrap: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: SPACING.XXL,
+    },
+    emptyTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XL,
+      fontWeight: '600',
+      color: colors.TEXT.SECONDARY,
+      marginBottom: SPACING.SM,
+    },
+    emptySubtitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      color: colors.TEXT.QUATERNARY,
+    },
+  }), [colors]);
 
   useFocusEffect(
     useCallback(() => {
@@ -236,16 +285,16 @@ export const StatsScreen: React.FC = () => {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       <View style={styles.ambientGlow} pointerEvents="none">
-        <View style={styles.glowOrb} />
+        <View style={dynamicStyles.glowOrb} />
       </View>
       <FullScreenBlur />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>数据统计</Text>
+          <Text style={dynamicStyles.headerTitle}>数据统计</Text>
           <StatsTypeFilter
             selected={typeFilter}
             onChange={setTypeFilter}
@@ -256,24 +305,24 @@ export const StatsScreen: React.FC = () => {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.PRIMARY} />
-          <Text style={styles.loadingText}>加载中...</Text>
+          <ActivityIndicator size="large" color={colors.PRIMARY} />
+          <Text style={dynamicStyles.loadingText}>加载中...</Text>
         </View>
       ) : error ? (
         <View style={styles.emptyState}>
-          <View style={styles.iconWrap}>
-            <IconChart size={48} color={COLORS.TEXT.QUATERNARY} />
+          <View style={dynamicStyles.iconWrap}>
+            <IconChart size={48} color={colors.TEXT.QUATERNARY} />
           </View>
-          <Text style={styles.emptyTitle}>{error}</Text>
-          <Text style={styles.emptySubtitle}>下拉刷新或检查网络连接</Text>
+          <Text style={dynamicStyles.emptyTitle}>{error}</Text>
+          <Text style={dynamicStyles.emptySubtitle}>下拉刷新或检查网络连接</Text>
         </View>
       ) : isEmpty ? (
         <View style={styles.emptyState}>
-          <View style={styles.iconWrap}>
-            <IconChart size={48} color={COLORS.TEXT.QUATERNARY} />
+          <View style={dynamicStyles.iconWrap}>
+            <IconChart size={48} color={colors.TEXT.QUATERNARY} />
           </View>
-          <Text style={styles.emptyTitle}>暂无数据</Text>
-          <Text style={styles.emptySubtitle}>完成一次运动后，数据会出现在这里</Text>
+          <Text style={dynamicStyles.emptyTitle}>暂无数据</Text>
+          <Text style={dynamicStyles.emptySubtitle}>完成一次运动后，数据会出现在这里</Text>
         </View>
       ) : (
         <View style={styles.body}>
@@ -350,14 +399,32 @@ function fmtH(s: number) { return String(Math.round(s / 360) / 10); }
 
 // ---- 内部组件：无背景概览行 ----
 function InlineSummary({ items }: { items: { value: string; label: string }[] }) {
+  const { colors } = useTheme();
+  const inlineDynamicStyles = useMemo(() => StyleSheet.create({
+    val: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.LG,
+      fontWeight: '700',
+      color: colors.TEXT.PRIMARY,
+    },
+    lbl: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+    },
+    sep: {
+      width: 1,
+      height: 28,
+      backgroundColor: colors.BORDER.LIGHT,
+    },
+  }), [colors]);
+
   return (
-    <View style={inlineStyles.row}>
+    <View style={inlineStaticStyles.row}>
       {items.map((item, i) => (
         <React.Fragment key={item.label}>
-          {i > 0 && <View style={inlineStyles.sep} />}
-          <View style={inlineStyles.cell}>
-            <Text style={inlineStyles.val}>{item.value}</Text>
-            <Text style={inlineStyles.lbl}>{item.label}</Text>
+          {i > 0 && <View style={inlineDynamicStyles.sep} />}
+          <View style={inlineStaticStyles.cell}>
+            <Text style={inlineDynamicStyles.val}>{item.value}</Text>
+            <Text style={inlineDynamicStyles.lbl}>{item.label}</Text>
           </View>
         </React.Fragment>
       ))}
@@ -365,7 +432,7 @@ function InlineSummary({ items }: { items: { value: string; label: string }[] })
   );
 }
 
-const inlineStyles = StyleSheet.create({
+const inlineStaticStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -376,40 +443,13 @@ const inlineStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
-  val: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-    fontWeight: '700',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  lbl: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  sep: {
-    width: 1,
-    height: 28,
-    backgroundColor: COLORS.BORDER.LIGHT,
-  },
 });
 
 // ---- 主样式 ----
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
-  },
   ambientGlow: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-  },
-  glowOrb: {
-    position: 'absolute',
-    top: -40,
-    right: '20%',
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: COLORS.GRADIENT.BLUE_LIGHT,
   },
   header: {
     paddingHorizontal: SPACING.XL,
@@ -420,12 +460,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-    letterSpacing: -0.5,
   },
   loadingContainer: {
     flex: 1,
@@ -440,31 +474,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
     paddingBottom: 120,
-  },
-  iconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.XXL,
-  },
-  emptyTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XL,
-    fontWeight: '600',
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: SPACING.SM,
-  },
-  emptySubtitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  loadingText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
   },
   body: {
     flex: 1,

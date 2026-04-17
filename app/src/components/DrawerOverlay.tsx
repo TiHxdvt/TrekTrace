@@ -9,7 +9,7 @@
  *   DrawerOverlay.close(callback)   — 关闭
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,7 @@ import {
   InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
+import { TYPOGRAPHY, SPACING } from '../theme';
 import { storageService } from '../services/storageService';
 import { Dialog } from '../components/Dialog';
 import { Avatar } from '../components/Avatar';
@@ -59,8 +59,35 @@ const DrawerContent: React.FC = () => {
   const [userAccount, setUserAccount] = useState<number | null>(null);
   const [userPhone, setUserPhone] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { isDarkMode, toggleDarkMode, colors } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    drawer: {
+      position: 'absolute',
+      left: 0, top: 0, bottom: 0,
+      width: SCREEN_WIDTH,
+      backgroundColor: colors.BACKGROUND,
+    },
+    userName: { fontSize: TYPOGRAPHY.FONT_SIZE.XXL, fontWeight: '700', color: colors.TEXT.PRIMARY },
+    userAccount: { fontSize: TYPOGRAPHY.FONT_SIZE.SM, color: colors.TEXT.QUATERNARY },
+    accountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    sectionTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE, fontWeight: '500',
+      color: colors.TEXT.QUATERNARY, marginBottom: SPACING.MD, marginTop: SPACING.SM,
+    },
+    menuIconWrap: {
+      width: 36, height: 36, borderRadius: 18,
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      justifyContent: 'center', alignItems: 'center',
+    },
+    menuLabel: { flex: 1, fontSize: TYPOGRAPHY.FONT_SIZE.MD, fontWeight: '500', color: colors.TEXT.SECONDARY },
+    logoutBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: SPACING.SM, paddingVertical: SPACING.MD,
+    },
+    logoutText: { fontSize: TYPOGRAPHY.FONT_SIZE.MD, fontWeight: '500', color: colors.ERROR },
+  }), [colors]);
 
   const loadUserData = useCallback(async () => {
     try {
@@ -109,11 +136,11 @@ const DrawerContent: React.FC = () => {
         <View style={styles.userArea}>
           <Avatar uri={avatarUrl} size={64} />
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{userName}</Text>
+            <Text style={dynamicStyles.userName}>{userName}</Text>
             {userAccount ? (
-              <View style={styles.accountRow}>
-                <Text style={styles.userAccount}>途迹账号：{userAccount}</Text>
-                <IconQrCode size={14} color={COLORS.TEXT.QUATERNARY} />
+              <View style={dynamicStyles.accountRow}>
+                <Text style={dynamicStyles.userAccount}>途迹账号：{userAccount}</Text>
+                <IconQrCode size={14} color={colors.TEXT.QUATERNARY} />
               </View>
             ) : null}
           </View>
@@ -123,68 +150,68 @@ const DrawerContent: React.FC = () => {
           activeOpacity={0.7}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <IconCloseCircle size={28} color={COLORS.TEXT.TERTIARY} />
+          <IconCloseCircle size={28} color={colors.TEXT.TERTIARY} />
         </TouchableOpacity>
       </View>
 
       {/* 菜单列表 */}
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>账户设置</Text>
+        <Text style={dynamicStyles.sectionTitle}>账户设置</Text>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => go('Notification')} activeOpacity={0.7}>
-          <View style={styles.menuIconWrap}><IconBell size={22} color={COLORS.TEXT.SECONDARY} /></View>
-          <Text style={styles.menuLabel}>系统通知</Text>
+          <View style={dynamicStyles.menuIconWrap}><IconBell size={22} color={colors.TEXT.SECONDARY} /></View>
+          <Text style={dynamicStyles.menuLabel}>系统通知</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => go('Profile')} activeOpacity={0.7}>
-          <View style={styles.menuIconWrap}><IconUserId size={22} color={COLORS.TEXT.SECONDARY} /></View>
-          <Text style={styles.menuLabel}>个人信息</Text>
-          <IconAltArrowRight size={20} color={COLORS.TEXT.QUINARY} />
+          <View style={dynamicStyles.menuIconWrap}><IconUserId size={22} color={colors.TEXT.SECONDARY} /></View>
+          <Text style={dynamicStyles.menuLabel}>个人信息</Text>
+          <IconAltArrowRight size={20} color={colors.TEXT.QUINARY} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => go('AccountPrivacy')} activeOpacity={0.7}>
-          <View style={styles.menuIconWrap}><IconShieldCheck size={22} color={COLORS.TEXT.SECONDARY} /></View>
-          <Text style={styles.menuLabel}>账号隐私</Text>
-          <IconAltArrowRight size={20} color={COLORS.TEXT.QUINARY} />
+          <View style={dynamicStyles.menuIconWrap}><IconShieldCheck size={22} color={colors.TEXT.SECONDARY} /></View>
+          <Text style={dynamicStyles.menuLabel}>账号隐私</Text>
+          <IconAltArrowRight size={20} color={colors.TEXT.QUINARY} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => go('Friends')} activeOpacity={0.7}>
-          <View style={styles.menuIconWrap}><IconUsersGroupRounded size={22} color={COLORS.TEXT.SECONDARY} /></View>
-          <Text style={styles.menuLabel}>同行好友</Text>
-          <IconAltArrowRight size={20} color={COLORS.TEXT.QUINARY} />
+          <View style={dynamicStyles.menuIconWrap}><IconUsersGroupRounded size={22} color={colors.TEXT.SECONDARY} /></View>
+          <Text style={dynamicStyles.menuLabel}>同行好友</Text>
+          <IconAltArrowRight size={20} color={colors.TEXT.QUINARY} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => go('DataManagement')} activeOpacity={0.7}>
-          <View style={styles.menuIconWrap}><IconGraphUp size={22} color={COLORS.TEXT.SECONDARY} /></View>
-          <Text style={styles.menuLabel}>数据管理</Text>
-          <IconAltArrowRight size={20} color={COLORS.TEXT.QUINARY} />
+          <View style={dynamicStyles.menuIconWrap}><IconGraphUp size={22} color={colors.TEXT.SECONDARY} /></View>
+          <Text style={dynamicStyles.menuLabel}>数据管理</Text>
+          <IconAltArrowRight size={20} color={colors.TEXT.QUINARY} />
         </TouchableOpacity>
 
-        <Text style={[styles.sectionTitle, { marginTop: SPACING.XXL }]}>更多</Text>
+        <Text style={[dynamicStyles.sectionTitle, { marginTop: SPACING.XXL }]}>更多</Text>
 
         <View style={styles.menuItem}>
-          <View style={styles.menuIconWrap}><IconMoonStars size={22} color={COLORS.TEXT.SECONDARY} /></View>
-          <Text style={styles.menuLabel}>深色模式</Text>
+          <View style={dynamicStyles.menuIconWrap}><IconMoonStars size={22} color={colors.TEXT.SECONDARY} /></View>
+          <Text style={dynamicStyles.menuLabel}>深色模式</Text>
           <Switch
             value={isDarkMode}
             onValueChange={toggleDarkMode}
-            trackColor={{ false: COLORS.OVERLAY.MEDIUM, true: COLORS.PRIMARY }}
-            thumbColor={COLORS.TEXT.PRIMARY}
+            trackColor={{ false: colors.OVERLAY.MEDIUM, true: colors.PRIMARY }}
+            thumbColor={colors.TEXT.PRIMARY}
           />
         </View>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => go('Permission')} activeOpacity={0.7}>
-          <View style={styles.menuIconWrap}><IconSettingsMinimalistic size={22} color={COLORS.TEXT.SECONDARY} /></View>
-          <Text style={styles.menuLabel}>系统权限</Text>
-          <IconAltArrowRight size={20} color={COLORS.TEXT.QUINARY} />
+          <View style={dynamicStyles.menuIconWrap}><IconSettingsMinimalistic size={22} color={colors.TEXT.SECONDARY} /></View>
+          <Text style={dynamicStyles.menuLabel}>系统权限</Text>
+          <IconAltArrowRight size={20} color={colors.TEXT.QUINARY} />
         </TouchableOpacity>
       </ScrollView>
 
       {/* 底部退出 */}
       <View style={[styles.bottomArea, { paddingBottom: insets.bottom + SPACING.XXL }]}>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
-          <IconLogout size={20} color={COLORS.ERROR} />
-          <Text style={styles.logoutText}>退出登录</Text>
+        <TouchableOpacity style={dynamicStyles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
+          <IconLogout size={20} color={colors.ERROR} />
+          <Text style={dynamicStyles.logoutText}>退出登录</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -194,11 +221,20 @@ const DrawerContent: React.FC = () => {
 // ─── Root 组件 ───
 
 export const DrawerOverlayRoot: React.FC = () => {
+  const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const isOpenRef = useRef(false);
   const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    drawer: {
+      position: 'absolute',
+      left: 0, top: 0, bottom: 0,
+      width: SCREEN_WIDTH,
+      backgroundColor: colors.BACKGROUND,
+    },
+  }), [colors]);
 
   // iOS 风格弹簧动画参数
   const springConfig = {
@@ -235,7 +271,7 @@ export const DrawerOverlayRoot: React.FC = () => {
       <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]} pointerEvents="auto">
         <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => DrawerOverlay.close()} />
       </Animated.View>
-      <Animated.View style={[styles.drawer, { transform: [{ translateX }] }]} pointerEvents="auto">
+      <Animated.View style={[dynamicStyles.drawer, { transform: [{ translateX }] }]} pointerEvents="auto">
         <DrawerContent />
       </Animated.View>
     </View>
@@ -270,12 +306,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  drawer: {
-    position: 'absolute',
-    left: 0, top: 0, bottom: 0,
-    width: SCREEN_WIDTH,
-    backgroundColor: COLORS.BACKGROUND,
-  },
   panel: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -286,31 +316,13 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.XL,
   },
   userArea: { flexDirection: 'row', alignItems: 'center', gap: SPACING.LG, flex: 1 },
-  userName: { fontSize: TYPOGRAPHY.FONT_SIZE.XXL, fontWeight: '700', color: COLORS.TEXT.PRIMARY },
-  userAccount: { fontSize: TYPOGRAPHY.FONT_SIZE.SM, color: COLORS.TEXT.QUATERNARY },
   userInfo: { flex: 1, gap: 4 },
-  accountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  userPhone: { fontSize: TYPOGRAPHY.FONT_SIZE.BASE, color: COLORS.TEXT.TERTIARY },
+  userPhone: { fontSize: TYPOGRAPHY.FONT_SIZE.BASE },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE, fontWeight: '500',
-    color: COLORS.TEXT.QUATERNARY, marginBottom: SPACING.MD, marginTop: SPACING.SM,
-  },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.LG,
     paddingVertical: SPACING.LG, paddingHorizontal: SPACING.SM,
   },
-  menuIconWrap: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  menuLabel: { flex: 1, fontSize: TYPOGRAPHY.FONT_SIZE.MD, fontWeight: '500', color: COLORS.TEXT.SECONDARY },
   bottomArea: { paddingHorizontal: SPACING.XL },
-  logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: SPACING.SM, paddingVertical: SPACING.MD,
-  },
-  logoutText: { fontSize: TYPOGRAPHY.FONT_SIZE.MD, fontWeight: '500', color: COLORS.ERROR },
 });

@@ -3,7 +3,7 @@
  * 遵循玻璃拟态设计风格
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   TouchableOpacity,
   Text,
@@ -12,7 +12,8 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline';
 type ButtonSize = 'small' | 'medium' | 'large';
@@ -38,15 +39,50 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const { colors } = useTheme();
+
+  const dynamicStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        // 主按钮（蓝色渐变）
+        buttonPrimary: {
+          backgroundColor: colors.PRIMARY,
+          ...SHADOWS.PRIMARY,
+        },
+
+        // 次要按钮（半透明）
+        buttonSecondary: {
+          backgroundColor: colors.OVERLAY.LIGHT,
+          borderWidth: 1,
+          borderColor: colors.BORDER.LIGHT,
+        },
+
+        // 轮廓按钮
+        buttonOutline: {
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderColor: colors.BORDER.HEAVY,
+        },
+
+        textPrimary: {
+          color: '#ffffff',
+        },
+        textSecondary: {
+          color: colors.TEXT.SECONDARY,
+        },
+      }),
+    [colors],
+  );
+
   const getButtonStyle = (): ViewStyle[] => {
     const baseStyle: ViewStyle[] = [styles.button, styles[`button_${size}`]];
 
     if (variant === 'primary') {
-      baseStyle.push(styles.buttonPrimary);
+      baseStyle.push(dynamicStyles.buttonPrimary);
     } else if (variant === 'secondary') {
-      baseStyle.push(styles.buttonSecondary);
+      baseStyle.push(dynamicStyles.buttonSecondary);
     } else if (variant === 'outline') {
-      baseStyle.push(styles.buttonOutline);
+      baseStyle.push(dynamicStyles.buttonOutline);
     }
 
     if (disabled || loading) {
@@ -64,9 +100,9 @@ export const Button: React.FC<ButtonProps> = ({
     const baseStyle: TextStyle[] = [styles.text, styles[`text_${size}`]];
 
     if (variant === 'primary') {
-      baseStyle.push(styles.textPrimary);
+      baseStyle.push(dynamicStyles.textPrimary);
     } else if (variant === 'secondary' || variant === 'outline') {
-      baseStyle.push(styles.textSecondary);
+      baseStyle.push(dynamicStyles.textSecondary);
     }
 
     if (textStyle) {
@@ -85,7 +121,7 @@ export const Button: React.FC<ButtonProps> = ({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? COLORS.TEXT.PRIMARY : COLORS.PRIMARY}
+          color={variant === 'primary' ? '#ffffff' : colors.PRIMARY}
           size="small"
         />
       ) : (
@@ -119,26 +155,6 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
 
-  // 主按钮（蓝色渐变）
-  buttonPrimary: {
-    backgroundColor: COLORS.PRIMARY,
-    ...SHADOWS.PRIMARY,
-  },
-
-  // 次要按钮（半透明）
-  buttonSecondary: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-  },
-
-  // 轮廓按钮
-  buttonOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.HEAVY,
-  },
-
   // 禁用状态
   buttonDisabled: {
     opacity: 0.5,
@@ -156,11 +172,5 @@ const styles = StyleSheet.create({
   },
   text_large: {
     fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-  },
-  textPrimary: {
-    color: COLORS.TEXT.PRIMARY,
-  },
-  textSecondary: {
-    color: COLORS.TEXT.SECONDARY,
   },
 });

@@ -17,7 +17,8 @@ import { MessagesScreen } from '../screens/MessagesScreen';
 import { MainTabParamList } from './types';
 import { storageService, authServiceEvents } from '../services/storageService';
 import { websocketService } from '../services/websocketService';
-import { COLORS, SHADOWS, ANIMATION } from '../theme';
+import { SHADOWS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   IconMapPoint,
   IconPlane,
@@ -42,11 +43,38 @@ const MainTab = createBottomTabNavigator<MainTabParamList>();
 
 // 自定义浮空 Tab Bar - 先动画再切换页面
 const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
+  const { colors, isDarkMode } = useTheme();
   const buttonXs = useRef<number[]>([]);
   const indicatorTranslateX = useRef(new Animated.Value(0)).current;
   const layoutReady = useRef(false);
   // 点击触发的动画进行中时为 true，跳过 useEffect 的重复动画
   const pressAnimating = useRef(false);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    barOuter: {
+      width: '85%',
+      height: 64,
+      borderRadius: 32,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      overflow: 'hidden',
+      ...SHADOWS.LARGE,
+    },
+    indicator: {
+      position: 'absolute',
+      left: 0,
+      top: 8,
+      width: BUTTON_SIZE,
+      height: BUTTON_SIZE,
+      borderRadius: BUTTON_SIZE / 2,
+      backgroundColor: colors.PRIMARY,
+      shadowColor: colors.PRIMARY,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+  }), [colors]);
 
   // 滑动指示器到指定 tab 的弹簧动画
   const animateIndicatorTo = useCallback((index: number, callback?: () => void) => {
@@ -108,7 +136,7 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
     <View style={floatingStyles.container}>
       <GestureDetector gesture={panGesture}>
         <View
-          style={floatingStyles.barOuter}
+          style={dynamicStyles.barOuter}
           collapsable={false}
           onLayout={(e) => {
             barLayoutRef.current = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
@@ -117,15 +145,15 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={20}
-            overlayColor={COLORS.OVERLAY.NAV}
-            blurType="dark"
+            overlayColor={colors.OVERLAY.NAV}
+            blurType={isDarkMode ? 'dark' : 'light'}
             blurAmount={20}
           />
           <View style={floatingStyles.barContent}>
             {/* 滑动指示器：活跃 tab 的背景圆 */}
             <Animated.View
               style={[
-                floatingStyles.indicator,
+                dynamicStyles.indicator,
                 {
                   transform: [{ translateX: indicatorTranslateX }],
                 },
@@ -173,7 +201,7 @@ const FloatingTabBar = ({ state, navigation, descriptors }: any) => {
                 >
                   <config.Icon
                     size={20}
-                    color={isFocused ? COLORS.TEXT.PRIMARY : COLORS.TEXT.TERTIARY}
+                    color={isFocused ? '#ffffff' : colors.TEXT.TERTIARY}
                   />
                 </TouchableOpacity>
               );
@@ -194,37 +222,12 @@ const floatingStyles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 30,
   },
-  barOuter: {
-    width: '85%',
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    overflow: 'hidden',
-    ...SHADOWS.LARGE,
-  },
   barContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: BAR_PADDING,
     height: 64,
-  },
-  // 滑动指示器：和按钮同尺寸，绝对定位在 barContent 左上角
-  // translateX = 按钮的 layout.x，所以 left=0
-  indicator: {
-    position: 'absolute',
-    left: 0,
-    top: 8,
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
-    backgroundColor: COLORS.PRIMARY,
-    shadowColor: COLORS.PRIMARY,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   button: {
     width: BUTTON_SIZE,
@@ -236,6 +239,7 @@ const floatingStyles = StyleSheet.create({
 });
 
 export const AppNavigator: React.FC = () => {
+  const { colors } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
 
   const checkAuthStatus = async () => {
@@ -262,8 +266,8 @@ export const AppNavigator: React.FC = () => {
 
   if (isAuthenticated === null) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={COLORS.PRIMARY} />
+      <View style={[styles.loading, { backgroundColor: colors.BACKGROUND }]}>
+        <ActivityIndicator color={colors.PRIMARY} />
       </View>
     );
   }
@@ -296,6 +300,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.BACKGROUND,
   },
 });

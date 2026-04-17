@@ -3,7 +3,7 @@
  * 提供命令式 Dialog.show() API，替代 Alert.alert
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -12,7 +12,8 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 export interface DialogButton {
   text: string;
@@ -46,12 +47,69 @@ export const Dialog = {
 };
 
 export const DialogRoot: React.FC = () => {
+  const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const [config, setConfig] = useState<DialogConfig>({
     title: '',
     message: '',
     buttons: [DEFAULT_BUTTON],
   });
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    card: {
+      width: '100%',
+      maxWidth: 320,
+      backgroundColor: colors.BACKGROUND,
+      borderRadius: BORDER_RADIUS.G2.LG,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      padding: SPACING.XXL,
+    },
+    title: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.LG,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+      marginBottom: SPACING.SM,
+      textAlign: 'center',
+    },
+    message: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      color: colors.TEXT.SECONDARY,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: SPACING.XXL,
+    },
+    button: {
+      paddingVertical: SPACING.SM,
+      paddingHorizontal: SPACING.LG,
+      borderRadius: BORDER_RADIUS.MD,
+      backgroundColor: colors.PRIMARY,
+      minWidth: 64,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    buttonCancel: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    buttonDestructive: {
+      backgroundColor: colors.ERROR_OVERLAY.BUTTON_BG,
+      borderWidth: 1,
+      borderColor: colors.ERROR_OVERLAY.BUTTON_BORDER,
+    },
+    buttonText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
+    buttonTextCancel: {
+      color: colors.TEXT.TERTIARY,
+    },
+    buttonTextDestructive: {
+      color: colors.ERROR,
+    },
+  }), [colors]);
 
   const handleShow = useCallback((newConfig: DialogConfig) => {
     setConfig(newConfig);
@@ -89,15 +147,15 @@ export const DialogRoot: React.FC = () => {
       onRequestClose={handleBackdropPress}
     >
       <Pressable style={styles.overlay} onPress={handleBackdropPress}>
-        <Pressable onPress={() => {}} style={styles.card}>
+        <Pressable onPress={() => {}} style={dynamicStyles.card}>
           {/* Title */}
           {config.title ? (
-            <Text style={styles.title}>{config.title}</Text>
+            <Text style={dynamicStyles.title}>{config.title}</Text>
           ) : null}
 
           {/* Message */}
           {config.message ? (
-            <Text style={styles.message}>{config.message}</Text>
+            <Text style={dynamicStyles.message}>{config.message}</Text>
           ) : null}
 
           {/* Buttons */}
@@ -106,18 +164,18 @@ export const DialogRoot: React.FC = () => {
               <TouchableOpacity
                 key={index}
                 style={[
-                  styles.button,
-                  button.style === 'cancel' && styles.buttonCancel,
-                  button.style === 'destructive' && styles.buttonDestructive,
+                  dynamicStyles.button,
+                  button.style === 'cancel' && dynamicStyles.buttonCancel,
+                  button.style === 'destructive' && dynamicStyles.buttonDestructive,
                 ]}
                 onPress={() => handleButtonPress(button)}
                 activeOpacity={0.7}
               >
                 <Text
                   style={[
-                    styles.buttonText,
-                    button.style === 'cancel' && styles.buttonTextCancel,
-                    button.style === 'destructive' && styles.buttonTextDestructive,
+                    dynamicStyles.buttonText,
+                    button.style === 'cancel' && dynamicStyles.buttonTextCancel,
+                    button.style === 'destructive' && dynamicStyles.buttonTextDestructive,
                   ]}
                 >
                   {button.text}
@@ -139,62 +197,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SPACING.XXL,
   },
-  card: {
-    width: '100%',
-    maxWidth: 320,
-    backgroundColor: COLORS.BACKGROUND,
-    borderRadius: BORDER_RADIUS.G2.LG,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    padding: SPACING.XXL,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: SPACING.SM,
-    textAlign: 'center',
-  },
-  message: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.SECONDARY,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: SPACING.XXL,
-  },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: SPACING.SM,
-  },
-  button: {
-    paddingVertical: SPACING.SM,
-    paddingHorizontal: SPACING.LG,
-    borderRadius: BORDER_RADIUS.MD,
-    backgroundColor: COLORS.PRIMARY,
-    minWidth: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonCancel: {
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-  },
-  buttonDestructive: {
-    backgroundColor: COLORS.ERROR_OVERLAY.BUTTON_BG,
-    borderWidth: 1,
-    borderColor: COLORS.ERROR_OVERLAY.BUTTON_BORDER,
-  },
-  buttonText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  buttonTextCancel: {
-    color: COLORS.TEXT.TERTIARY,
-  },
-  buttonTextDestructive: {
-    color: COLORS.ERROR,
   },
 });

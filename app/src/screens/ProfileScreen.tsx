@@ -15,7 +15,8 @@ import {
   PermissionsAndroid,
 } from 'react-native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { userService, ProfileData } from '../services/userService';
@@ -75,12 +76,68 @@ function getCooldownDesc(updatedAt: string | null | undefined): string | null {
 }
 
 export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation }) => {
+  const { colors } = useTheme();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [nickname, setNickname] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    sectionTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      fontWeight: '500',
+      color: colors.TEXT.QUATERNARY,
+      marginBottom: SPACING.MD,
+      marginTop: SPACING.SM,
+    },
+    card: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.LG,
+      paddingHorizontal: SPACING.LG,
+    },
+    input: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      borderRadius: BORDER_RADIUS.MD,
+      paddingHorizontal: SPACING.LG,
+      paddingVertical: SPACING.MD,
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.PRIMARY,
+    },
+    cooldownText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.WARNING,
+    },
+    itemTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.SECONDARY,
+    },
+    itemValue: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.BORDER.LIGHT,
+    },
+    saveBtn: {
+      backgroundColor: colors.PRIMARY,
+      borderRadius: BORDER_RADIUS.LG,
+      paddingVertical: SPACING.LG,
+      alignItems: 'center',
+      marginTop: SPACING.XXL,
+    },
+    saveBtnText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
+  }), [colors]);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -193,7 +250,7 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
       <FeatureScreenLayout>
         <FeatureHeader title="个人信息" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
-          <ActivityIndicator color={COLORS.PRIMARY} />
+          <ActivityIndicator color={colors.PRIMARY} />
         </View>
       </FeatureScreenLayout>
     );
@@ -209,46 +266,46 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
         </View>
 
         {/* 基本信息 */}
-        <Text style={styles.sectionTitle}>基本信息</Text>
-        <View style={styles.card}>
+        <Text style={dynamicStyles.sectionTitle}>基本信息</Text>
+        <View style={dynamicStyles.card}>
           {/* 昵称（可编辑） */}
           <View style={styles.editSection}>
             <View style={styles.editLabelRow}>
-              <Text style={styles.itemTitle}>昵称</Text>
-              {cooldownDesc && <Text style={styles.cooldownText}>{cooldownDesc}</Text>}
+              <Text style={dynamicStyles.itemTitle}>昵称</Text>
+              {cooldownDesc && <Text style={dynamicStyles.cooldownText}>{cooldownDesc}</Text>}
             </View>
             <TextInput
-              style={styles.input}
+              style={dynamicStyles.input}
               value={nickname}
               onChangeText={(text) => setNickname(truncateToWidth(text, NICKNAME_MAX_LENGTH))}
               placeholder="中文、字母、数字、下划线，最长7个中文"
-              placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+              placeholderTextColor={colors.TEXT.PLACEHOLDER}
               editable={!cooldownDesc}
             />
           </View>
 
-          <View style={styles.divider} />
+          <View style={dynamicStyles.divider} />
 
           {/* 账号 */}
           <View style={styles.item}>
-            <Text style={styles.itemTitle}>途迹账号</Text>
-            <Text style={styles.itemValue}>{profile?.account != null ? profile.account : '-'}</Text>
+            <Text style={dynamicStyles.itemTitle}>途迹账号</Text>
+            <Text style={dynamicStyles.itemValue}>{profile?.account != null ? profile.account : '-'}</Text>
           </View>
 
-          <View style={styles.divider} />
+          <View style={dynamicStyles.divider} />
 
           {/* 手机号 */}
           <View style={styles.item}>
-            <Text style={styles.itemTitle}>手机号</Text>
-            <Text style={styles.itemValue}>{profile?.phone || '-'}</Text>
+            <Text style={dynamicStyles.itemTitle}>手机号</Text>
+            <Text style={dynamicStyles.itemValue}>{profile?.phone || '-'}</Text>
           </View>
 
-          <View style={styles.divider} />
+          <View style={dynamicStyles.divider} />
 
           {/* 注册时间 */}
           <View style={styles.item}>
-            <Text style={styles.itemTitle}>注册时间</Text>
-            <Text style={styles.itemValue}>
+            <Text style={dynamicStyles.itemTitle}>注册时间</Text>
+            <Text style={dynamicStyles.itemValue}>
               {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('zh-CN') : '-'}
             </Text>
           </View>
@@ -256,12 +313,12 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
 
         {/* Save button */}
         <TouchableOpacity
-          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+          style={[dynamicStyles.saveBtn, saving && styles.saveBtnDisabled]}
           onPress={handleSave}
           disabled={saving}
           activeOpacity={0.7}
         >
-          <Text style={styles.saveBtnText}>{saving ? '保存中...' : '保存'}</Text>
+          <Text style={dynamicStyles.saveBtnText}>{saving ? '保存中...' : '保存'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </FeatureScreenLayout>
@@ -273,20 +330,6 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },
   avatarSection: { alignItems: 'center', marginVertical: SPACING.XXL },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    fontWeight: '500',
-    color: COLORS.TEXT.QUATERNARY,
-    marginBottom: SPACING.MD,
-    marginTop: SPACING.SM,
-  },
-  card: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.LG,
-    paddingHorizontal: SPACING.LG,
-  },
   editSection: {
     paddingVertical: SPACING.LG,
   },
@@ -296,49 +339,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.SM,
   },
-  input: {
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    borderRadius: BORDER_RADIUS.MD,
-    paddingHorizontal: SPACING.LG,
-    paddingVertical: SPACING.MD,
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  cooldownText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.WARNING,
-  },
   item: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: SPACING.LG,
   },
-  itemTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    color: COLORS.TEXT.SECONDARY,
-  },
-  itemValue: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.BORDER.LIGHT,
-  },
-  saveBtn: {
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: BORDER_RADIUS.LG,
-    paddingVertical: SPACING.LG,
-    alignItems: 'center',
-    marginTop: SPACING.XXL,
-  },
   saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
 });

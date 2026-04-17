@@ -3,7 +3,7 @@
  * 支持验证码登录和密码登录两种模式
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,8 @@ import { IconEyeClosed, IconEyeScan } from '../components/SolarIcons';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
 import { saveToken } from '../services/api';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 type LoginMode = 'sms' | 'password';
 
@@ -32,6 +33,8 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+  const { colors, isDarkMode } = useTheme();
+
   // 登录模式
   const [loginMode, setLoginMode] = useState<LoginMode>('sms');
 
@@ -56,6 +59,129 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [codeError, setCodeError] = useState('');
   const [accountError, setAccountError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.BACKGROUND,
+    },
+    glowBlue: {
+      top: -100,
+      left: 50,
+      width: 300,
+      height: 300,
+      backgroundColor: colors.GRADIENT.BLUE,
+      opacity: 0.8,
+    },
+    glowPurple: {
+      bottom: -50,
+      right: -50,
+      width: 350,
+      height: 350,
+      backgroundColor: colors.GRADIENT.PURPLE,
+    },
+    glowPink: {
+      top: '40%',
+      left: '50%',
+      marginLeft: -150,
+      width: 300,
+      height: 300,
+      backgroundColor: colors.GRADIENT.PINK_MID,
+    },
+    formTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+      marginBottom: SPACING.SM,
+      letterSpacing: -0.5,
+    },
+    formSubtitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      color: colors.TEXT.TERTIARY,
+      fontWeight: '400',
+    },
+    switchModeText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+    },
+    switchModeLink: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.PRIMARY,
+      fontWeight: '600',
+    },
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      borderRadius: BORDER_RADIUS.LG,
+      paddingHorizontal: SPACING.LG,
+      height: 48,
+    },
+    inputError: {
+      borderColor: colors.ERROR_OVERLAY.BORDER,
+      backgroundColor: colors.ERROR_OVERLAY.BACKGROUND,
+    },
+    inputPrefix: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.TERTIARY,
+      fontWeight: '500',
+    },
+    inputDivider: {
+      width: 1,
+      height: 20,
+      backgroundColor: colors.BORDER.MEDIUM,
+      marginHorizontal: SPACING.MD,
+    },
+    input: {
+      flex: 1,
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.PRIMARY,
+      fontWeight: '500',
+    },
+    errorText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.ERROR,
+      marginTop: 6,
+      marginLeft: SPACING.XS,
+    },
+    forgotPasswordText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.PRIMARY_LIGHT,
+      fontWeight: '500',
+    },
+    autoRegisterHint: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUINARY,
+      textAlign: 'center',
+      marginBottom: SPACING.LG,
+    },
+    socialIconWrapper: {
+      width: 48,
+      height: 48,
+      borderRadius: BORDER_RADIUS.FULL,
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    socialIcon: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.LG,
+      fontWeight: '600',
+      color: colors.TEXT.TERTIARY,
+    },
+    terms: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+      color: colors.TEXT.QUINARY,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+    termsLink: {
+      color: colors.PRIMARY_LIGHT,
+    },
+  }), [colors]);
 
   // 倒计时逻辑 — 基于绝对时间戳，后台回来也能正确显示剩余时间
   const [countdownActive, setCountdownActive] = useState(false);
@@ -231,14 +357,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.BACKGROUND} />
+    <View style={dynamicStyles.container}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.BACKGROUND} />
 
       {/* Background Glow Effects */}
       <View style={styles.backgroundGlow}>
-        <View style={[styles.glowCircle, styles.glowBlue]} />
-        <View style={[styles.glowCircle, styles.glowPurple]} />
-        <View style={[styles.glowCircle, styles.glowPink]} />
+        <View style={[styles.glowCircle, dynamicStyles.glowBlue]} />
+        <View style={[styles.glowCircle, dynamicStyles.glowPurple]} />
+        <View style={[styles.glowCircle, dynamicStyles.glowPink]} />
       </View>
 
       {/* 全屏模糊层 */}
@@ -256,8 +382,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <View style={styles.formContainer}>
               {/* Form Header */}
               <View style={styles.formHeader}>
-                <Text style={styles.formTitle}>登录</Text>
-                <Text style={styles.formSubtitle}>欢迎回来，继续你的户外探索</Text>
+                <Text style={dynamicStyles.formTitle}>登录</Text>
+                <Text style={dynamicStyles.formSubtitle}>欢迎回来，继续你的户外探索</Text>
               </View>
 
               {/* SMS Login Form */}
@@ -265,36 +391,36 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 <View style={styles.formFields}>
                   {/* Phone Input */}
                   <View style={styles.inputContainer}>
-                    <View style={[styles.inputWrapper, phoneError && styles.inputError]}>
-                      <Text style={styles.inputPrefix}>+86</Text>
-                      <View style={styles.inputDivider} />
+                    <View style={[dynamicStyles.inputWrapper, phoneError && dynamicStyles.inputError]}>
+                      <Text style={dynamicStyles.inputPrefix}>+86</Text>
+                      <View style={dynamicStyles.inputDivider} />
                       <TextInput
-                        style={styles.input}
+                        style={dynamicStyles.input}
                         value={phone}
                         onChangeText={setPhone}
                         placeholder="请输入手机号"
-                        placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+                        placeholderTextColor={colors.TEXT.PLACEHOLDER}
                         keyboardType="phone-pad"
                         maxLength={11}
-                        selectionColor={COLORS.PRIMARY}
+                        selectionColor={colors.PRIMARY}
                       />
                     </View>
-                    {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
+                    {phoneError ? <Text style={dynamicStyles.errorText}>{phoneError}</Text> : null}
                   </View>
 
                   {/* Code Input */}
                   <View style={styles.inputContainer}>
                     <View style={styles.codeRow}>
-                      <View style={[styles.inputWrapper, styles.codeInputWrapper, codeError && styles.inputError]}>
+                      <View style={[dynamicStyles.inputWrapper, styles.codeInputWrapper, codeError && dynamicStyles.inputError]}>
                         <TextInput
-                          style={styles.input}
+                          style={dynamicStyles.input}
                           value={code}
                           onChangeText={setCode}
                           placeholder="请输入验证码"
-                          placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+                          placeholderTextColor={colors.TEXT.PLACEHOLDER}
                           keyboardType="number-pad"
                           maxLength={6}
-                          selectionColor={COLORS.PRIMARY}
+                          selectionColor={colors.PRIMARY}
                         />
                       </View>
                       <Button
@@ -307,7 +433,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         style={styles.codeButton}
                       />
                     </View>
-                    {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
+                    {codeError ? <Text style={dynamicStyles.errorText}>{codeError}</Text> : null}
                   </View>
                 </View>
               )}
@@ -317,34 +443,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 <View style={styles.formFields}>
                   {/* Account Input */}
                   <View style={styles.inputContainer}>
-                    <View style={[styles.inputWrapper, accountError && styles.inputError]}>
-                      <Text style={styles.inputPrefix}>+86</Text>
-                      <View style={styles.inputDivider} />
+                    <View style={[dynamicStyles.inputWrapper, accountError && dynamicStyles.inputError]}>
+                      <Text style={dynamicStyles.inputPrefix}>+86</Text>
+                      <View style={dynamicStyles.inputDivider} />
                       <TextInput
-                        style={styles.input}
+                        style={dynamicStyles.input}
                         value={account}
                         onChangeText={setAccount}
                         placeholder="请输入手机号"
-                        placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+                        placeholderTextColor={colors.TEXT.PLACEHOLDER}
                         keyboardType="phone-pad"
                         maxLength={11}
-                        selectionColor={COLORS.PRIMARY}
+                        selectionColor={colors.PRIMARY}
                       />
                     </View>
-                    {accountError ? <Text style={styles.errorText}>{accountError}</Text> : null}
+                    {accountError ? <Text style={dynamicStyles.errorText}>{accountError}</Text> : null}
                   </View>
 
                   {/* Password Input */}
                   <View style={styles.inputContainer}>
-                    <View style={[styles.inputWrapper, passwordError && styles.inputError]}>
+                    <View style={[dynamicStyles.inputWrapper, passwordError && dynamicStyles.inputError]}>
                       <TextInput
-                        style={styles.input}
+                        style={dynamicStyles.input}
                         value={password}
                         onChangeText={setPassword}
                         placeholder="请输入密码"
-                        placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+                        placeholderTextColor={colors.TEXT.PLACEHOLDER}
                         secureTextEntry={!showPassword}
-                        selectionColor={COLORS.PRIMARY}
+                        selectionColor={colors.PRIMARY}
                       />
                       <TouchableOpacity
                         onPress={() => setShowPassword(!showPassword)}
@@ -352,13 +478,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         activeOpacity={0.7}
                       >
                         {showPassword ? (
-                          <IconEyeScan size={20} color={COLORS.TEXT.TERTIARY} />
+                          <IconEyeScan size={20} color={colors.TEXT.TERTIARY} />
                         ) : (
-                          <IconEyeClosed size={20} color={COLORS.TEXT.TERTIARY} />
+                          <IconEyeClosed size={20} color={colors.TEXT.TERTIARY} />
                         )}
                       </TouchableOpacity>
                     </View>
-                    {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+                    {passwordError ? <Text style={dynamicStyles.errorText}>{passwordError}</Text> : null}
                   </View>
                 </View>
               )}
@@ -374,21 +500,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
                 {/* Switch Login Mode */}
                 <View style={styles.switchModeRow}>
-                  <Text style={styles.switchModeText}>
+                  <Text style={dynamicStyles.switchModeText}>
                     {loginMode === 'sms' ? '账号密码登录' : '验证码登录'}
                   </Text>
                   <TouchableOpacity
                     onPress={() => handleSwitchMode(loginMode === 'sms' ? 'password' : 'sms')}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.switchModeLink}>切换</Text>
+                    <Text style={dynamicStyles.switchModeLink}>切换</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => Toast.show('功能开发中')}
                     activeOpacity={0.7}
                     style={styles.forgotPasswordLink}
                   >
-                    <Text style={styles.forgotPasswordText}>忘记密码</Text>
+                    <Text style={dynamicStyles.forgotPasswordText}>忘记密码</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -396,23 +522,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 {/* TODO: 接入微信/Apple 等第三方登录 */}
                 <View style={styles.socialContainer}>
                   <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
-                    <View style={styles.socialIconWrapper}>
-                      <Text style={styles.socialIcon}>W</Text>
+                    <View style={dynamicStyles.socialIconWrapper}>
+                      <Text style={dynamicStyles.socialIcon}>W</Text>
                     </View>
                   </TouchableOpacity>
                 </View>
 
-                <Text style={styles.autoRegisterHint}>
+                <Text style={dynamicStyles.autoRegisterHint}>
                   未注册手机号将自动创建账号
                 </Text>
 
                 {/* Terms */}
                 {/* TODO: 接入用户协议和隐私政策页面 */}
-                <Text style={styles.terms}>
+                <Text style={dynamicStyles.terms}>
                   登录即表示同意{' '}
-                  <Text style={styles.termsLink}>用户协议</Text>
+                  <Text style={dynamicStyles.termsLink}>用户协议</Text>
                   {' '}和{' '}
-                  <Text style={styles.termsLink}>隐私政策</Text>
+                  <Text style={dynamicStyles.termsLink}>隐私政策</Text>
                 </Text>
               </View>
           </View>
@@ -423,10 +549,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
-  },
   backgroundGlow: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
@@ -435,29 +557,6 @@ const styles = StyleSheet.create({
   glowCircle: {
     position: 'absolute',
     borderRadius: BORDER_RADIUS.FULL,
-  },
-  glowBlue: {
-    top: -100,
-    left: 50,
-    width: 300,
-    height: 300,
-    backgroundColor: COLORS.GRADIENT.BLUE,
-    opacity: 0.8,
-  },
-  glowPurple: {
-    bottom: -50,
-    right: -50,
-    width: 350,
-    height: 350,
-    backgroundColor: COLORS.GRADIENT.PURPLE,
-  },
-  glowPink: {
-    top: '40%',
-    left: '50%',
-    marginLeft: -150,
-    width: 300,
-    height: 300,
-    backgroundColor: COLORS.GRADIENT.PINK_MID,
   },
   keyboardView: {
     flex: 1,
@@ -484,36 +583,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 28,
   },
-  formTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: SPACING.SM,
-    letterSpacing: -0.5,
-  },
-  formSubtitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.TERTIARY,
-    fontWeight: '400',
-  },
-
-  // Mode Tabs
-  switchModeRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: SPACING.LG,
-    gap: SPACING.XS,
-  },
-  switchModeText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  switchModeLink: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
 
   // Form Fields
   formFields: {
@@ -521,37 +590,6 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: SPACING.LG,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    borderRadius: BORDER_RADIUS.LG,
-    paddingHorizontal: SPACING.LG,
-    height: 48,
-  },
-  inputError: {
-    borderColor: COLORS.ERROR_OVERLAY.BORDER,
-    backgroundColor: COLORS.ERROR_OVERLAY.BACKGROUND,
-  },
-  inputPrefix: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    color: COLORS.TEXT.TERTIARY,
-    fontWeight: '500',
-  },
-  inputDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: COLORS.BORDER.MEDIUM,
-    marginHorizontal: SPACING.MD,
-  },
-  input: {
-    flex: 1,
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '500',
   },
   codeRow: {
     flexDirection: 'row',
@@ -565,12 +603,6 @@ const styles = StyleSheet.create({
     minWidth: 100,
     height: 48,
   },
-  errorText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.ERROR,
-    marginTop: 6,
-    marginLeft: SPACING.XS,
-  },
 
   // Password Eye Toggle
   eyeButton: {
@@ -580,17 +612,6 @@ const styles = StyleSheet.create({
   // Bottom Area
   forgotPasswordLink: {
     marginLeft: 'auto',
-  },
-  forgotPasswordText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.PRIMARY_LIGHT,
-    fontWeight: '500',
-  },
-  autoRegisterHint: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUINARY,
-    textAlign: 'center',
-    marginBottom: SPACING.LG,
   },
 
   // Login Button
@@ -609,30 +630,13 @@ const styles = StyleSheet.create({
   socialButton: {
     alignItems: 'center',
   },
-  socialIconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: BORDER_RADIUS.FULL,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialIcon: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-    fontWeight: '600',
-    color: COLORS.TEXT.TERTIARY,
-  },
 
-  // Terms
-  terms: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUINARY,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  termsLink: {
-    color: COLORS.PRIMARY_LIGHT,
+  // Switch Mode Row
+  switchModeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: SPACING.LG,
+    gap: SPACING.XS,
   },
 });

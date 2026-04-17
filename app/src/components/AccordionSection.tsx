@@ -5,7 +5,7 @@
  * 展开动画：opacity + translateY（native driver）+ 内容始终挂载避免重建
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
   Animated,
   StyleSheet,
@@ -13,7 +13,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { IconArrowDown } from './SolarIcons';
 import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
 import { formatDistance, formatDuration } from '../utils/format';
@@ -38,6 +39,74 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
   onActivityPress,
 }) => {
   const expandAnim = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
+  const { colors } = useTheme();
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.XXL,
+      overflow: 'hidden',
+    },
+    typeIconWrapper: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    typeLabel: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+    },
+    typeStats: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+      flex: 1,
+    },
+    content: {
+      paddingHorizontal: SPACING.LG,
+      paddingBottom: SPACING.MD,
+      borderTopWidth: 1,
+      borderTopColor: colors.BORDER.LIGHT,
+    },
+    emptyText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+      textAlign: 'center',
+      paddingVertical: SPACING.LG,
+    },
+    rowDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.BORDER.LIGHT,
+    },
+    activityDate: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.TERTIARY,
+      width: 40,
+    },
+    activityDistance: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.SECONDARY,
+      fontWeight: '500',
+      flex: 1,
+    },
+    activityDuration: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.TERTIARY,
+      width: 48,
+      textAlign: 'center',
+    },
+    activityElevation: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.TERTIARY,
+      width: 40,
+      textAlign: 'right',
+    },
+  }), [colors]);
 
   useEffect(() => {
     Animated.spring(expandAnim, {
@@ -83,7 +152,7 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
   }, [isExpanded, contentMaxH]);
 
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       {/* Header */}
       <TouchableOpacity
         style={styles.header}
@@ -91,16 +160,16 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
         activeOpacity={0.7}
       >
         <View style={styles.headerLeft}>
-          <View style={styles.typeIconWrapper}>
-            <TypeIcon size={18} color={COLORS.TEXT.SECONDARY} />
+          <View style={dynamicStyles.typeIconWrapper}>
+            <TypeIcon size={18} color={colors.TEXT.SECONDARY} />
           </View>
-          <Text style={styles.typeLabel}>{meta.label}</Text>
-          <Text style={styles.typeStats} numberOfLines={1}>
+          <Text style={dynamicStyles.typeLabel}>{meta.label}</Text>
+          <Text style={dynamicStyles.typeStats} numberOfLines={1}>
             {count}次 · {formatDistance(totalDistance)}
           </Text>
         </View>
         <Animated.View style={[styles.arrowWrapper, { transform: [{ rotate: arrowRotate }] }]}>
-          <IconArrowDown size={16} color={COLORS.TEXT.QUATERNARY} />
+          <IconArrowDown size={16} color={colors.TEXT.QUATERNARY} />
         </Animated.View>
       </TouchableOpacity>
 
@@ -115,9 +184,9 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
             transform: [{ translateY: contentTranslateY }],
           }}
         >
-          <View style={styles.content}>
+          <View style={dynamicStyles.content}>
             {activities.length === 0 ? (
-              <Text style={styles.emptyText}>暂无记录</Text>
+              <Text style={dynamicStyles.emptyText}>暂无记录</Text>
             ) : (
               activities.map((activity, index) => {
                 const date = new Date(activity.startTime);
@@ -129,23 +198,23 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
                       onPress={() => onActivityPress(activity)}
                       activeOpacity={0.6}
                     >
-                      <Text style={styles.activityDate}>{dateStr}</Text>
-                      <Text style={styles.activityDistance}>
+                      <Text style={dynamicStyles.activityDate}>{dateStr}</Text>
+                      <Text style={dynamicStyles.activityDistance}>
                         {formatDistance(activity.distance)}
                       </Text>
-                      <Text style={styles.activityDuration}>
+                      <Text style={dynamicStyles.activityDuration}>
                         {formatDuration(activity.duration)}
                       </Text>
-                      <Text style={styles.activityElevation}>
+                      <Text style={dynamicStyles.activityElevation}>
                         {Math.round(activity.elevationGain)}m
                       </Text>
                       <IconArrowDown
                         size={14}
-                        color={COLORS.TEXT.QUINARY}
+                        color={colors.TEXT.QUINARY}
                         style={{ transform: [{ rotate: '-90deg' }] }}
                       />
                     </TouchableOpacity>
-                    {index < activities.length - 1 && <View style={styles.rowDivider} />}
+                    {index < activities.length - 1 && <View style={dynamicStyles.rowDivider} />}
                   </React.Fragment>
                 );
               })
@@ -158,13 +227,6 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.XXL,
-    overflow: 'hidden',
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -177,24 +239,6 @@ const styles = StyleSheet.create({
     gap: SPACING.SM + 2,
     flex: 1,
   },
-  typeIconWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  typeLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  typeStats: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-    flex: 1,
-  },
   arrowWrapper: {
     width: SPACING.XL + 4,
     height: SPACING.XL + 4,
@@ -205,49 +249,10 @@ const styles = StyleSheet.create({
   contentClip: {
     overflow: 'hidden',
   },
-  content: {
-    paddingHorizontal: SPACING.LG,
-    paddingBottom: SPACING.MD,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER.LIGHT,
-  },
-  emptyText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-    textAlign: 'center',
-    paddingVertical: SPACING.LG,
-  },
   activityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.MD,
     gap: SPACING.SM,
-  },
-  rowDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: COLORS.BORDER.LIGHT,
-  },
-  activityDate: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.TERTIARY,
-    width: 40,
-  },
-  activityDistance: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.SECONDARY,
-    fontWeight: '500',
-    flex: 1,
-  },
-  activityDuration: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.TERTIARY,
-    width: 48,
-    textAlign: 'center',
-  },
-  activityElevation: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.TERTIARY,
-    width: 40,
-    textAlign: 'right',
   },
 });

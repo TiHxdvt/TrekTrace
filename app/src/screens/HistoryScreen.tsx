@@ -7,7 +7,8 @@ import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS, TYPOGRAPHY, SPACING } from '../theme';
+import { TYPOGRAPHY, SPACING } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { IconPlane, IconFlame, IconMedalStar } from '../components/SolarIcons';
 import { FullScreenBlur } from '../components/FullScreenBlur';
 import { AccordionSection } from '../components/AccordionSection';
@@ -32,6 +33,7 @@ function toActivityItem(dto: ActivityResponseDTO): ActivityItem {
 }
 
 export const HistoryScreen: React.FC = () => {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [activities, setActivities] = useState<ActivityResponseDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +46,67 @@ export const HistoryScreen: React.FC = () => {
   const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1);
 
   const hasLoaded = useRef(false);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.BACKGROUND,
+    },
+    glowOrb: {
+      position: 'absolute',
+      top: -60,
+      left: '30%',
+      width: 200,
+      height: 200,
+      borderRadius: 100,
+      backgroundColor: colors.GRADIENT.PURPLE_LIGHT,
+    },
+    headerTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+      letterSpacing: -0.5,
+    },
+    streakValue: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.LG,
+      fontWeight: '700',
+      color: colors.TEXT.PRIMARY,
+    },
+    streakLabel: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+    },
+    streakSep: {
+      width: 1,
+      height: 28,
+      backgroundColor: colors.BORDER.LIGHT,
+    },
+    loadingText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+    },
+    iconWrap: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: SPACING.XXL,
+    },
+    emptyTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XL,
+      fontWeight: '600',
+      color: colors.TEXT.SECONDARY,
+      marginBottom: SPACING.SM,
+    },
+    emptySubtitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      color: colors.TEXT.QUATERNARY,
+    },
+  }), [colors]);
 
   useFocusEffect(
     useCallback(() => {
@@ -121,10 +184,10 @@ export const HistoryScreen: React.FC = () => {
   }, [activities]);
 
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       {/* Background Glow */}
       <View style={styles.ambientGlow} pointerEvents="none">
-        <View style={styles.glowOrb} />
+        <View style={dynamicStyles.glowOrb} />
       </View>
 
       <FullScreenBlur />
@@ -132,7 +195,7 @@ export const HistoryScreen: React.FC = () => {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>历史记录</Text>
+          <Text style={dynamicStyles.headerTitle}>历史记录</Text>
           <DateFilterDropdown
             year={filterYear}
             month={filterMonth}
@@ -147,14 +210,14 @@ export const HistoryScreen: React.FC = () => {
           <View style={styles.streakRow}>
             <View style={styles.streakItem}>
               <IconFlame size={20} color="#f97316" />
-              <Text style={styles.streakValue}>{lifetimeStats.currentStreak}</Text>
-              <Text style={styles.streakLabel}>当前连续</Text>
+              <Text style={dynamicStyles.streakValue}>{lifetimeStats.currentStreak}</Text>
+              <Text style={dynamicStyles.streakLabel}>当前连续</Text>
             </View>
-            <View style={styles.streakSep} />
+            <View style={dynamicStyles.streakSep} />
             <View style={styles.streakItem}>
-              <IconMedalStar size={20} color={COLORS.PRIMARY} />
-              <Text style={styles.streakValue}>{lifetimeStats.longestStreak}</Text>
-              <Text style={styles.streakLabel}>最长连续</Text>
+              <IconMedalStar size={20} color={colors.PRIMARY} />
+              <Text style={dynamicStyles.streakValue}>{lifetimeStats.longestStreak}</Text>
+              <Text style={dynamicStyles.streakLabel}>最长连续</Text>
             </View>
           </View>
         </View>
@@ -167,24 +230,24 @@ export const HistoryScreen: React.FC = () => {
       >
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.PRIMARY} />
-            <Text style={styles.loadingText}>加载中...</Text>
+            <ActivityIndicator size="large" color={colors.PRIMARY} />
+            <Text style={dynamicStyles.loadingText}>加载中...</Text>
           </View>
         ) : error ? (
           <View style={styles.emptyState}>
-            <View style={styles.iconWrap}>
-              <IconPlane size={48} color={COLORS.TEXT.QUATERNARY} />
+            <View style={dynamicStyles.iconWrap}>
+              <IconPlane size={48} color={colors.TEXT.QUATERNARY} />
             </View>
-            <Text style={styles.emptyTitle}>{error}</Text>
-            <Text style={styles.emptySubtitle}>下拉刷新或检查网络连接</Text>
+            <Text style={dynamicStyles.emptyTitle}>{error}</Text>
+            <Text style={dynamicStyles.emptySubtitle}>下拉刷新或检查网络连接</Text>
           </View>
         ) : isEmpty ? (
           <View style={styles.emptyState}>
-            <View style={styles.iconWrap}>
-              <IconPlane size={48} color={COLORS.TEXT.QUATERNARY} />
+            <View style={dynamicStyles.iconWrap}>
+              <IconPlane size={48} color={colors.TEXT.QUATERNARY} />
             </View>
-            <Text style={styles.emptyTitle}>暂无记录</Text>
-            <Text style={styles.emptySubtitle}>完成一次运动后，记录会出现在这里</Text>
+            <Text style={dynamicStyles.emptyTitle}>暂无记录</Text>
+            <Text style={dynamicStyles.emptySubtitle}>完成一次运动后，记录会出现在这里</Text>
           </View>
         ) : (
           ACTIVITY_TYPES.map(type => (
@@ -209,25 +272,12 @@ export const HistoryScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
-  },
   ambientGlow: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-  },
-  glowOrb: {
-    position: 'absolute',
-    top: -60,
-    left: '30%',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: COLORS.GRADIENT.PURPLE_LIGHT,
   },
   header: {
     paddingHorizontal: SPACING.XL,
@@ -238,12 +288,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-    letterSpacing: -0.5,
   },
   streakRow: {
     flexDirection: 'row',
@@ -260,20 +304,6 @@ const styles = StyleSheet.create({
   streakItem: {
     alignItems: 'center',
     gap: 2,
-  },
-  streakValue: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-    fontWeight: '700',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  streakLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  streakSep: {
-    width: 1,
-    height: 28,
-    backgroundColor: COLORS.BORDER.LIGHT,
   },
   scrollView: {
     flex: 1,
@@ -296,32 +326,7 @@ const styles = StyleSheet.create({
     paddingVertical: 64,
     gap: 12,
   },
-  loadingText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-  },
   emptyState: {
     alignItems: 'center',
-  },
-  iconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.XXL,
-  },
-  emptyTitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XL,
-    fontWeight: '600',
-    color: COLORS.TEXT.SECONDARY,
-    marginBottom: SPACING.SM,
-  },
-  emptySubtitle: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.QUATERNARY,
   },
 });

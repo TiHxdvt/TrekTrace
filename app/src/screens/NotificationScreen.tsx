@@ -2,7 +2,7 @@
  * 系统通知页面
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { notificationService, NotificationItem } from '../services/notificationService';
@@ -45,9 +46,51 @@ function formatTime(dateStr: string): string {
 }
 
 export const NotificationScreen: React.FC<{ navigation: NavProp }> = ({ navigation }) => {
+  const { colors } = useTheme();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    emptyText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.QUATERNARY,
+    },
+    notificationCard: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.LG,
+      padding: SPACING.LG,
+      marginTop: SPACING.MD,
+    },
+    unreadCard: {
+      borderColor: colors.BORDER.HEAVY,
+      backgroundColor: colors.OVERLAY.MEDIUM,
+    },
+    cardTitle: {
+      flex: 1,
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+    },
+    unreadDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.PRIMARY,
+    },
+    cardContent: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      color: colors.TEXT.TERTIARY,
+      lineHeight: TYPOGRAPHY.FONT_SIZE.BASE * TYPOGRAPHY.LINE_HEIGHT.NORMAL,
+    },
+    cardTime: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUINARY,
+      marginTop: SPACING.SM,
+    },
+  }), [colors]);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -95,7 +138,7 @@ export const NotificationScreen: React.FC<{ navigation: NavProp }> = ({ navigati
 
   const rightEl = (
     <TouchableOpacity onPress={handleReadAll} activeOpacity={0.7}>
-      <IconCheckCircle size={22} color={COLORS.TEXT.TERTIARY} />
+      <IconCheckCircle size={22} color={colors.TEXT.TERTIARY} />
     </TouchableOpacity>
   );
 
@@ -104,7 +147,7 @@ export const NotificationScreen: React.FC<{ navigation: NavProp }> = ({ navigati
       <FeatureScreenLayout>
         <FeatureHeader title="系统通知" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
-          <ActivityIndicator color={COLORS.PRIMARY} />
+          <ActivityIndicator color={colors.PRIMARY} />
         </View>
       </FeatureScreenLayout>
     );
@@ -117,29 +160,29 @@ export const NotificationScreen: React.FC<{ navigation: NavProp }> = ({ navigati
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.TEXT.TERTIARY} />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.TEXT.TERTIARY} />
         }
       >
         {notifications.length === 0 ? (
           <View style={styles.emptyState}>
-            <IconBell size={48} color={COLORS.TEXT.QUINARY} />
-            <Text style={styles.emptyText}>暂无通知</Text>
+            <IconBell size={48} color={colors.TEXT.QUINARY} />
+            <Text style={dynamicStyles.emptyText}>暂无通知</Text>
           </View>
         ) : (
           notifications.map(item => (
             <TouchableOpacity
               key={item.id}
-              style={[styles.notificationCard, !item.isRead && styles.unreadCard]}
+              style={[dynamicStyles.notificationCard, !item.isRead && dynamicStyles.unreadCard]}
               onPress={() => handlePress(item)}
               activeOpacity={0.7}
             >
               <View style={styles.cardHeader}>
                 <Text style={styles.cardIcon}>{getNotificationIcon(item.type)}</Text>
-                <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-                {!item.isRead && <View style={styles.unreadDot} />}
+                <Text style={dynamicStyles.cardTitle} numberOfLines={1}>{item.title}</Text>
+                {!item.isRead && <View style={dynamicStyles.unreadDot} />}
               </View>
-              <Text style={styles.cardContent} numberOfLines={2}>{item.content}</Text>
-              <Text style={styles.cardTime}>{formatTime(item.createdAt)}</Text>
+              <Text style={dynamicStyles.cardContent} numberOfLines={2}>{item.content}</Text>
+              <Text style={dynamicStyles.cardTime}>{formatTime(item.createdAt)}</Text>
             </TouchableOpacity>
           ))
         )}
@@ -158,22 +201,6 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.XXXL * 3,
     gap: SPACING.LG,
   },
-  emptyText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  notificationCard: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.LG,
-    padding: SPACING.LG,
-    marginTop: SPACING.MD,
-  },
-  unreadCard: {
-    borderColor: COLORS.BORDER.HEAVY,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -182,27 +209,5 @@ const styles = StyleSheet.create({
   },
   cardIcon: {
     fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-  },
-  cardTitle: {
-    flex: 1,
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.PRIMARY,
-  },
-  cardContent: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.TERTIARY,
-    lineHeight: TYPOGRAPHY.FONT_SIZE.BASE * TYPOGRAPHY.LINE_HEIGHT.NORMAL,
-  },
-  cardTime: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUINARY,
-    marginTop: SPACING.SM,
   },
 });

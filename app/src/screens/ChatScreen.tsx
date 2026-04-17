@@ -4,7 +4,7 @@
  * 延续 glassmorphism 设计风格
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,8 @@ import {
   InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { Avatar } from '../components/Avatar';
 import { Toast } from '../components/Toast';
 import { chatService } from '../services/chatService';
@@ -50,6 +51,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
 }) => {
   const { conversationId, friendNickname, friendAvatarUrl, friendUserId } = route.params;
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -59,6 +61,60 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   const [hasMore, setHasMore] = useState(true);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | undefined>();
   const flatListRef = useRef<FlatList>(null);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.BACKGROUND,
+    },
+    loadingContainer: {
+      backgroundColor: colors.BACKGROUND,
+    },
+    header: {
+      backgroundColor: colors.OVERLAY.NAV,
+      borderBottomColor: colors.BORDER.LIGHT,
+    },
+    backBtn: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    headerTitle: {
+      color: colors.TEXT.PRIMARY,
+    },
+    messageTextMine: {
+      color: '#ffffff',
+    },
+    messageTextOther: {
+      color: colors.TEXT.SECONDARY,
+    },
+    messageTimeMine: {
+      color: 'rgba(255, 255, 255, 0.7)',
+    },
+    messageTimeOther: {
+      color: colors.TEXT.QUATERNARY,
+    },
+    bubbleMine: {
+      backgroundColor: colors.PRIMARY,
+    },
+    bubbleOther: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    inputBar: {
+      backgroundColor: colors.OVERLAY.NAV,
+      borderTopColor: colors.BORDER.LIGHT,
+    },
+    textInput: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderColor: colors.BORDER.MEDIUM,
+      color: colors.TEXT.PRIMARY,
+    },
+    sendBtn: {
+      backgroundColor: colors.PRIMARY,
+    },
+    sendBtnText: {
+      color: '#ffffff',
+    },
+  }), [colors]);
 
   // Load current user's avatar
   useEffect(() => {
@@ -159,11 +215,11 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         {!isMine && (
           <Avatar uri={friendAvatarUrl} size={32} />
         )}
-        <View style={[styles.messageBubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
-          <Text style={[styles.messageText, isMine ? styles.messageTextMine : styles.messageTextOther]}>
+        <View style={[styles.messageBubble, isMine ? dynamicStyles.bubbleMine : dynamicStyles.bubbleOther, isMine ? styles.bubbleMine : styles.bubbleOther]}>
+          <Text style={[styles.messageText, isMine ? dynamicStyles.messageTextMine : dynamicStyles.messageTextOther]}>
             {item.content}
           </Text>
-          <Text style={[styles.messageTime, isMine ? styles.messageTimeMine : styles.messageTimeOther]}>
+          <Text style={[styles.messageTime, isMine ? dynamicStyles.messageTimeMine : dynamicStyles.messageTimeOther]}>
             {formatMessageTime(item.createdAt)}
           </Text>
         </View>
@@ -172,32 +228,32 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         )}
       </View>
     );
-  }, [friendUserId, friendAvatarUrl, myAvatarUrl]);
+  }, [friendUserId, friendAvatarUrl, myAvatarUrl, dynamicStyles]);
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator color={COLORS.PRIMARY} />
+      <View style={[styles.loadingContainer, dynamicStyles.loadingContainer]}>
+        <ActivityIndicator color={colors.PRIMARY} />
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, dynamicStyles.container]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={insets.top}
     >
       {/* Header - centered title */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, dynamicStyles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
-          style={styles.backBtn}
+          style={[styles.backBtn, dynamicStyles.backBtn]}
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <IconAltArrowLeft size={20} color={COLORS.TEXT.PRIMARY} />
+          <IconAltArrowLeft size={20} color={colors.TEXT.PRIMARY} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
+        <Text style={[styles.headerTitle, dynamicStyles.headerTitle]} numberOfLines={1}>
           {friendNickname || '用户'}
         </Text>
         <View style={styles.headerRight} />
@@ -217,25 +273,25 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       />
 
       {/* Input Bar */}
-      <View style={[styles.inputBar, { paddingBottom: insets.bottom + SPACING.SM }]}>
+      <View style={[styles.inputBar, dynamicStyles.inputBar, { paddingBottom: insets.bottom + SPACING.SM }]}>
         <View style={styles.inputWrap}>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, dynamicStyles.textInput]}
             value={inputText}
             onChangeText={setInputText}
             placeholder="输入消息..."
-            placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+            placeholderTextColor={colors.TEXT.PLACEHOLDER}
             multiline
             maxLength={500}
             editable={!sending}
           />
           <TouchableOpacity
-            style={[styles.sendBtn, (!inputText.trim() || sending) && styles.sendBtnDisabled]}
+            style={[styles.sendBtn, dynamicStyles.sendBtn, (!inputText.trim() || sending) && styles.sendBtnDisabled]}
             onPress={handleSend}
             disabled={!inputText.trim() || sending}
             activeOpacity={0.7}
           >
-            <Text style={styles.sendBtnText}>发送</Text>
+            <Text style={[styles.sendBtnText, dynamicStyles.sendBtnText]}>发送</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -246,30 +302,24 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.BACKGROUND,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.LG,
     paddingBottom: SPACING.MD,
-    backgroundColor: COLORS.OVERLAY.NAV,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.BORDER.LIGHT,
   },
   backBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -277,7 +327,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: TYPOGRAPHY.FONT_SIZE.LG,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
     textAlign: 'center',
   },
   headerRight: {
@@ -308,13 +357,10 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.SM,
   },
   bubbleMine: {
-    backgroundColor: COLORS.PRIMARY,
     borderBottomRightRadius: 4,
   },
   bubbleOther: {
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
     borderBottomLeftRadius: 4,
   },
   messageText: {
@@ -322,28 +368,22 @@ const styles = StyleSheet.create({
     lineHeight: TYPOGRAPHY.FONT_SIZE.BASE * TYPOGRAPHY.LINE_HEIGHT.NORMAL,
   },
   messageTextMine: {
-    color: COLORS.TEXT.PRIMARY,
   },
   messageTextOther: {
-    color: COLORS.TEXT.SECONDARY,
   },
   messageTime: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
     marginTop: 2,
   },
   messageTimeMine: {
-    color: COLORS.TEXT.TERTIARY,
     textAlign: 'right',
   },
   messageTimeOther: {
-    color: COLORS.TEXT.QUATERNARY,
   },
   inputBar: {
     paddingHorizontal: SPACING.LG,
     paddingTop: SPACING.SM,
-    backgroundColor: COLORS.OVERLAY.NAV,
     borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER.LIGHT,
   },
   inputWrap: {
     flexDirection: 'row',
@@ -352,18 +392,14 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
     borderRadius: BORDER_RADIUS.XL,
     paddingHorizontal: SPACING.LG,
     paddingVertical: SPACING.SM,
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.PRIMARY,
     maxHeight: 100,
   },
   sendBtn: {
-    backgroundColor: COLORS.PRIMARY,
     borderRadius: BORDER_RADIUS.XL,
     paddingHorizontal: SPACING.LG,
     paddingVertical: SPACING.SM,
@@ -377,6 +413,5 @@ const styles = StyleSheet.create({
   sendBtnText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
 });

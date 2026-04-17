@@ -3,9 +3,10 @@
  * 下拉列表与按钮等宽，紧贴按钮下方，每项高度与按钮一致
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING, ANIMATION } from '../../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING, ANIMATION } from '../../theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import { IconChecklistMinimalistic, IconArrowDown } from '../SolarIcons';
 import { ACTIVITY_TYPE_META } from '../../constants/activityMeta';
 import type { ActivityType } from '../../utils/statsComputations';
@@ -29,6 +30,7 @@ export const StatsTypeFilter: React.FC<StatsTypeFilterProps> = ({
   onChange,
   availableTypes,
 }) => {
+  const { colors } = useTheme();
   const [open, setOpen] = React.useState(false);
   const expandAnim = useRef(new Animated.Value(0)).current;
   const menuMaxH = useRef(new Animated.Value(0)).current;
@@ -72,18 +74,57 @@ export const StatsTypeFilter: React.FC<StatsTypeFilterProps> = ({
     setOpen(false);
   };
 
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    btn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.XS,
+      paddingVertical: SPACING.XS + 2,
+      paddingHorizontal: SPACING.MD,
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.FULL,
+    },
+    label: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+    },
+    menu: {
+      marginTop: SPACING.XS,
+      backgroundColor: colors.OVERLAY.SUMMARY,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      borderRadius: BORDER_RADIUS.LG,
+      overflow: 'hidden',
+    },
+    menuItemActive: {
+      backgroundColor: colors.PRIMARY,
+    },
+    menuLabel: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '500',
+      color: colors.TEXT.SECONDARY,
+    },
+    menuLabelActive: {
+      color: colors.TEXT.PRIMARY,
+      fontWeight: '600',
+    },
+  }), [colors]);
+
   return (
     <View style={styles.wrapper}>
       {/* 胶囊按钮 */}
-      <Pressable style={styles.btn} onPress={() => setOpen(prev => !prev)}>
+      <Pressable style={dynamicStyles.btn} onPress={() => setOpen(prev => !prev)}>
         {selected === 'ALL' ? (
-          <IconChecklistMinimalistic size={16} color={COLORS.TEXT.PRIMARY} />
+          <IconChecklistMinimalistic size={16} color={colors.TEXT.PRIMARY} />
         ) : (
-          TypeIcon && <TypeIcon size={16} color={COLORS.TEXT.PRIMARY} />
+          TypeIcon && <TypeIcon size={16} color={colors.TEXT.PRIMARY} />
         )}
-        <Text style={styles.label}>{label}</Text>
+        <Text style={dynamicStyles.label}>{label}</Text>
         <Animated.View style={[styles.arrowWrapper, { transform: [{ rotate: arrowRotate }] }]}>
-          <IconArrowDown size={14} color={COLORS.TEXT.TERTIARY} />
+          <IconArrowDown size={14} color={colors.TEXT.TERTIARY} />
         </Animated.View>
       </Pressable>
 
@@ -93,7 +134,7 @@ export const StatsTypeFilter: React.FC<StatsTypeFilterProps> = ({
         pointerEvents={open ? 'auto' : 'none'}
       >
         <Animated.View style={{ opacity: contentOpacity }}>
-          <View style={styles.menu}>
+          <View style={dynamicStyles.menu}>
             {validOptions.map(filter => {
               const fMeta = filter !== 'ALL' ? ACTIVITY_TYPE_META[filter as ActivityType] : null;
               const FIcon = fMeta?.icon;
@@ -103,15 +144,15 @@ export const StatsTypeFilter: React.FC<StatsTypeFilterProps> = ({
               return (
                 <Pressable
                   key={filter}
-                  style={[styles.menuItem, isActive && styles.menuItemActive]}
+                  style={[styles.menuItem, isActive && dynamicStyles.menuItemActive]}
                   onPress={() => handleSelect(filter)}
                 >
                   {filter === 'ALL' ? (
-                    <IconChecklistMinimalistic size={16} color={isActive ? COLORS.TEXT.PRIMARY : COLORS.TEXT.SECONDARY} />
+                    <IconChecklistMinimalistic size={16} color={isActive ? colors.TEXT.PRIMARY : colors.TEXT.SECONDARY} />
                   ) : (
-                    FIcon && <FIcon size={16} color={isActive ? COLORS.TEXT.PRIMARY : COLORS.TEXT.SECONDARY} />
+                    FIcon && <FIcon size={16} color={isActive ? colors.TEXT.PRIMARY : colors.TEXT.SECONDARY} />
                   )}
-                  <Text style={[styles.menuLabel, isActive && styles.menuLabelActive]}>
+                  <Text style={[dynamicStyles.menuLabel, isActive && dynamicStyles.menuLabelActive]}>
                     {fLabel}
                   </Text>
                 </Pressable>
@@ -128,22 +169,6 @@ const styles = StyleSheet.create({
   wrapper: {
     position: 'relative',
   },
-  btn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.XS,
-    paddingVertical: SPACING.XS + 2,
-    paddingHorizontal: SPACING.MD,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.FULL,
-  },
-  label: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
   arrowWrapper: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -157,14 +182,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     zIndex: 50,
   },
-  menu: {
-    marginTop: SPACING.XS,
-    backgroundColor: 'rgba(28, 30, 38, 0.95)',
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    borderRadius: BORDER_RADIUS.LG,
-    overflow: 'hidden',
-  },
   /* 每项高度、内间距与按钮一致 */
   menuItem: {
     flexDirection: 'row',
@@ -172,17 +189,5 @@ const styles = StyleSheet.create({
     gap: SPACING.XS,
     paddingVertical: SPACING.XS + 2,
     paddingHorizontal: SPACING.MD,
-  },
-  menuItemActive: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  menuLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '500',
-    color: COLORS.TEXT.SECONDARY,
-  },
-  menuLabelActive: {
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '600',
   },
 });

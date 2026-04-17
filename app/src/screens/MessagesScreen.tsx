@@ -3,10 +3,11 @@
  * 显示所有聊天会话，支持实时新消息推送
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { IconChatRoundLine, IconCheckCircle, IconMagnifer } from '../components/SolarIcons';
 import { ChatOverlay } from '../components/ChatOverlay';
 import { Toast } from '../components/Toast';
@@ -38,6 +39,7 @@ function truncateContent(content: string, maxLen = 30): string {
 
 export const MessagesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,29 +84,71 @@ export const MessagesScreen: React.FC = () => {
     });
   }, []);
 
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.BACKGROUND,
+    },
+    headerTitle: {
+      color: colors.TEXT.PRIMARY,
+    },
+    headerIconBtn: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    iconWrap: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    emptyTitle: {
+      color: colors.TEXT.SECONDARY,
+    },
+    emptySubtitle: {
+      color: colors.TEXT.QUATERNARY,
+    },
+    conversationItem: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    conversationName: {
+      color: colors.TEXT.PRIMARY,
+    },
+    conversationTime: {
+      color: colors.TEXT.QUATERNARY,
+    },
+    conversationPreview: {
+      color: colors.TEXT.TERTIARY,
+    },
+    unreadBadge: {
+      backgroundColor: colors.PRIMARY,
+    },
+    unreadBadgeText: {
+      color: colors.TEXT.PRIMARY,
+    },
+  }), [colors]);
+
   const renderItem = useCallback(({ item }: { item: Conversation }) => (
     <TouchableOpacity
-      style={styles.conversationItem}
+      style={[styles.conversationItem, dynamicStyles.conversationItem]}
       onPress={() => handleConversationPress(item)}
       activeOpacity={0.7}
     >
       <Avatar uri={item.otherUser?.avatarUrl} size={48} />
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
-          <Text style={styles.conversationName} numberOfLines={1}>
+          <Text style={[styles.conversationName, dynamicStyles.conversationName]} numberOfLines={1}>
             {item.otherUser?.nickname || '用户'}
           </Text>
-          <Text style={styles.conversationTime}>
+          <Text style={[styles.conversationTime, dynamicStyles.conversationTime]}>
             {formatTime(item.lastMessage?.createdAt)}
           </Text>
         </View>
         <View style={styles.conversationFooter}>
-          <Text style={styles.conversationPreview} numberOfLines={1}>
+          <Text style={[styles.conversationPreview, dynamicStyles.conversationPreview]} numberOfLines={1}>
             {item.lastMessage ? truncateContent(item.lastMessage.content) : '暂无消息'}
           </Text>
           {item.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>
+            <View style={[styles.unreadBadge, dynamicStyles.unreadBadge]}>
+              <Text style={[styles.unreadBadgeText, dynamicStyles.unreadBadgeText]}>
                 {item.unreadCount > 99 ? '99+' : item.unreadCount}
               </Text>
             </View>
@@ -112,28 +156,28 @@ export const MessagesScreen: React.FC = () => {
         </View>
       </View>
     </TouchableOpacity>
-  ), [handleConversationPress]);
+  ), [handleConversationPress, dynamicStyles]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, dynamicStyles.container]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>消息</Text>
+          <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>消息</Text>
           <View style={styles.headerActions}>
             <TouchableOpacity
-              style={styles.headerIconBtn}
+              style={[styles.headerIconBtn, dynamicStyles.headerIconBtn]}
               onPress={handleMarkAllRead}
               activeOpacity={0.7}
             >
-              <IconCheckCircle size={20} color={COLORS.TEXT.PRIMARY} />
+              <IconCheckCircle size={20} color={colors.TEXT.PRIMARY} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.headerIconBtn}
+              style={[styles.headerIconBtn, dynamicStyles.headerIconBtn]}
               onPress={() => Toast.show('功能开发中')}
               activeOpacity={0.7}
             >
-              <IconMagnifer size={20} color={COLORS.TEXT.PRIMARY} />
+              <IconMagnifer size={20} color={colors.TEXT.PRIMARY} />
             </TouchableOpacity>
           </View>
         </View>
@@ -142,15 +186,15 @@ export const MessagesScreen: React.FC = () => {
       {/* Content */}
       {loading ? (
         <View style={styles.loadingState}>
-          <ActivityIndicator color={COLORS.PRIMARY} />
+          <ActivityIndicator color={colors.PRIMARY} />
         </View>
       ) : conversations.length === 0 ? (
         <View style={styles.emptyState}>
-          <View style={styles.iconWrap}>
-            <IconChatRoundLine size={48} color={COLORS.TEXT.QUATERNARY} />
+          <View style={[styles.iconWrap, dynamicStyles.iconWrap]}>
+            <IconChatRoundLine size={48} color={colors.TEXT.QUATERNARY} />
           </View>
-          <Text style={styles.emptyTitle}>暂无消息</Text>
-          <Text style={styles.emptySubtitle}>在好友页面点击"发消息"开始聊天</Text>
+          <Text style={[styles.emptyTitle, dynamicStyles.emptyTitle]}>暂无消息</Text>
+          <Text style={[styles.emptySubtitle, dynamicStyles.emptySubtitle]}>在好友页面点击"发消息"开始聊天</Text>
         </View>
       ) : (
         <FlatList
@@ -169,7 +213,6 @@ export const MessagesScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
   },
   header: {
     paddingHorizontal: SPACING.XL,
@@ -183,7 +226,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XXXL,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
     letterSpacing: -0.5,
   },
   headerActions: {
@@ -194,9 +236,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -215,9 +255,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.XXL,
@@ -225,12 +263,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XL,
     fontWeight: '600',
-    color: COLORS.TEXT.SECONDARY,
     marginBottom: SPACING.SM,
   },
   emptySubtitle: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.QUATERNARY,
   },
   listContent: {
     paddingHorizontal: SPACING.XL,
@@ -240,9 +276,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.MD,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
     borderRadius: BORDER_RADIUS.LG,
     padding: SPACING.LG,
     marginBottom: SPACING.SM,
@@ -259,13 +293,11 @@ const styles = StyleSheet.create({
   conversationName: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '500',
-    color: COLORS.TEXT.PRIMARY,
     flex: 1,
     marginRight: SPACING.SM,
   },
   conversationTime: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
   },
   conversationFooter: {
     flexDirection: 'row',
@@ -274,12 +306,10 @@ const styles = StyleSheet.create({
   },
   conversationPreview: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.TERTIARY,
     flex: 1,
     marginRight: SPACING.SM,
   },
   unreadBadge: {
-    backgroundColor: COLORS.PRIMARY,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -290,6 +320,5 @@ const styles = StyleSheet.create({
   unreadBadgeText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
 });

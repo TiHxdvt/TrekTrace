@@ -3,10 +3,11 @@
  * 固定尺寸 375×500，positioned off-screen
  */
 
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../../theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import type { MonthSummary, LifetimeStats, ActivityType } from '../../utils/statsComputations';
 
 interface StatsShareCardProps {
@@ -22,6 +23,7 @@ const TYPE_COLORS: Record<ActivityType, string> = {
 
 export const StatsShareCard = forwardRef<View, StatsShareCardProps>(
   ({ monthSummary, lifetimeStats }, ref) => {
+    const { colors } = useTheme();
     const monthDate = new Date(monthSummary.year, monthSummary.month - 1, 1);
     const title = format(monthDate, 'yyyy年M月');
 
@@ -36,31 +38,105 @@ export const StatsShareCard = forwardRef<View, StatsShareCardProps>(
     for (const d of daysInMonth) cells.push(d.getDate());
     while (cells.length < 42) cells.push(null);
 
+    const dynamicStyles = useMemo(() => StyleSheet.create({
+      card: {
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
+        backgroundColor: colors.BACKGROUND,
+        padding: SPACING.XXL,
+        position: 'absolute',
+        top: -10000,
+        left: 0,
+      },
+      brand: {
+        fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+        color: colors.PRIMARY,
+        fontWeight: '600',
+        letterSpacing: 1,
+      },
+      title: {
+        fontSize: TYPOGRAPHY.FONT_SIZE.XXL,
+        fontWeight: '700',
+        color: colors.TEXT.PRIMARY,
+        marginTop: SPACING.LG,
+      },
+      statsRow: {
+        flexDirection: 'row',
+        marginTop: SPACING.XL,
+        paddingVertical: SPACING.LG,
+        paddingHorizontal: SPACING.SM,
+        backgroundColor: colors.OVERLAY.LIGHT,
+        borderRadius: BORDER_RADIUS.XL,
+        alignItems: 'center',
+        justifyContent: 'space-around',
+      },
+      statValue: {
+        fontSize: TYPOGRAPHY.FONT_SIZE.LG,
+        fontWeight: '700',
+        color: colors.TEXT.PRIMARY,
+      },
+      statLabel: {
+        fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+        color: colors.TEXT.QUATERNARY,
+      },
+      statDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: colors.BORDER.LIGHT,
+      },
+      miniDayText: {
+        fontSize: 8,
+        color: colors.TEXT.QUINARY,
+      },
+      miniDayActive: {
+        color: colors.PRIMARY,
+        fontWeight: '600',
+      },
+      miniDot: {
+        position: 'absolute',
+        bottom: 1,
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: colors.PRIMARY,
+      },
+      slogan: {
+        position: 'absolute',
+        bottom: SPACING.XXL,
+        left: 0,
+        right: 0,
+        textAlign: 'center',
+        fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+        color: colors.TEXT.QUATERNARY,
+        letterSpacing: 2,
+      },
+    }), [colors]);
+
     return (
-      <View ref={ref} style={styles.card} collapsable={false}>
+      <View ref={ref} style={dynamicStyles.card} collapsable={false}>
         {/* 品牌标识 */}
-        <Text style={styles.brand}>途迹 TrekTrace</Text>
+        <Text style={dynamicStyles.brand}>途迹 TrekTrace</Text>
 
         {/* 标题 */}
-        <Text style={styles.title}>{title} 运动报告</Text>
+        <Text style={dynamicStyles.title}>{title} 运动报告</Text>
 
         {/* 统计数据 */}
-        <View style={styles.statsRow}>
+        <View style={dynamicStyles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{monthSummary.activeDays}</Text>
-            <Text style={styles.statLabel}>活跃天数</Text>
+            <Text style={dynamicStyles.statValue}>{monthSummary.activeDays}</Text>
+            <Text style={dynamicStyles.statLabel}>活跃天数</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={dynamicStyles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>
+            <Text style={dynamicStyles.statValue}>
               {(monthSummary.totalDistance / 1000).toFixed(1)}
             </Text>
-            <Text style={styles.statLabel}>总里程(km)</Text>
+            <Text style={dynamicStyles.statLabel}>总里程(km)</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={dynamicStyles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{monthSummary.totalActivities}</Text>
-            <Text style={styles.statLabel}>活动次数</Text>
+            <Text style={dynamicStyles.statValue}>{monthSummary.totalActivities}</Text>
+            <Text style={dynamicStyles.statLabel}>活动次数</Text>
           </View>
         </View>
 
@@ -74,17 +150,17 @@ export const StatsShareCard = forwardRef<View, StatsShareCardProps>(
 
             return (
               <View key={dateKey} style={styles.miniCell}>
-                <Text style={[styles.miniDayText, hasAct && styles.miniDayActive]}>
+                <Text style={[dynamicStyles.miniDayText, hasAct && dynamicStyles.miniDayActive]}>
                   {day}
                 </Text>
-                {hasAct && <View style={styles.miniDot} />}
+                {hasAct && <View style={dynamicStyles.miniDot} />}
               </View>
             );
           })}
         </View>
 
         {/* 底部标语 */}
-        <Text style={styles.slogan}>每一步都值得记录</Text>
+        <Text style={dynamicStyles.slogan}>每一步都值得记录</Text>
       </View>
     );
   },
@@ -97,54 +173,9 @@ const CARD_HEIGHT = 500;
 const MINI_CELL = 20;
 
 const styles = StyleSheet.create({
-  card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    backgroundColor: COLORS.BACKGROUND,
-    padding: SPACING.XXL,
-    position: 'absolute',
-    top: -10000,
-    left: 0,
-  },
-  brand: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XXL,
-    fontWeight: '700',
-    color: COLORS.TEXT.PRIMARY,
-    marginTop: SPACING.LG,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    marginTop: SPACING.XL,
-    paddingVertical: SPACING.LG,
-    paddingHorizontal: SPACING.SM,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderRadius: BORDER_RADIUS.XL,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
   statItem: {
     alignItems: 'center',
     gap: 2,
-  },
-  statValue: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.LG,
-    fontWeight: '700',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  statLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: COLORS.BORDER.LIGHT,
   },
   miniGrid: {
     flexDirection: 'row',
@@ -156,31 +187,5 @@ const styles = StyleSheet.create({
     height: MINI_CELL,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  miniDayText: {
-    fontSize: 8,
-    color: COLORS.TEXT.QUINARY,
-  },
-  miniDayActive: {
-    color: COLORS.PRIMARY,
-    fontWeight: '600',
-  },
-  miniDot: {
-    position: 'absolute',
-    bottom: 1,
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: COLORS.PRIMARY,
-  },
-  slogan: {
-    position: 'absolute',
-    bottom: SPACING.XXL,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-    letterSpacing: 2,
   },
 });

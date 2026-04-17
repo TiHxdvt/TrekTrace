@@ -3,9 +3,9 @@
  * 统一处理 DiceBear 绝对 URL 和服务器相对路径，自动 fallback 到 IconUser 占位符
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { COLORS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { IconUser } from './SolarIcons';
 import { APP_CONFIG } from '../config';
 
@@ -36,6 +36,23 @@ export function resolveAvatarUrl(uri: string | null | undefined): string | null 
 
 export const Avatar: React.FC<AvatarProps> = ({ uri, size = 48, onPress, loading: loadingProp }) => {
   const [error, setError] = useState(false);
+  const { colors } = useTheme();
+
+  const dynamicStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          backgroundColor: colors.OVERLAY.MEDIUM,
+          borderWidth: 1,
+          borderColor: colors.BORDER.MEDIUM,
+          justifyContent: 'center',
+          alignItems: 'center',
+          overflow: 'hidden',
+        },
+      }),
+    [colors],
+  );
+
   const resolvedUri = resolveAvatarUrl(uri);
 
   // uri 变化时重置错误状态，以便重新尝试加载
@@ -46,9 +63,9 @@ export const Avatar: React.FC<AvatarProps> = ({ uri, size = 48, onPress, loading
   const radius = size / 2;
 
   const content = (
-    <View style={[styles.container, { width: size, height: size, borderRadius: radius }]}>
+    <View style={[dynamicStyles.container, { width: size, height: size, borderRadius: radius }]}>
       {loadingProp ? (
-        <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+        <ActivityIndicator size="small" color={colors.PRIMARY} />
       ) : showImage ? (
         <Image
           source={{ uri: resolvedUri! }}
@@ -57,7 +74,7 @@ export const Avatar: React.FC<AvatarProps> = ({ uri, size = 48, onPress, loading
           resizeMode="cover"
         />
       ) : (
-        <IconUser size={size * 0.5} color={COLORS.TEXT.SECONDARY} />
+        <IconUser size={size * 0.5} color={colors.TEXT.SECONDARY} />
       )}
     </View>
   );
@@ -74,14 +91,6 @@ export const Avatar: React.FC<AvatarProps> = ({ uri, size = 48, onPress, loading
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
   image: {
     flex: 1,
   },

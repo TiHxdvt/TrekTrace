@@ -3,7 +3,7 @@
  * 提供命令式 Toast.show() API
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING, ANIMATION } from '../theme';
+import { BORDER_RADIUS, TYPOGRAPHY, SPACING, ANIMATION } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ToastConfig {
   message: string;
@@ -40,11 +41,45 @@ export const Toast = {
 };
 
 export const ToastRoot: React.FC = () => {
+  const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const [config, setConfig] = useState<ToastConfig>({ message: '' });
   const opacity = useRef(new Animated.Value(0));
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    toast: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.BACKGROUND_LIGHT,
+      borderRadius: BORDER_RADIUS.G2.LG,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      paddingHorizontal: SPACING.LG,
+      paddingVertical: SPACING.MD,
+      maxWidth: 360,
+    },
+    message: {
+      flexShrink: 1,
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      color: colors.TEXT.SECONDARY,
+      fontWeight: '500',
+      lineHeight: 20,
+    },
+    copyButton: {
+      marginLeft: SPACING.MD,
+      paddingVertical: SPACING.XS,
+      paddingHorizontal: SPACING.MD,
+      backgroundColor: colors.PRIMARY,
+      borderRadius: BORDER_RADIUS.MD,
+    },
+    copyText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: '#ffffff',
+      fontWeight: '600',
+    },
+  }), [colors]);
 
   const hide = useCallback(() => {
     Animated.timing(opacity.current, {
@@ -106,13 +141,13 @@ export const ToastRoot: React.FC = () => {
       ]}
       pointerEvents="box-none"
     >
-      <View style={styles.toast}>
-        <Text style={styles.message} numberOfLines={2}>
+      <View style={dynamicStyles.toast}>
+        <Text style={dynamicStyles.message} numberOfLines={2}>
           {config.message}
         </Text>
         {config.copyText ? (
-          <TouchableOpacity onPress={handleCopy} activeOpacity={0.7} style={styles.copyButton}>
-            <Text style={styles.copyText}>复制</Text>
+          <TouchableOpacity onPress={handleCopy} activeOpacity={0.7} style={dynamicStyles.copyButton}>
+            <Text style={dynamicStyles.copyText}>复制</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -129,35 +164,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.XXL,
     zIndex: 9999,
     elevation: 9999,
-  },
-  toast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.BACKGROUND_LIGHT,
-    borderRadius: BORDER_RADIUS.G2.LG,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    paddingHorizontal: SPACING.LG,
-    paddingVertical: SPACING.MD,
-    maxWidth: 360,
-  },
-  message: {
-    flexShrink: 1,
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    color: COLORS.TEXT.SECONDARY,
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-  copyButton: {
-    marginLeft: SPACING.MD,
-    paddingVertical: SPACING.XS,
-    paddingHorizontal: SPACING.MD,
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: BORDER_RADIUS.MD,
-  },
-  copyText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.PRIMARY,
-    fontWeight: '600',
   },
 });

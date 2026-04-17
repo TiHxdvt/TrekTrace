@@ -2,7 +2,7 @@
  * 同行好友页面
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { friendService, FriendData, FriendRequestData } from '../services/friendService';
@@ -30,6 +31,7 @@ type Tab = 'friends' | 'requests';
 type AddMode = 'account' | 'phone';
 
 export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation }) => {
+  const { colors } = useTheme();
   const [tab, setTab] = useState<Tab>('friends');
   const [addMode, setAddMode] = useState<AddMode>('account');
   const [friends, setFriends] = useState<FriendData[]>([]);
@@ -37,6 +39,139 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
   const [loading, setLoading] = useState(true);
   const [addInput, setAddInput] = useState('');
   const [sending, setSending] = useState(false);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    badge: {
+      backgroundColor: colors.ERROR,
+      borderRadius: 10,
+      minWidth: 20,
+      height: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+    },
+    badgeText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
+    card: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.LG,
+      paddingHorizontal: SPACING.LG,
+      marginTop: SPACING.MD,
+    },
+    addModeBtn: {
+      paddingVertical: SPACING.SM,
+      paddingHorizontal: SPACING.LG,
+      borderRadius: BORDER_RADIUS.SM,
+      backgroundColor: colors.OVERLAY.MEDIUM,
+    },
+    addModeBtnActive: {
+      backgroundColor: colors.PRIMARY,
+    },
+    addModeText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+      fontWeight: '500',
+    },
+    addModeTextActive: {
+      color: '#ffffff',
+    },
+    addInput: {
+      flex: 1,
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      borderRadius: BORDER_RADIUS.MD,
+      paddingHorizontal: SPACING.LG,
+      paddingVertical: SPACING.MD,
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.PRIMARY,
+    },
+    addBtn: {
+      backgroundColor: colors.PRIMARY,
+      borderRadius: BORDER_RADIUS.MD,
+      paddingHorizontal: SPACING.XL,
+      justifyContent: 'center',
+    },
+    addBtnText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
+    tabBar: {
+      flexDirection: 'row',
+      marginTop: SPACING.XXL,
+      marginBottom: SPACING.MD,
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderRadius: BORDER_RADIUS.MD,
+      padding: 3,
+    },
+    tabActive: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+    },
+    tabText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      fontWeight: '500',
+      color: colors.TEXT.QUATERNARY,
+    },
+    tabTextActive: {
+      color: colors.TEXT.PRIMARY,
+    },
+    emptyText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.QUATERNARY,
+    },
+    friendName: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      fontWeight: '500',
+      color: colors.TEXT.SECONDARY,
+    },
+    friendAccount: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+      marginTop: 2,
+    },
+    chatBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.BORDER.LIGHT,
+    },
+    acceptBtn: {
+      backgroundColor: colors.PRIMARY,
+      borderRadius: BORDER_RADIUS.SM,
+      paddingHorizontal: SPACING.LG,
+      paddingVertical: SPACING.SM,
+    },
+    acceptBtnText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '500',
+      color: '#ffffff',
+    },
+    declineBtn: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderRadius: BORDER_RADIUS.SM,
+      paddingHorizontal: SPACING.LG,
+      paddingVertical: SPACING.SM,
+    },
+    declineBtnText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '500',
+      color: colors.TEXT.TERTIARY,
+    },
+  }), [colors]);
 
   const loadData = useCallback(async () => {
     try {
@@ -150,8 +285,8 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
 
   const rightEl = requests.length > 0 ? (
     <TouchableOpacity onPress={() => setTab('requests')} activeOpacity={0.7}>
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>{requests.length}</Text>
+      <View style={dynamicStyles.badge}>
+        <Text style={dynamicStyles.badgeText}>{requests.length}</Text>
       </View>
     </TouchableOpacity>
   ) : null;
@@ -161,7 +296,7 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
       <FeatureScreenLayout>
         <FeatureHeader title="同行好友" onBack={() => navigation.goBack()} />
         <View style={styles.center}>
-          <ActivityIndicator color={COLORS.PRIMARY} />
+          <ActivityIndicator color={colors.PRIMARY} />
         </View>
       </FeatureScreenLayout>
     );
@@ -172,59 +307,59 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
       <FeatureHeader title="同行好友" onBack={() => navigation.goBack()} right={rightEl} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* 添加好友 */}
-        <View style={styles.card}>
+        <View style={dynamicStyles.card}>
           <View style={styles.addModeRow}>
             <TouchableOpacity
-              style={[styles.addModeBtn, addMode === 'account' && styles.addModeBtnActive]}
+              style={[dynamicStyles.addModeBtn, addMode === 'account' && dynamicStyles.addModeBtnActive]}
               onPress={() => { setAddMode('account'); setAddInput(''); }}
               activeOpacity={0.7}
             >
-              <Text style={[styles.addModeText, addMode === 'account' && styles.addModeTextActive]}>账号</Text>
+              <Text style={[dynamicStyles.addModeText, addMode === 'account' && dynamicStyles.addModeTextActive]}>账号</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.addModeBtn, addMode === 'phone' && styles.addModeBtnActive]}
+              style={[dynamicStyles.addModeBtn, addMode === 'phone' && dynamicStyles.addModeBtnActive]}
               onPress={() => { setAddMode('phone'); setAddInput(''); }}
               activeOpacity={0.7}
             >
-              <Text style={[styles.addModeText, addMode === 'phone' && styles.addModeTextActive]}>手机号</Text>
+              <Text style={[dynamicStyles.addModeText, addMode === 'phone' && dynamicStyles.addModeTextActive]}>手机号</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.addRow}>
             <TextInput
-              style={styles.addInput}
+              style={dynamicStyles.addInput}
               value={addInput}
               onChangeText={setAddInput}
               placeholder={addMode === 'account' ? '输入途迹账号' : '输入手机号'}
-              placeholderTextColor={COLORS.TEXT.PLACEHOLDER}
+              placeholderTextColor={colors.TEXT.PLACEHOLDER}
               keyboardType="number-pad"
               maxLength={addMode === 'account' ? 15 : 11}
             />
             <TouchableOpacity
-              style={[styles.addBtn, sending && styles.addBtnDisabled]}
+              style={[dynamicStyles.addBtn, sending && styles.addBtnDisabled]}
               onPress={handleSendRequest}
               disabled={sending}
               activeOpacity={0.7}
             >
-              <Text style={styles.addBtnText}>{sending ? '...' : '添加'}</Text>
+              <Text style={dynamicStyles.addBtnText}>{sending ? '...' : '添加'}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Tab selector */}
-        <View style={styles.tabBar}>
+        <View style={dynamicStyles.tabBar}>
           <TouchableOpacity
-            style={[styles.tab, tab === 'friends' && styles.tabActive]}
+            style={[styles.tab, tab === 'friends' && dynamicStyles.tabActive]}
             onPress={() => setTab('friends')}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, tab === 'friends' && styles.tabTextActive]}>好友</Text>
+            <Text style={[dynamicStyles.tabText, tab === 'friends' && dynamicStyles.tabTextActive]}>好友</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, tab === 'requests' && styles.tabActive]}
+            style={[styles.tab, tab === 'requests' && dynamicStyles.tabActive]}
             onPress={() => setTab('requests')}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>
+            <Text style={[dynamicStyles.tabText, tab === 'requests' && dynamicStyles.tabTextActive]}>
               请求 {requests.length > 0 ? `(${requests.length})` : ''}
             </Text>
           </TouchableOpacity>
@@ -234,11 +369,11 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
         {tab === 'friends' && (
           friends.length === 0 ? (
             <View style={styles.emptyState}>
-              <IconUsersGroupRounded size={48} color={COLORS.TEXT.QUINARY} />
-              <Text style={styles.emptyText}>暂无好友</Text>
+              <IconUsersGroupRounded size={48} color={colors.TEXT.QUINARY} />
+              <Text style={dynamicStyles.emptyText}>暂无好友</Text>
             </View>
           ) : (
-            <View style={styles.card}>
+            <View style={dynamicStyles.card}>
               {friends.map((friend, index) => (
                 <React.Fragment key={friend.friendshipId}>
                   <TouchableOpacity
@@ -249,18 +384,18 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
                   >
                     <Avatar uri={friend.avatarUrl} size={44} />
                     <View style={styles.friendInfo}>
-                      <Text style={styles.friendName}>{friend.nickname || '用户'}</Text>
-                      <Text style={styles.friendAccount}>途迹账号：{friend.account ?? '-'}</Text>
+                      <Text style={dynamicStyles.friendName}>{friend.nickname || '用户'}</Text>
+                      <Text style={dynamicStyles.friendAccount}>途迹账号：{friend.account ?? '-'}</Text>
                     </View>
                     <TouchableOpacity
-                      style={styles.chatBtn}
+                      style={dynamicStyles.chatBtn}
                       onPress={() => handleChatFriend(friend)}
                       activeOpacity={0.7}
                     >
-                      <IconChatRoundDots size={20} color={COLORS.TEXT.PRIMARY} />
+                      <IconChatRoundDots size={20} color={colors.TEXT.PRIMARY} />
                     </TouchableOpacity>
                   </TouchableOpacity>
-                  {index < friends.length - 1 && <View style={styles.divider} />}
+                  {index < friends.length - 1 && <View style={dynamicStyles.divider} />}
                 </React.Fragment>
               ))}
             </View>
@@ -271,36 +406,36 @@ export const FriendsScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
         {tab === 'requests' && (
           requests.length === 0 ? (
             <View style={styles.emptyState}>
-              <IconUsersGroupRounded size={48} color={COLORS.TEXT.QUINARY} />
-              <Text style={styles.emptyText}>暂无好友请求</Text>
+              <IconUsersGroupRounded size={48} color={colors.TEXT.QUINARY} />
+              <Text style={dynamicStyles.emptyText}>暂无好友请求</Text>
             </View>
           ) : (
-            <View style={styles.card}>
+            <View style={dynamicStyles.card}>
               {requests.map((req, index) => (
                 <React.Fragment key={req.id}>
                   <View style={styles.requestItem}>
                     <Avatar uri={req.requesterAvatarUrl} size={44} />
                     <View style={styles.friendInfo}>
-                      <Text style={styles.friendName}>{req.requesterNickname || '用户'}</Text>
+                      <Text style={dynamicStyles.friendName}>{req.requesterNickname || '用户'}</Text>
                     </View>
                     <View style={styles.requestActions}>
                       <TouchableOpacity
-                        style={styles.acceptBtn}
+                        style={dynamicStyles.acceptBtn}
                         onPress={() => handleAccept(req.id)}
                         activeOpacity={0.7}
                       >
-                        <Text style={styles.acceptBtnText}>接受</Text>
+                        <Text style={dynamicStyles.acceptBtnText}>接受</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={styles.declineBtn}
+                        style={dynamicStyles.declineBtn}
                         onPress={() => handleDecline(req.id)}
                         activeOpacity={0.7}
                       >
-                        <Text style={styles.declineBtnText}>拒绝</Text>
+                        <Text style={dynamicStyles.declineBtnText}>拒绝</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-                  {index < requests.length - 1 && <View style={styles.divider} />}
+                  {index < requests.length - 1 && <View style={dynamicStyles.divider} />}
                 </React.Fragment>
               ))}
             </View>
@@ -315,113 +450,29 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },
-  badge: {
-    backgroundColor: COLORS.ERROR,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  card: {
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.LG,
-    paddingHorizontal: SPACING.LG,
-    marginTop: SPACING.MD,
-  },
   addModeRow: {
     flexDirection: 'row',
     gap: SPACING.SM,
     marginBottom: SPACING.MD,
     paddingTop: SPACING.LG,
   },
-  addModeBtn: {
-    paddingVertical: SPACING.SM,
-    paddingHorizontal: SPACING.LG,
-    borderRadius: BORDER_RADIUS.SM,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-  },
-  addModeBtnActive: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  addModeText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-    fontWeight: '500',
-  },
-  addModeTextActive: {
-    color: COLORS.TEXT.PRIMARY,
-  },
   addRow: {
     flexDirection: 'row',
     gap: SPACING.SM,
     paddingBottom: SPACING.LG,
   },
-  addInput: {
-    flex: 1,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    borderRadius: BORDER_RADIUS.MD,
-    paddingHorizontal: SPACING.LG,
-    paddingVertical: SPACING.MD,
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    color: COLORS.TEXT.PRIMARY,
-  },
-  addBtn: {
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: BORDER_RADIUS.MD,
-    paddingHorizontal: SPACING.XL,
-    justifyContent: 'center',
-  },
   addBtnDisabled: { opacity: 0.5 },
-  addBtnText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    marginTop: SPACING.XXL,
-    marginBottom: SPACING.MD,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderRadius: BORDER_RADIUS.MD,
-    padding: 3,
-  },
   tab: {
     flex: 1,
     paddingVertical: SPACING.MD,
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.SM,
   },
-  tabActive: {
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-  },
-  tabText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    fontWeight: '500',
-    color: COLORS.TEXT.QUATERNARY,
-  },
-  tabTextActive: {
-    color: COLORS.TEXT.PRIMARY,
-  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: SPACING.XXXL * 2,
     gap: SPACING.LG,
-  },
-  emptyText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    color: COLORS.TEXT.QUATERNARY,
   },
   friendItem: {
     flexDirection: 'row',
@@ -432,30 +483,6 @@ const styles = StyleSheet.create({
   friendInfo: {
     flex: 1,
   },
-  friendName: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '500',
-    color: COLORS.TEXT.SECONDARY,
-  },
-  friendAccount: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-    marginTop: 2,
-  },
-  chatBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.BORDER.LIGHT,
-  },
   requestItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -465,27 +492,5 @@ const styles = StyleSheet.create({
   requestActions: {
     flexDirection: 'row',
     gap: SPACING.SM,
-  },
-  acceptBtn: {
-    backgroundColor: COLORS.PRIMARY,
-    borderRadius: BORDER_RADIUS.SM,
-    paddingHorizontal: SPACING.LG,
-    paddingVertical: SPACING.SM,
-  },
-  acceptBtnText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '500',
-    color: COLORS.TEXT.PRIMARY,
-  },
-  declineBtn: {
-    backgroundColor: COLORS.OVERLAY.MEDIUM,
-    borderRadius: BORDER_RADIUS.SM,
-    paddingHorizontal: SPACING.LG,
-    paddingVertical: SPACING.SM,
-  },
-  declineBtnText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    fontWeight: '500',
-    color: COLORS.TEXT.TERTIARY,
   },
 });

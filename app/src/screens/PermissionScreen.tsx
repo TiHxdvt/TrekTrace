@@ -3,7 +3,7 @@
  * 展示当前 App 所需权限的获取状态，支持点击重新请求
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import {
   PermissionsAndroid,
   Linking,
 } from 'react-native';
-import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { Dialog } from '../components/Dialog';
@@ -55,7 +56,50 @@ const PERMS: PermItem[] = [
 ];
 
 export const PermissionScreen: React.FC<{ navigation: NavProp }> = ({ navigation }) => {
+  const { colors } = useTheme();
   const [granted, setGranted] = useState<Record<string, boolean> | null>(null);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.LG,
+      padding: SPACING.LG,
+      marginBottom: SPACING.MD,
+    },
+    cardLabel: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+      marginBottom: 2,
+    },
+    cardDesc: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.TERTIARY,
+    },
+    badgeOn: {
+      backgroundColor: colors.SUCCESS + '20',
+    },
+    badgeOff: {
+      backgroundColor: colors.ERROR + '20',
+    },
+    badgeTextOn: {
+      color: colors.SUCCESS,
+    },
+    badgeTextOff: {
+      color: colors.ERROR,
+    },
+    tip: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      color: colors.TEXT.QUATERNARY,
+      textAlign: 'center',
+      marginTop: SPACING.XL,
+    },
+  }), [colors]);
 
   const checkAll = useCallback(async () => {
     if (Platform.OS !== 'android') {
@@ -102,30 +146,30 @@ export const PermissionScreen: React.FC<{ navigation: NavProp }> = ({ navigation
           return (
             <TouchableOpacity
               key={perm.key}
-              style={styles.card}
+              style={dynamicStyles.card}
               onPress={() => handleRequest(perm)}
               activeOpacity={0.7}
             >
               <View style={styles.cardLeft}>
                 {isGranted ? (
-                  <IconShieldCheck size={28} color={COLORS.SUCCESS} />
+                  <IconShieldCheck size={28} color={colors.SUCCESS} />
                 ) : (
-                  <IconShieldCross size={28} color={COLORS.ERROR} />
+                  <IconShieldCross size={28} color={colors.ERROR} />
                 )}
                 <View style={styles.cardText}>
-                  <Text style={styles.cardLabel}>{perm.label}</Text>
-                  <Text style={styles.cardDesc}>{perm.desc}</Text>
+                  <Text style={dynamicStyles.cardLabel}>{perm.label}</Text>
+                  <Text style={dynamicStyles.cardDesc}>{perm.desc}</Text>
                 </View>
               </View>
-              <View style={[styles.badge, isGranted ? styles.badgeOn : styles.badgeOff]}>
-                <Text style={[styles.badgeText, isGranted ? styles.badgeTextOn : styles.badgeTextOff]}>
+              <View style={[styles.badge, isGranted ? dynamicStyles.badgeOn : dynamicStyles.badgeOff]}>
+                <Text style={[styles.badgeText, isGranted ? dynamicStyles.badgeTextOn : dynamicStyles.badgeTextOff]}>
                   {isGranted ? '已获取' : granted === null ? '检测中' : '未获取'}
                 </Text>
               </View>
             </TouchableOpacity>
           );
         })}
-        <Text style={styles.tip}>点击权限项可重新请求授权</Text>
+        <Text style={dynamicStyles.tip}>点击权限项可重新请求授权</Text>
       </ScrollView>
     </FeatureScreenLayout>
   );
@@ -134,17 +178,6 @@ export const PermissionScreen: React.FC<{ navigation: NavProp }> = ({ navigation
 const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2, paddingTop: SPACING.MD },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER.LIGHT,
-    borderRadius: BORDER_RADIUS.LG,
-    padding: SPACING.LG,
-    marginBottom: SPACING.MD,
-  },
   cardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -154,41 +187,13 @@ const styles = StyleSheet.create({
   cardText: {
     flex: 1,
   },
-  cardLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
-    marginBottom: 2,
-  },
-  cardDesc: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.TERTIARY,
-  },
   badge: {
     borderRadius: BORDER_RADIUS.SM,
     paddingHorizontal: SPACING.SM,
     paddingVertical: 4,
   },
-  badgeOn: {
-    backgroundColor: COLORS.SUCCESS + '20',
-  },
-  badgeOff: {
-    backgroundColor: COLORS.ERROR + '20',
-  },
   badgeText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
     fontWeight: '500',
-  },
-  badgeTextOn: {
-    color: COLORS.SUCCESS,
-  },
-  badgeTextOff: {
-    color: COLORS.ERROR,
-  },
-  tip: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-    color: COLORS.TEXT.QUATERNARY,
-    textAlign: 'center',
-    marginTop: SPACING.XL,
   },
 });

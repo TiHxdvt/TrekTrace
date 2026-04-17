@@ -28,7 +28,8 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '../navigation/types';
 import { DrawerOverlay } from '../components/DrawerOverlay';
 import Svg, { Circle, Polyline as SvgPolyline } from 'react-native-svg';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../theme';
+import { BORDER_RADIUS, TYPOGRAPHY } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { APP_CONFIG } from '../config';
 import {
   IconHamburgerMenu,
@@ -63,13 +64,6 @@ import type {
 
 type ActivityTypeLocal = 'running' | 'cycling' | 'hiking';
 type GpsStrength = 'none' | 'weak' | 'medium' | 'strong';
-
-const GPS_COLORS: Record<GpsStrength, string> = {
-  none: COLORS.TEXT.DISABLED,
-  weak: COLORS.ERROR,
-  medium: COLORS.WARNING,
-  strong: COLORS.SUCCESS,
-};
 
 const ACTIVITY_CYCLE: ActivityTypeLocal[] = ['hiking', 'running', 'cycling'];
 const PANEL_HEIGHT = 105;
@@ -107,6 +101,7 @@ function samplePoints(coords: Array<{latitude: number; longitude: number}>, maxC
 
 export const ActivityScreen: React.FC = () => {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, 'ActivityTab'>>();
+  const { colors, isDarkMode } = useTheme();
   const [activityIndex, setActivityIndex] = useState(0); // 默认徒步
   const insets = useSafeAreaInsets();
   const mapViewRef = useRef<MapView>(null);
@@ -209,8 +204,8 @@ export const ActivityScreen: React.FC = () => {
   // Mock GPS simulation state (__DEV__ only)
   const [isSimulating, setIsSimulating] = useState(false);
 
-  // Map type state
-  const [mapType, setMapType] = useState<MapType>(MapType.Night);
+  // Map type — follows theme reactively
+  const mapType = useMemo(() => isDarkMode ? MapType.Night : MapType.Standard, [isDarkMode]);
 
   // Refs for Drawer callbacks (to always get latest state)
   const isSimulatingRef = useRef(false);
@@ -696,6 +691,167 @@ export const ActivityScreen: React.FC = () => {
 
   const selectedType = ACTIVITY_CYCLE[activityIndex];
 
+  // GPS strength colors — derived from theme
+  const gpsColors: Record<GpsStrength, string> = useMemo(() => ({
+    none: colors.TEXT.DISABLED,
+    weak: colors.ERROR,
+    medium: colors.WARNING,
+    strong: colors.SUCCESS,
+  }), [colors]);
+
+  // Dynamic styles — all color-dependent styles
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.BACKGROUND,
+    },
+    glowOrbTop: {
+      backgroundColor: colors.GRADIENT.BLUE,
+    },
+    glowOrbCenter: {
+      backgroundColor: colors.GRADIENT.PINK,
+    },
+    glowOrbBottom: {
+      backgroundColor: colors.GRADIENT.PURPLE,
+    },
+    headerIconButton: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    searchBar: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+    },
+    searchPlaceholder: {
+      color: colors.TEXT.TERTIARY,
+    },
+    mapGpsStatusWrapper: {
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    mapLocateWrapper: {
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    mapSimWrapper: {
+      backgroundColor: colors.OVERLAY.GPS_SIM,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    mapSimActive: {
+      backgroundColor: colors.ERROR_OVERLAY.SIM_BG,
+      borderColor: colors.ERROR_OVERLAY.SIM_BORDER,
+    },
+    simText: {
+      color: colors.TEXT.SECONDARY,
+    },
+    simTextActive: {
+      color: colors.TEXT.PRIMARY,
+    },
+    panelWrapper: {
+      backgroundColor: colors.BACKGROUND,
+    },
+    statDivider: {
+      backgroundColor: colors.BORDER.LIGHT,
+    },
+    statLabel: {
+      color: colors.TEXT.QUATERNARY,
+    },
+    statValue: {
+      color: colors.TEXT.PRIMARY,
+    },
+    statValueDim: {
+      color: colors.TEXT.DISABLED,
+    },
+    statUnit: {
+      color: colors.TEXT.QUINARY,
+    },
+    idleBtnBg: {
+      backgroundColor: isDarkMode ? '#2a2d38' : 'rgba(0, 0, 0, 0.06)',
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    resumeBtnBg: {
+      backgroundColor: colors.SUCCESS,
+      shadowColor: colors.SUCCESS,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
+    },
+    startBtnBg: {
+      backgroundColor: colors.PRIMARY,
+      shadowColor: colors.PRIMARY,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.4,
+    },
+    stopBtnBg: {
+      backgroundColor: colors.ERROR_OVERLAY.BUTTON_BG,
+      borderWidth: 1,
+      borderColor: colors.ERROR_OVERLAY.BUTTON_BORDER,
+    },
+    summaryTypeBadge: {
+      backgroundColor: colors.OVERLAY.SUMMARY,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    summaryTypeText: {
+      color: colors.TEXT.PRIMARY,
+    },
+    summaryStatsCard: {
+      backgroundColor: colors.OVERLAY.SUMMARY,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    summaryStatLabel: {
+      color: colors.TEXT.QUATERNARY,
+    },
+    summaryStatValue: {
+      color: colors.TEXT.PRIMARY,
+    },
+    summaryDiscardBtn: {
+      backgroundColor: colors.ERROR_OVERLAY.BUTTON_BG,
+      borderWidth: 1,
+      borderColor: colors.ERROR_OVERLAY.BUTTON_BORDER,
+    },
+    summaryDiscardText: {
+      color: colors.ERROR,
+    },
+    summarySaveBtn: {
+      backgroundColor: colors.PRIMARY,
+      shadowColor: colors.PRIMARY,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
+    },
+    summarySaveText: {
+      color: '#ffffff',
+    },
+    summaryShareBtn: {
+      backgroundColor: colors.OVERLAY.SUMMARY,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    shareCard: {
+      backgroundColor: colors.BACKGROUND,
+    },
+    shareCardDivider: {
+      backgroundColor: colors.BORDER.LIGHT,
+    },
+    shareCardTypeText: {
+      color: colors.TEXT.PRIMARY,
+    },
+    shareCardStatLabel: {
+      color: colors.TEXT.QUATERNARY,
+    },
+    shareCardStatValue: {
+      color: colors.TEXT.PRIMARY,
+    },
+    shareCardWatermark: {
+      color: colors.TEXT.DISABLED,
+    },
+  }), [colors]);
+
   // 重试上传：失败后持续弹窗，直到成功或用户主动丢弃
   const retryUploadWithDialog = async () => {
     let ok = false;
@@ -962,12 +1118,12 @@ export const ActivityScreen: React.FC = () => {
   const SummaryIcon = summaryTypeMeta.icon;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, dynamicStyles.container]}>
       {/* Background Ambient Glow */}
       <View style={styles.ambientGlow} pointerEvents="none">
-        <View style={[styles.glowOrb, styles.glowOrbTop]} />
-        <View style={[styles.glowOrb, styles.glowOrbCenter]} />
-        <View style={[styles.glowOrb, styles.glowOrbBottom]} />
+        <View style={[styles.glowOrb, dynamicStyles.glowOrbTop]} />
+        <View style={[styles.glowOrb, dynamicStyles.glowOrbCenter]} />
+        <View style={[styles.glowOrb, dynamicStyles.glowOrbBottom]} />
       </View>
 
       {/* 全屏模糊层 */}
@@ -975,7 +1131,7 @@ export const ActivityScreen: React.FC = () => {
         <BlurView
           style={StyleSheet.absoluteFillObject}
           blurRadius={24}
-          overlayColor={COLORS.OVERLAY.CARD}
+          overlayColor={colors.OVERLAY.CARD}
           blurType="dark"
           blurAmount={24}
         />
@@ -984,15 +1140,15 @@ export const ActivityScreen: React.FC = () => {
       {/* Header — hidden during summary */}
       {!showSummary && (
       <View style={[styles.headerBar, { paddingTop: insets.top + 16 }]}>
-        <TouchableOpacity style={styles.headerIconButton} onPress={() => DrawerOverlay.open()}>
-          <IconHamburgerMenu size={20} color={COLORS.TEXT.PRIMARY} />
+        <TouchableOpacity style={[styles.headerIconButton, dynamicStyles.headerIconButton]} onPress={() => DrawerOverlay.open()}>
+          <IconHamburgerMenu size={20} color={colors.TEXT.PRIMARY} />
         </TouchableOpacity>
-        <View style={styles.searchBar}>
-          <IconMagnifer size={18} color={COLORS.TEXT.TERTIARY} />
-          <Text style={styles.searchPlaceholder}>搜索路线...</Text>
+        <View style={[styles.searchBar, dynamicStyles.searchBar]}>
+          <IconMagnifer size={18} color={colors.TEXT.TERTIARY} />
+          <Text style={[styles.searchPlaceholder, dynamicStyles.searchPlaceholder]}>搜索路线...</Text>
         </View>
-        <TouchableOpacity style={styles.headerIconButton}>
-          <IconMicrophone size={20} color={COLORS.TEXT.PRIMARY} />
+        <TouchableOpacity style={[styles.headerIconButton, dynamicStyles.headerIconButton]}>
+          <IconMicrophone size={20} color={colors.TEXT.PRIMARY} />
         </TouchableOpacity>
       </View>
       )}
@@ -1030,7 +1186,7 @@ export const ActivityScreen: React.FC = () => {
             <Polyline
               key={`segment-${idx}`}
               points={seg.coords}
-              color={COLORS.PRIMARY}
+              color={colors.PRIMARY}
               width={8}
               zIndex={10}
             />
@@ -1038,7 +1194,7 @@ export const ActivityScreen: React.FC = () => {
         </MapView>}
         {mapError && (
           <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-            <Text style={{ color: COLORS.TEXT.TERTIARY, textAlign: 'center', marginTop: 80 }}>
+            <Text style={{ color: colors.TEXT.TERTIARY, textAlign: 'center', marginTop: 80 }}>
               地图加载失败
             </Text>
           </View>
@@ -1046,17 +1202,17 @@ export const ActivityScreen: React.FC = () => {
 
         {/* GPS Status Indicator - 左上角 */}
         {!showSummary && (
-        <TouchableOpacity style={styles.mapGpsStatusWrapper} activeOpacity={0.7}>
+        <TouchableOpacity style={[styles.mapGpsStatusWrapper, dynamicStyles.mapGpsStatusWrapper]} activeOpacity={0.7}>
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={12}
-            overlayColor={COLORS.OVERLAY.HEAVY}
+            overlayColor={colors.OVERLAY.HEAVY}
             blurType="dark"
             blurAmount={12}
             pointerEvents="none"
           />
           <Animated.View style={{ opacity: pulseAnim }}>
-            <IconCompass size={18} color={GPS_COLORS[gpsStrength]} />
+            <IconCompass size={18} color={gpsColors[gpsStrength]} />
           </Animated.View>
         </TouchableOpacity>
         )}
@@ -1066,31 +1222,32 @@ export const ActivityScreen: React.FC = () => {
           <TouchableOpacity
             style={[
               styles.mapSimWrapper,
-              isSimulating && styles.mapSimActive,
+              dynamicStyles.mapSimWrapper,
+              isSimulating && dynamicStyles.mapSimActive,
             ]}
             onPress={handleSimButton}
             activeOpacity={0.7}
           >
-            <Text style={[styles.simText, isSimulating && styles.simTextActive]}>SIM</Text>
+            <Text style={[styles.simText, isSimulating ? dynamicStyles.simTextActive : dynamicStyles.simText]}>SIM</Text>
           </TouchableOpacity>
         )}
 
         {/* Locate Button - 右下角 */}
         {!showSummary && (
         <TouchableOpacity
-          style={[styles.mapLocateWrapper, !hasGps && styles.mapLocateDisabled]}
+          style={[styles.mapLocateWrapper, dynamicStyles.mapLocateWrapper, !hasGps && styles.mapLocateDisabled]}
           onPress={handleLocate}
           disabled={!hasGps}
         >
           <BlurView
             style={StyleSheet.absoluteFillObject}
             blurRadius={12}
-            overlayColor={COLORS.OVERLAY.BLUR_LIGHT}
+            overlayColor={colors.OVERLAY.BLUR_LIGHT}
             blurType="dark"
             blurAmount={12}
             pointerEvents="none"
           />
-          <IconGps size={18} color={hasGps ? COLORS.TEXT.SECONDARY : COLORS.TEXT.DISABLED} />
+          <IconGps size={18} color={hasGps ? colors.TEXT.SECONDARY : colors.TEXT.DISABLED} />
         </TouchableOpacity>
         )}
 
@@ -1101,27 +1258,27 @@ export const ActivityScreen: React.FC = () => {
             {/* Top stats overlay */}
             <View style={[styles.summaryStatsOverlay, { paddingTop: insets.top + 16 }]}>
               {/* Activity type badge */}
-              <View style={styles.summaryTypeBadge}>
-                <SummaryIcon size={16} color={COLORS.TEXT.PRIMARY} />
-                <Text style={styles.summaryTypeText}>{summaryTypeMeta.label}</Text>
+              <View style={[styles.summaryTypeBadge, dynamicStyles.summaryTypeBadge]}>
+                <SummaryIcon size={16} color={colors.TEXT.PRIMARY} />
+                <Text style={[styles.summaryTypeText, dynamicStyles.summaryTypeText]}>{summaryTypeMeta.label}</Text>
               </View>
-              <View style={styles.summaryStatsCard}>
+              <View style={[styles.summaryStatsCard, dynamicStyles.summaryStatsCard]}>
                 <View style={styles.summaryStatsRow}>
                   <View style={styles.summaryStatItem}>
-                    <Text style={styles.summaryStatLabel}>距离</Text>
-                    <Text style={styles.summaryStatValue}>{(animatedStats.distance / 1000).toFixed(2)} km</Text>
+                    <Text style={[styles.summaryStatLabel, dynamicStyles.summaryStatLabel]}>距离</Text>
+                    <Text style={[styles.summaryStatValue, dynamicStyles.summaryStatValue]}>{(animatedStats.distance / 1000).toFixed(2)} km</Text>
                   </View>
                   <View style={styles.summaryStatItem}>
-                    <Text style={styles.summaryStatLabel}>时长</Text>
-                    <Text style={styles.summaryStatValue}>{formatDuration(animatedStats.duration)}</Text>
+                    <Text style={[styles.summaryStatLabel, dynamicStyles.summaryStatLabel]}>时长</Text>
+                    <Text style={[styles.summaryStatValue, dynamicStyles.summaryStatValue]}>{formatDuration(animatedStats.duration)}</Text>
                   </View>
                   <View style={styles.summaryStatItem}>
-                    <Text style={styles.summaryStatLabel}>配速</Text>
-                    <Text style={styles.summaryStatValue}>{formatPace(animatedStats.currentPace)}</Text>
+                    <Text style={[styles.summaryStatLabel, dynamicStyles.summaryStatLabel]}>配速</Text>
+                    <Text style={[styles.summaryStatValue, dynamicStyles.summaryStatValue]}>{formatPace(animatedStats.currentPace)}</Text>
                   </View>
                   <View style={styles.summaryStatItem}>
-                    <Text style={styles.summaryStatLabel}>爬升</Text>
-                    <Text style={styles.summaryStatValue}>{Math.round(animatedStats.elevationGain)} m</Text>
+                    <Text style={[styles.summaryStatLabel, dynamicStyles.summaryStatLabel]}>爬升</Text>
+                    <Text style={[styles.summaryStatValue, dynamicStyles.summaryStatValue]}>{Math.round(animatedStats.elevationGain)} m</Text>
                   </View>
                 </View>
               </View>
@@ -1130,25 +1287,25 @@ export const ActivityScreen: React.FC = () => {
             <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
               <View style={styles.summaryButtonRow}>
                 <TouchableOpacity
-                  style={styles.summaryDiscardBtn}
+                  style={[styles.summaryDiscardBtn, dynamicStyles.summaryDiscardBtn]}
                   onPress={handleDiscardFromSummary}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.summaryDiscardText}>丢弃</Text>
+                  <Text style={[styles.summaryDiscardText, dynamicStyles.summaryDiscardText]}>丢弃</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.summaryShareBtn}
+                  style={[styles.summaryShareBtn, dynamicStyles.summaryShareBtn]}
                   onPress={handleShareFromSummary}
                   activeOpacity={0.7}
                 >
-                  <IconShareBold size={18} color={COLORS.TEXT.PRIMARY} />
+                  <IconShareBold size={18} color={colors.TEXT.PRIMARY} />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.summarySaveBtn}
+                  style={[styles.summarySaveBtn, dynamicStyles.summarySaveBtn]}
                   onPress={handleSaveFromSummary}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.summarySaveText}>保存</Text>
+                  <Text style={[styles.summarySaveText, dynamicStyles.summarySaveText]}>保存</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1157,54 +1314,54 @@ export const ActivityScreen: React.FC = () => {
 
         {/* ========== Control Panel — hidden during summary ========== */}
         {!showSummary && (
-        <View style={styles.panelWrapper}>
+        <View style={[styles.panelWrapper, dynamicStyles.panelWrapper]}>
           <View style={styles.panelContent}>
 
             {/* 一行数据 */}
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statLabel}>距离</Text>
+                <Text style={[styles.statLabel, dynamicStyles.statLabel]}>距离</Text>
                 <View style={styles.statValueRow}>
-                  <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
+                  <Text style={[styles.statValue, dynamicStyles.statValue, isIdle && dynamicStyles.statValueDim]}>
                     {isIdle ? '--' : (stats.distance / 1000).toFixed(2)}
                   </Text>
-                  <Text style={styles.statUnit}>km</Text>
+                  <Text style={[styles.statUnit, dynamicStyles.statUnit]}>km</Text>
                 </View>
               </View>
 
-              <View style={styles.statDivider} />
+              <View style={[styles.statDivider, dynamicStyles.statDivider]} />
 
               <View style={styles.statItem}>
-                <Text style={styles.statLabel}>时长</Text>
+                <Text style={[styles.statLabel, dynamicStyles.statLabel]}>时长</Text>
                 <View style={styles.statValueRow}>
-                  <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
+                  <Text style={[styles.statValue, dynamicStyles.statValue, isIdle && dynamicStyles.statValueDim]}>
                     {isIdle ? '--' : formatDuration(stats.duration)}
                   </Text>
-                  <Text style={styles.statUnit}> </Text>
+                  <Text style={[styles.statUnit, dynamicStyles.statUnit]}> </Text>
                 </View>
               </View>
 
-              <View style={styles.statDivider} />
+              <View style={[styles.statDivider, dynamicStyles.statDivider]} />
 
               <View style={styles.statItem}>
-                <Text style={styles.statLabel}>配速</Text>
+                <Text style={[styles.statLabel, dynamicStyles.statLabel]}>配速</Text>
                 <View style={styles.statValueRow}>
-                  <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
+                  <Text style={[styles.statValue, dynamicStyles.statValue, isIdle && dynamicStyles.statValueDim]}>
                     {isIdle ? '--' : formatPace(stats.currentPace)}
                   </Text>
-                  <Text style={styles.statUnit}>min/km</Text>
+                  <Text style={[styles.statUnit, dynamicStyles.statUnit]}>min/km</Text>
                 </View>
               </View>
 
-              <View style={styles.statDivider} />
+              <View style={[styles.statDivider, dynamicStyles.statDivider]} />
 
               <View style={styles.statItem}>
-                <Text style={styles.statLabel}>海拔</Text>
+                <Text style={[styles.statLabel, dynamicStyles.statLabel]}>海拔</Text>
                 <View style={styles.statValueRow}>
-                  <Text style={[styles.statValue, isIdle && styles.statValueDim]}>
+                  <Text style={[styles.statValue, dynamicStyles.statValue, isIdle && dynamicStyles.statValueDim]}>
                     {isIdle ? '--' : Math.round(stats.elevationGain)}
                   </Text>
-                  <Text style={styles.statUnit}>m</Text>
+                  <Text style={[styles.statUnit, dynamicStyles.statUnit]}>m</Text>
                 </View>
               </View>
             </View>
@@ -1216,17 +1373,17 @@ export const ActivityScreen: React.FC = () => {
                 activeOpacity={0.7}
                 style={[
                   styles.actionBtn,
-                  isIdle ? styles.idleBtnBg : null,
-                  isRecording ? styles.startBtnBg : null,
-                  isPaused ? styles.resumeBtnBg : null,
+                  isIdle ? dynamicStyles.idleBtnBg : null,
+                  isRecording ? dynamicStyles.startBtnBg : null,
+                  isPaused ? dynamicStyles.resumeBtnBg : null,
                 ]}
               >
                 {isIdle ? (
-                  <ActiveIcon size={20} color={COLORS.TEXT.SECONDARY} />
+                  <ActiveIcon size={20} color={colors.TEXT.SECONDARY} />
                 ) : isRecording ? (
-                  <IconPause size={18} color={COLORS.TEXT.PRIMARY} />
+                  <IconPause size={18} color="#ffffff" />
                 ) : (
-                  <IconPlay size={18} color={COLORS.TEXT.PRIMARY} />
+                  <IconPlay size={18} color="#ffffff" />
                 )}
               </TouchableOpacity>
 
@@ -1234,19 +1391,19 @@ export const ActivityScreen: React.FC = () => {
                 <TouchableOpacity
                   onPress={handleStart}
                   activeOpacity={0.7}
-                  style={[styles.actionBtn, styles.startBtnBg]}
+                  style={[styles.actionBtn, dynamicStyles.startBtnBg]}
                 >
-                  <IconPlay size={18} color={COLORS.TEXT.PRIMARY} />
+                  <IconPlay size={18} color="#ffffff" />
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   onPressIn={handleStopPressIn}
                   onPressOut={handleStopPressOut}
                   activeOpacity={0.7}
-                  style={[styles.actionBtn, styles.stopBtnBg]}
+                  style={[styles.actionBtn, dynamicStyles.stopBtnBg]}
                 >
                   <View style={styles.stopBtnInner}>
-                    <IconStop size={18} color={COLORS.ERROR} />
+                    <IconStop size={18} color={colors.ERROR} />
                   </View>
                   {/* Circular progress ring */}
                   <View style={styles.stopProgressRingContainer} pointerEvents="none">
@@ -1256,7 +1413,7 @@ export const ActivityScreen: React.FC = () => {
                           cx={22}
                           cy={22}
                           r={20}
-                          stroke="rgba(255,255,255,0.1)"
+                          stroke={colors.BORDER.LIGHT}
                           strokeWidth={3}
                           fill="none"
                         />
@@ -1266,7 +1423,7 @@ export const ActivityScreen: React.FC = () => {
                           cy={22}
                           r={20}
                           transform="rotate(-90 22 22)"
-                          stroke={COLORS.ERROR}
+                          stroke={colors.ERROR}
                           strokeWidth={3}
                           fill="none"
                           strokeLinecap="round"
@@ -1289,7 +1446,7 @@ export const ActivityScreen: React.FC = () => {
 
       {/* ========== Offscreen Share Card ========== */}
       {showShareCard && (
-        <View ref={shareCardRef} style={styles.shareCard}>
+        <View ref={shareCardRef} style={[styles.shareCard, dynamicStyles.shareCard]}>
           {/* SVG Track */}
           <View style={styles.shareCardTrackArea}>
             <Svg width="100%" height="100%" viewBox="0 0 200 200">
@@ -1299,7 +1456,7 @@ export const ActivityScreen: React.FC = () => {
                     key={idx}
                     points={points.map(p => `${p.x},${p.y}`).join(' ')}
                     fill="none"
-                    stroke={COLORS.PRIMARY}
+                    stroke={colors.PRIMARY}
                     strokeWidth="3"
                     strokeLinejoin="round"
                     strokeLinecap="round"
@@ -1310,36 +1467,36 @@ export const ActivityScreen: React.FC = () => {
           </View>
 
           {/* Divider */}
-          <View style={styles.shareCardDivider} />
+          <View style={[styles.shareCardDivider, dynamicStyles.shareCardDivider]} />
 
           {/* Data Area */}
           <View style={styles.shareCardDataArea}>
             {/* Activity type */}
             <View style={styles.shareCardTypeRow}>
-              <SummaryIcon size={16} color={COLORS.TEXT.PRIMARY} />
-              <Text style={styles.shareCardTypeText}>{summaryTypeMeta.label}</Text>
+              <SummaryIcon size={16} color={colors.TEXT.PRIMARY} />
+              <Text style={[styles.shareCardTypeText, dynamicStyles.shareCardTypeText]}>{summaryTypeMeta.label}</Text>
             </View>
             {/* Stats */}
             <View style={styles.shareCardStatsRow}>
               <View style={styles.shareCardStatItem}>
-                <Text style={styles.shareCardStatLabel}>距离</Text>
-                <Text style={styles.shareCardStatValue}>{(stats.distance / 1000).toFixed(2)} km</Text>
+                <Text style={[styles.shareCardStatLabel, dynamicStyles.shareCardStatLabel]}>距离</Text>
+                <Text style={[styles.shareCardStatValue, dynamicStyles.shareCardStatValue]}>{(stats.distance / 1000).toFixed(2)} km</Text>
               </View>
               <View style={styles.shareCardStatItem}>
-                <Text style={styles.shareCardStatLabel}>时长</Text>
-                <Text style={styles.shareCardStatValue}>{formatDuration(stats.duration)}</Text>
+                <Text style={[styles.shareCardStatLabel, dynamicStyles.shareCardStatLabel]}>时长</Text>
+                <Text style={[styles.shareCardStatValue, dynamicStyles.shareCardStatValue]}>{formatDuration(stats.duration)}</Text>
               </View>
               <View style={styles.shareCardStatItem}>
-                <Text style={styles.shareCardStatLabel}>配速</Text>
-                <Text style={styles.shareCardStatValue}>{formatPace(stats.currentPace)}</Text>
+                <Text style={[styles.shareCardStatLabel, dynamicStyles.shareCardStatLabel]}>配速</Text>
+                <Text style={[styles.shareCardStatValue, dynamicStyles.shareCardStatValue]}>{formatPace(stats.currentPace)}</Text>
               </View>
               <View style={styles.shareCardStatItem}>
-                <Text style={styles.shareCardStatLabel}>爬升</Text>
-                <Text style={styles.shareCardStatValue}>{Math.round(stats.elevationGain)} m</Text>
+                <Text style={[styles.shareCardStatLabel, dynamicStyles.shareCardStatLabel]}>爬升</Text>
+                <Text style={[styles.shareCardStatValue, dynamicStyles.shareCardStatValue]}>{Math.round(stats.elevationGain)} m</Text>
               </View>
             </View>
             {/* Watermark */}
-            <Text style={styles.shareCardWatermark}>途迹 · TrekTrace</Text>
+            <Text style={[styles.shareCardWatermark, dynamicStyles.shareCardWatermark]}>途迹 · TrekTrace</Text>
           </View>
         </View>
       )}
@@ -1350,7 +1507,6 @@ export const ActivityScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
   },
 
   // Glow
@@ -1362,16 +1518,13 @@ const styles = StyleSheet.create({
   glowOrb: { position: 'absolute', borderRadius: 9999 },
   glowOrbTop: {
     top: -80, right: -40, width: 300, height: 300,
-    backgroundColor: COLORS.GRADIENT.BLUE,
   },
   glowOrbCenter: {
     top: '40%', left: '50%', transform: [{ translateX: -150 }],
     width: 400, height: 400,
-    backgroundColor: COLORS.GRADIENT.PINK,
   },
   glowOrbBottom: {
     bottom: -80, left: -60, width: 500, height: 500,
-    backgroundColor: COLORS.GRADIENT.PURPLE,
   },
   fullScreenBlur: {
     ...StyleSheet.absoluteFillObject,
@@ -1389,21 +1542,16 @@ const styles = StyleSheet.create({
   },
   headerIconButton: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
-    borderWidth: 1, borderColor: COLORS.BORDER.LIGHT,
     justifyContent: 'center', alignItems: 'center',
   },
   searchBar: {
     flex: 1, height: 40,
-    backgroundColor: COLORS.OVERLAY.LIGHT,
     borderRadius: 20,
-    borderWidth: 1, borderColor: COLORS.BORDER.LIGHT,
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, gap: 12,
   },
   searchPlaceholder: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    color: COLORS.TEXT.TERTIARY,
   },
 
   // Map Card
@@ -1420,7 +1568,6 @@ const styles = StyleSheet.create({
   mapGpsStatusWrapper: {
     position: 'absolute', top: 16, left: 16,
     width: 36, height: 36, borderRadius: 18,
-    borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1430,7 +1577,6 @@ const styles = StyleSheet.create({
   mapLocateWrapper: {
     position: 'absolute', bottom: PANEL_HEIGHT + 12, right: 12,
     width: 36, height: 36, borderRadius: 18,
-    borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1443,30 +1589,23 @@ const styles = StyleSheet.create({
   mapSimWrapper: {
     position: 'absolute', bottom: PANEL_HEIGHT + 12, left: 12,
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: COLORS.OVERLAY.GPS_SIM,
-    borderWidth: 1, borderColor: COLORS.BORDER.MEDIUM,
     justifyContent: 'center',
     alignItems: 'center',
   },
   mapSimActive: {
-    backgroundColor: COLORS.ERROR_OVERLAY.SIM_BG,
-    borderColor: COLORS.ERROR_OVERLAY.SIM_BORDER,
   },
   simText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
     fontWeight: '600',
-    color: COLORS.TEXT.SECONDARY,
     letterSpacing: 0.5,
   },
   simTextActive: {
-    color: COLORS.TEXT.PRIMARY,
   },
 
   // ========== Control Panel ==========
   panelWrapper: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    backgroundColor: COLORS.BACKGROUND,
   },
   panelContent: {
     paddingVertical: 12,
@@ -1482,7 +1621,6 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 20,
-    backgroundColor: COLORS.BORDER.LIGHT,
   },
   statItem: {
     flex: 1,
@@ -1490,7 +1628,6 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUATERNARY,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontWeight: '600',
@@ -1503,14 +1640,11 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
   statValueDim: {
-    color: COLORS.TEXT.DISABLED,
   },
   statUnit: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUINARY,
     fontWeight: '400',
     marginLeft: 2,
   },
@@ -1530,13 +1664,9 @@ const styles = StyleSheet.create({
 
   // 左按钮背景
   idleBtnBg: {
-    backgroundColor: '#2a2d38',
     borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
   },
   resumeBtnBg: {
-    backgroundColor: COLORS.SUCCESS,
-    shadowColor: COLORS.SUCCESS,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
@@ -1544,15 +1674,11 @@ const styles = StyleSheet.create({
 
   // 右按钮背景
   startBtnBg: {
-    backgroundColor: COLORS.PRIMARY,
-    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
   },
   stopBtnBg: {
-    backgroundColor: COLORS.ERROR_OVERLAY.BUTTON_BG,
     borderWidth: 1,
-    borderColor: COLORS.ERROR_OVERLAY.BUTTON_BORDER,
     overflow: 'hidden',
   },
   stopBtnInner: {
@@ -1588,23 +1714,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'center',
     gap: 8,
-    backgroundColor: COLORS.OVERLAY.SUMMARY,
     borderRadius: BORDER_RADIUS.G2.XXL,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
     paddingHorizontal: 20,
     paddingVertical: 8,
   },
   summaryTypeText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
   summaryStatsCard: {
-    backgroundColor: COLORS.OVERLAY.SUMMARY,
     borderRadius: BORDER_RADIUS.G2.LG,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
     padding: 16,
   },
   summaryStatsRow: {
@@ -1616,7 +1737,6 @@ const styles = StyleSheet.create({
   },
   summaryStatLabel: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUATERNARY,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     fontWeight: '600',
@@ -1625,7 +1745,6 @@ const styles = StyleSheet.create({
   summaryStatValue: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
   summaryBottomBar: {
     position: 'absolute',
@@ -1645,14 +1764,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.ERROR_OVERLAY.BUTTON_BG,
     borderWidth: 1,
-    borderColor: COLORS.ERROR_OVERLAY.BUTTON_BORDER,
   },
   summaryDiscardText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
-    color: COLORS.ERROR,
   },
   summarySaveBtn: {
     flex: 1,
@@ -1660,8 +1776,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.PRIMARY,
-    shadowColor: COLORS.PRIMARY,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
@@ -1670,7 +1784,6 @@ const styles = StyleSheet.create({
   summarySaveText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
   summaryShareBtn: {
     width: 48,
@@ -1678,9 +1791,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.OVERLAY.SUMMARY,
     borderWidth: 1,
-    borderColor: COLORS.BORDER.MEDIUM,
   },
 
   // ========== Share Card ==========
@@ -1690,7 +1801,6 @@ const styles = StyleSheet.create({
     top: -9999,
     width: Dimensions.get('window').width,
     height: Math.round(Dimensions.get('window').width * 1.3),
-    backgroundColor: COLORS.BACKGROUND,
     borderRadius: BORDER_RADIUS.G2.LG,
     overflow: 'hidden',
   },
@@ -1703,7 +1813,6 @@ const styles = StyleSheet.create({
   shareCardDivider: {
     height: 1,
     marginHorizontal: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   shareCardDataArea: {
     paddingHorizontal: 24,
@@ -1718,7 +1827,6 @@ const styles = StyleSheet.create({
   shareCardTypeText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
   shareCardStatsRow: {
     flexDirection: 'row',
@@ -1729,7 +1837,6 @@ const styles = StyleSheet.create({
   },
   shareCardStatLabel: {
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: COLORS.TEXT.QUATERNARY,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1738,12 +1845,10 @@ const styles = StyleSheet.create({
   shareCardStatValue: {
     fontSize: TYPOGRAPHY.FONT_SIZE.MD,
     fontWeight: '600',
-    color: COLORS.TEXT.PRIMARY,
   },
   shareCardWatermark: {
     textAlign: 'right',
     fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    color: 'rgba(255, 255, 255, 0.15)',
     fontWeight: '600',
     letterSpacing: 1,
   },

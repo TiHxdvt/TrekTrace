@@ -4,17 +4,18 @@
  * 自动隐藏/恢复父级浮空导航栏
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { View, StyleSheet, InteractionManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { COLORS } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 export const FeatureScreenLayout: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const { colors } = useTheme();
 
   // 子页面获得焦点时隐藏浮空导航栏，失去焦点时恢复
   // 恢复操作延迟到转场动画结束后，避免在页面切换期间触发 FloatingTabBar 重渲染导致卡顿
@@ -35,16 +36,16 @@ export const FeatureScreenLayout: React.FC<{
     }, [navigation]),
   );
 
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.BACKGROUND,
+    },
+  }), [colors]);
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[dynamicStyles.container, { paddingTop: insets.top }]}>
       {children}
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
-  },
-});
