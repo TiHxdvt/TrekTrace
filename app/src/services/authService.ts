@@ -14,7 +14,6 @@ export const authService = {
   sendVerificationCode: async (phone: string): Promise<string | null> => {
     const data: SendCodeRequest = { phone };
     const response = await api.post('/auth/send-code', data);
-    // 开发环境后端返回 { code: "123456" }
     return response.data?.code ?? null;
   },
 

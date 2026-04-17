@@ -22,7 +22,7 @@ import { FullScreenBlur } from '../components/FullScreenBlur';
 import { IconEyeClosed, IconEyeScan } from '../components/SolarIcons';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
-import { setCachedToken } from '../services/api';
+import { saveToken } from '../services/api';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
 
 type LoginMode = 'sms' | 'password';
@@ -173,9 +173,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       setLoading(true);
       const response = await authService.login(phone, code);
 
-      await storageService.saveToken(response.token);
+      await saveToken(response.token);
       await storageService.saveUser(response.user);
-      setCachedToken(response.token);
 
       onLoginSuccess();
     } catch (error: any) {
@@ -210,9 +209,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       setLoading(true);
       const response = await authService.loginWithPassword(account, password);
 
-      await storageService.saveToken(response.token);
+      await saveToken(response.token);
       await storageService.saveUser(response.user);
-      setCachedToken(response.token);
 
       onLoginSuccess();
     } catch (error: any) {

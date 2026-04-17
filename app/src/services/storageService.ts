@@ -6,7 +6,12 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Keychain from 'react-native-keychain';
-import { User } from '../types';
+import { User, ActivityResponseDTO } from '../types';
+
+export interface AppSettings {
+  theme?: 'light' | 'dark';
+  [key: string]: string | boolean | number | undefined;
+}
 
 // 存储 key 常量
 const STORAGE_KEYS = {
@@ -116,7 +121,7 @@ export const storageService = {
   /**
    * 保存活动缓存（离线使用）
    */
-  saveActivitiesCache: async (activities: any[]): Promise<void> => {
+  saveActivitiesCache: async (activities: ActivityResponseDTO[]): Promise<void> => {
     await AsyncStorage.setItem(
       STORAGE_KEYS.ACTIVITIES_CACHE,
       JSON.stringify(activities)
@@ -126,7 +131,7 @@ export const storageService = {
   /**
    * 获取活动缓存
    */
-  getActivitiesCache: async (): Promise<any[] | null> => {
+  getActivitiesCache: async (): Promise<ActivityResponseDTO[] | null> => {
     try {
       const cacheStr = await AsyncStorage.getItem(STORAGE_KEYS.ACTIVITIES_CACHE);
       return cacheStr ? JSON.parse(cacheStr) : null;
@@ -139,14 +144,14 @@ export const storageService = {
   /**
    * 保存设置
    */
-  saveSettings: async (settings: Record<string, any>): Promise<void> => {
+  saveSettings: async (settings: AppSettings): Promise<void> => {
     await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   },
 
   /**
    * 获取设置
    */
-  getSettings: async (): Promise<Record<string, any> | null> => {
+  getSettings: async (): Promise<AppSettings | null> => {
     try {
       const settingsStr = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
       return settingsStr ? JSON.parse(settingsStr) : null;

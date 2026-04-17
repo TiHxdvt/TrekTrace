@@ -1,54 +1,40 @@
 /**
  * API 客户端配置
  * 基于 axios 封装，支持请求/响应拦截器
+ * Token 管理统一由 storageService 负责
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Keychain from 'react-native-keychain';
+import { storageService } from './storageService';
 import { APP_CONFIG } from '../config';
 
-const KEYCHAIN_SERVICE = 'com.trektrace.auth';
-
-// Module-level token cache to avoid async reads on every request
+// 内存 token 缓存，避免每次请求都读 Keychain
 let _cachedToken: string | null = null;
 
-/** Update the token cache (call on login / token refresh) */
-export function setCachedToken(token: string | null): void {
+/** 保存 token 到缓存 + 持久化存储 */
+export async function saveToken(token: string): Promise<void> {
   _cachedToken = token;
+  await storageService.saveToken(token);
 }
 
-/** Retrieve the cached token, falling back to Keychain then AsyncStorage */
+/** 获取 token（优先缓存 → Keychain → AsyncStorage） */
 export async function getToken(): Promise<string | null> {
   if (_cachedToken !== null) return _cachedToken;
-  try {
-    // 优先从 Keychain 读取（与 storageService 一致）
-    const result = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICE });
-    if (result) {
-      _cachedToken = result.password;
-      return _cachedToken;
-    }
-  } catch {
-    // Keychain 不可用时 fallback
-  }
-  try {
-    const stored = await AsyncStorage.getItem('token');
-    if (stored) _cachedToken = stored;
-    return stored;
-  } catch {
-    return null;
-  }
+  const token = await storageService.getToken();
+  if (token) _cachedToken = token;
+  return token;
 }
 
-/** Clear the token cache (call on logout) */
-export function clearCachedToken(): void {
+/** 清除 token 缓存 + 持久化存储 */
+export async function clearToken(): Promise<void> {
   _cachedToken = null;
+  await storageService.removeToken();
 }
 
 // 创建 axios 实例
 const api: AxiosInstance = axios.create({
   baseURL: APP_CONFIG.API_BASE_URL,
-  timeout: 10000, // 10 秒超时
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -68,56 +54,44 @@ api.interceptors.request.use(
       return config;
     }
   },
-  (error: AxiosError) => {
-    return Promise.reject(error);
-  }
+  (error: AxiosError) => Promise.reject(error),
 );
 
 // 响应拦截器 - 统一错误处理
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error: AxiosError) => {
     if (error.response) {
       const status = error.response.status;
 
-      // 401 未授权 - 清除 token 并跳转到登录页
       if (status === 401) {
-        clearCachedToken();
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('user');
-        // 这里可以触发全局登出事件
+        await storageService.clearAuthData();
+        _cachedToken = null;
         console.warn('Token expired or invalid, please login again');
       }
 
-      // 403 禁止访问
       if (status === 403) {
         console.error('Access forbidden');
       }
 
-      // 500 服务器错误
       if (status >= 500) {
         console.error('Server error');
       }
     } else if (error.request) {
-      // 请求已发送但没有收到响应
       console.error('Network error - no response received');
     } else {
-      // 请求配置出错
       console.error('Request setup error:', error.message);
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
-// Retry interceptor - retry POST requests once after 1s on network errors (no response)
+// 断网重试：POST 请求在无响应时重试一次
 api.interceptors.response.use(undefined, async (error: AxiosError) => {
   const config = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
   if (!config) return Promise.reject(error);
 
-  // Only retry POST requests that got no response (network error), once
   if (
     config.method?.toLowerCase() === 'post' &&
     !error.response &&
