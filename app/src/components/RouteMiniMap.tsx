@@ -11,6 +11,7 @@ import { MapView, MapType, Polyline } from 'react-native-amap3d';
 import { COLORS, BORDER_RADIUS } from '../theme';
 import { IconLayersBold, IconPlaybackSpeedBold, IconWalkingBold } from './SolarIcons';
 import { haversineDistance } from '../utils/trackData';
+import { wgs84ToGcj02 } from '../utils/geo';
 import type { TrackPointUploadDTO } from '../types';
 
 type TrailStyle = 'speed' | 'elevation';
@@ -59,7 +60,7 @@ export const RouteMiniMap: React.FC<RouteMiniMapProps> = ({ points }) => {
   }, [points]);
 
   const coords = useMemo(
-    () => sampled.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
+    () => sampled.map(p => wgs84ToGcj02(p.latitude, p.longitude)),
     [sampled],
   );
 

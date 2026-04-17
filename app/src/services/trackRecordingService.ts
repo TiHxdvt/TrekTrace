@@ -15,7 +15,7 @@ import {
   TrackPointUploadDTO,
 } from '../types';
 import { activityService } from './activityService';
-import { haversineDistance } from '../utils/geo';
+import { haversineDistance, wgs84ToGcj02 } from '../utils/geo';
 import { GpsKalmanFilter } from '../utils/gpsKalmanFilter';
 
 // ======================== 过滤常量 ========================
@@ -103,6 +103,18 @@ class TrackRecordingServiceImpl {
       const saved: RecordingSession = JSON.parse(raw);
       if (saved && saved.status !== 'idle' && !saved.uploadedToServer) {
         this.session = saved;
+
+        // 兼容旧数据：补充缺失的 gcjLatitude/gcjLongitude
+        for (const seg of this.session.segments) {
+          for (const p of seg.points) {
+            if (p.gcjLatitude == null) {
+              const gcj = wgs84ToGcj02(p.latitude, p.longitude);
+              (p as any).gcjLatitude = gcj.latitude;
+              (p as any).gcjLongitude = gcj.longitude;
+            }
+          }
+        }
+
         const allPoints = this.getAllPoints();
         if (allPoints.length > 0) {
           this.lastAcceptedPoint = allPoints[allPoints.length - 1];
@@ -238,12 +250,15 @@ class TrackRecordingServiceImpl {
     const altitude = this.smoothElevation(raw.altitude);
     this.lastSmoothedAltitude = altitude;
 
+    const gcj = wgs84ToGcj02(filtered.latitude, filtered.longitude);
     const point: ProcessedPoint = {
       latitude: filtered.latitude,
       longitude: filtered.longitude,
       altitude,
       timestamp: normalizeTimestamp(raw.timestamp),
       speed: raw.speed,
+      gcjLatitude: gcj.latitude,
+      gcjLongitude: gcj.longitude,
     };
 
     // Accumulate distance
@@ -354,7 +369,10 @@ class TrackRecordingServiceImpl {
     if (!this.session) return [];
     return this.session.segments
       .filter(s => s.points.length >= 2)
-      .map(s => s.points.map(p => ({ latitude: p.latitude, longitude: p.longitude })));
+      .map(s => s.points.map(p => ({
+        latitude: p.gcjLatitude ?? wgs84ToGcj02(p.latitude, p.longitude).latitude,
+        longitude: p.gcjLongitude ?? wgs84ToGcj02(p.latitude, p.longitude).longitude,
+      })));
   }
 
   // ---------- Get Stats ----------

@@ -145,11 +145,13 @@ export interface TrackSegment {
 
 // 经过过滤处理后的轨迹点
 export interface ProcessedPoint {
-  latitude: number;
+  latitude: number;   // WGS-84 原始坐标（用于距离计算和上传）
   longitude: number;
   altitude: number;
   timestamp: string;
   speed?: number;
+  gcjLatitude: number;  // GCJ-02 坐标（高德地图显示用，存储时一次性转换）
+  gcjLongitude: number;
 }
 
 // 原始 GPS 数据
