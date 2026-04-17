@@ -7,10 +7,7 @@
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { getToken } from './api';
-
-const WS_BASE_URL = __DEV__
-  ? 'http://localhost:8080/ws'
-  : 'http://139.155.152.218:8080/ws';
+import { APP_CONFIG } from '../config';
 
 const RECONNECT_DELAY = 5000;
 
@@ -39,9 +36,9 @@ class WebSocketService {
         return;
       }
 
-      console.log('[WS] Connecting to', WS_BASE_URL);
+      console.log('[WS] Connecting to', APP_CONFIG.WS_BASE_URL);
       this.client = new Client({
-        webSocketFactory: () => new SockJS(WS_BASE_URL),
+        webSocketFactory: () => new SockJS(APP_CONFIG.WS_BASE_URL),
         reconnectDelay: RECONNECT_DELAY,
         heartbeatIncoming: 10000,
         heartbeatOutgoing: 10000,
