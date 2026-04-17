@@ -87,7 +87,7 @@ class WebSocketService {
   subscribe(destination: string, handler: MessageHandler): void {
     console.log('[WS] Subscribe:', destination, '| connected:', this.connected);
     this.subscriptions.set(destination, { handler, stompSub: null });
-    if (this.connected && this.client) {
+    if (this.connected && this.client?.active) {
       this.doSubscribe(destination);
     }
   }
@@ -106,18 +106,24 @@ class WebSocketService {
   }
 
   private doSubscribe(destination: string): void {
-    if (!this.client || !this.connected) return;
+    if (!this.client?.active || !this.connected) return;
     const entry = this.subscriptions.get(destination);
     if (!entry) return;
-    const stompSub = this.client.subscribe(destination, (message: IMessage) => {
-      try {
-        const body = JSON.parse(message.body);
-        entry.handler(body);
-      } catch {
-        entry.handler(message.body);
-      }
-    });
-    entry.stompSub = stompSub;
+    try {
+      const stompSub = this.client.subscribe(destination, (message: IMessage) => {
+        try {
+          const body = JSON.parse(message.body);
+          entry.handler(body);
+        } catch {
+          entry.handler(message.body);
+        }
+      });
+      entry.stompSub = stompSub;
+    } catch (e) {
+      // STOMP client may throw if connection is not fully established yet
+      // Will be retried on next connect
+      console.warn('[WS] Subscribe failed (will retry on reconnect):', destination, e);
+    }
   }
 
   isConnected(): boolean {
