@@ -23,6 +23,9 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins:http://localhost:8081,http://10.0.2.2:8081}")
     private String allowedOrigins;
 
+    @Value("${springdoc.api-docs.enabled:false}")
+    private boolean swaggerEnabled;
+
     public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
     }
@@ -33,12 +36,16 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/avatars/**").permitAll()
-                .requestMatchers("/ws/**").permitAll()
-                .anyRequest().authenticated()
-            )
+            .authorizeHttpRequests(auth -> {
+                auth
+                    .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/avatars/**").permitAll()
+                    .requestMatchers("/ws/**").permitAll();
+                if (swaggerEnabled) {
+                    auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll();
+                }
+                auth.anyRequest().authenticated();
+            })
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
