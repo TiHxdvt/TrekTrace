@@ -1,6 +1,6 @@
 /**
  * 聊天页面
- * 一对一文字聊天，支持实时消息接收
+ * 一对一文字聊天，支持实时消息接收、发送状态、时间标签
  * 延续 glassmorphism 设计风格
  */
 
@@ -20,13 +20,20 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { useTheme } from '../contexts/ThemeContext';
-import { Avatar } from '../components/Avatar';
 import { Toast } from '../components/Toast';
 import { chatService } from '../services/chatService';
 import { storageService } from '../services/storageService';
 import { websocketService } from '../services/websocketService';
 import { ChatMessage, User } from '../types';
 import { IconAltArrowLeft } from '../components/SolarIcons';
+import { ChatTimeItem } from '../components/chat/ChatTimeItem';
+import { ChatMessageItem } from '../components/chat/ChatMessageItem';
+import { ChatTypingItem } from '../components/chat/ChatTypingItem';
+import {
+  transformMessagesToList,
+  ChatListItem,
+  MessageStatus,
+} from '../components/chat/chatDataTransform';
 
 type NavProp = { goBack: () => void };
 
@@ -35,14 +42,6 @@ interface ChatScreenParams {
   friendNickname?: string;
   friendAvatarUrl?: string;
   friendUserId: number;
-}
-
-function formatMessageTime(dateStr?: string): string {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const h = date.getHours().toString().padStart(2, '0');
-  const m = date.getMinutes().toString().padStart(2, '0');
-  return `${h}:${m}`;
 }
 
 export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatScreenParams } }> = ({
@@ -56,95 +55,106 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | undefined>();
+  const [showTyping, setShowTyping] = useState(false);
+
+  // 消息发送状态 Map: messageId → 'sending' | 'sent' | 'failed'
+  const [statusMap, setStatusMap] = useState<Map<number, MessageStatus>>(new Map());
+
   const flatListRef = useRef<FlatList>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const dynamicStyles = useMemo(() => StyleSheet.create({
-    container: {
-      backgroundColor: colors.BACKGROUND,
-    },
-    loadingContainer: {
-      backgroundColor: colors.BACKGROUND,
-    },
-    header: {
-      backgroundColor: colors.OVERLAY.NAV,
-      borderBottomColor: colors.BORDER.LIGHT,
-    },
-    backBtn: {
-      backgroundColor: colors.OVERLAY.LIGHT,
-      borderColor: colors.BORDER.LIGHT,
-    },
-    headerTitle: {
-      color: colors.TEXT.PRIMARY,
-    },
-    messageTextMine: {
-      color: '#ffffff',
-    },
-    messageTextOther: {
-      color: colors.TEXT.SECONDARY,
-    },
-    messageTimeMine: {
-      color: 'rgba(255, 255, 255, 0.7)',
-    },
-    messageTimeOther: {
-      color: colors.TEXT.QUATERNARY,
-    },
-    bubbleMine: {
-      backgroundColor: colors.PRIMARY,
-    },
-    bubbleOther: {
-      backgroundColor: colors.OVERLAY.MEDIUM,
-      borderColor: colors.BORDER.MEDIUM,
-    },
-    inputBar: {
-      backgroundColor: colors.OVERLAY.NAV,
-      borderTopColor: colors.BORDER.LIGHT,
-    },
-    textInput: {
-      backgroundColor: colors.OVERLAY.MEDIUM,
-      borderColor: colors.BORDER.MEDIUM,
-      color: colors.TEXT.PRIMARY,
-    },
-    sendBtn: {
-      backgroundColor: colors.PRIMARY,
-    },
-    sendBtnText: {
-      color: '#ffffff',
-    },
-  }), [colors]);
+  // 将消息数组变换为带时间标签的 FlatList 数据
+  const listData = useMemo(
+    () => transformMessagesToList(messages, statusMap),
+    [messages, statusMap],
+  );
 
-  // Load current user's avatar
+  const dynamicStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { backgroundColor: colors.BACKGROUND },
+        loadingContainer: { backgroundColor: colors.BACKGROUND },
+        header: {
+          backgroundColor: colors.OVERLAY.NAV,
+          borderBottomColor: colors.BORDER.LIGHT,
+        },
+        backBtn: {
+          backgroundColor: colors.OVERLAY.LIGHT,
+          borderColor: colors.BORDER.LIGHT,
+        },
+        headerTitle: { color: colors.TEXT.PRIMARY },
+        inputBar: {
+          backgroundColor: colors.OVERLAY.NAV,
+          borderTopColor: colors.BORDER.LIGHT,
+        },
+        inputContainer: {
+          backgroundColor: colors.OVERLAY.MEDIUM,
+          borderColor: colors.BORDER.MEDIUM,
+        },
+        textInput: {
+          color: colors.TEXT.PRIMARY,
+        },
+        sendBtn: { backgroundColor: colors.PRIMARY },
+        sendBtnDisabled: { backgroundColor: colors.TEXT.DISABLED },
+        sendBtnText: { color: '#ffffff' },
+        typingText: {
+          color: colors.TEXT.QUATERNARY,
+        },
+      }),
+    [colors],
+  );
+
+  // ---- 加载当前用户头像 ----
   useEffect(() => {
     storageService.getUser().then((user: User | null) => {
       if (user?.avatarUrl) setMyAvatarUrl(user.avatarUrl);
     });
   }, []);
 
-  const loadMessages = useCallback(async (pageNum: number = 0) => {
-    try {
-      const res = await chatService.getMessages(conversationId, pageNum, 20);
-      const newMessages = res.content.reverse();
-      if (pageNum === 0) {
-        setMessages(newMessages);
-        if (newMessages.length > 0) {
-          const latestMsg = newMessages[newMessages.length - 1];
-          if (latestMsg.senderId !== friendUserId) {
-            chatService.markAsRead(conversationId, latestMsg.id).catch(() => {});
+  // ---- 加载消息 ----
+  const loadMessages = useCallback(
+    async (pageNum: number = 0) => {
+      try {
+        if (pageNum > 0) setLoadingMore(true);
+        const res = await chatService.getMessages(conversationId, pageNum, 20);
+        const newMessages = res.content.reverse();
+
+        if (pageNum === 0) {
+          setMessages(newMessages);
+          // 首次加载的消息都是已发送
+          const sent = new Map<number, MessageStatus>();
+          newMessages.forEach(m => sent.set(m.id, 'sent'));
+          setStatusMap(sent);
+
+          if (newMessages.length > 0) {
+            const latestMsg = newMessages[newMessages.length - 1];
+            if (latestMsg.senderId !== friendUserId) {
+              chatService.markAsRead(conversationId, latestMsg.id).catch(() => {});
+            }
           }
+        } else {
+          setMessages(prev => [...newMessages, ...prev]);
+          setStatusMap(prev => {
+            const next = new Map(prev);
+            newMessages.forEach(m => next.set(m.id, 'sent'));
+            return next;
+          });
         }
-      } else {
-        setMessages(prev => [...newMessages, ...prev]);
+
+        setHasMore(!res.last);
+      } catch {
+        Toast.show('加载消息失败');
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
       }
-      setHasMore(!res.last);
-    } catch {
-      Toast.show('加载消息失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [conversationId, friendUserId]);
+    },
+    [conversationId, friendUserId],
+  );
 
   useEffect(() => {
     const handle = InteractionManager.runAfterInteractions(() => {
@@ -153,6 +163,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
     return () => handle.cancel();
   }, [loadMessages]);
 
+  // ---- WebSocket 实时消息 ----
   useEffect(() => {
     const topic = `/topic/conversation/${conversationId}`;
     const handler = (msg: ChatMessage) => {
@@ -160,8 +171,14 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         if (prev.some(m => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
+      setStatusMap(prev => new Map(prev).set(msg.id, 'sent'));
+
       if (msg.senderId === friendUserId) {
         chatService.markAsRead(conversationId, msg.id).catch(() => {});
+        // 显示对方输入中
+        setShowTyping(true);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => setShowTyping(false), 2000);
       }
     };
 
@@ -171,65 +188,129 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
     return () => {
       websocketService.unsubscribe(topic);
       websocketService.unsubscribe('/user/queue/messages');
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, [conversationId, friendUserId]);
 
+  // ---- 滚动到底部 ----
   useEffect(() => {
-    if (messages.length > 0) {
+    if (listData.length > 0) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
-  }, [messages.length]);
+  }, [listData.length]);
 
-  const handleSend = async () => {
+  // ---- 发送消息 ----
+  const handleSend = useCallback(async () => {
     const text = inputText.trim();
-    if (!text || sending) return;
+    if (!text) return;
 
-    setSending(true);
     setInputText('');
+
+    // 乐观更新：先插入本地消息（sending 状态）
+    const tempId = -Date.now();
+    const optimisticMsg: ChatMessage = {
+      id: tempId,
+      conversationId,
+      senderId: -1, // 自己（负数避免与真实 userId 冲突）
+      content: text,
+      type: 'TEXT',
+      createdAt: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, optimisticMsg]);
+    setStatusMap(prev => new Map(prev).set(tempId, 'sending'));
+
     try {
       const msg = await chatService.sendMessage(conversationId, text);
-      setMessages(prev => {
-        if (prev.some(m => m.id === msg.id)) return prev;
-        return [...prev, msg];
+      // 替换临时消息为真实消息
+      setMessages(prev =>
+        prev.map(m => (m.id === tempId ? msg : m)),
+      );
+      setStatusMap(prev => {
+        const next = new Map(prev);
+        next.delete(tempId);
+        next.set(msg.id, 'sent');
+        return next;
       });
     } catch {
+      // 标记为失败
+      setStatusMap(prev => new Map(prev).set(tempId, 'failed'));
       Toast.show('发送失败');
-      setInputText(text);
-    } finally {
-      setSending(false);
     }
-  };
+  }, [inputText, conversationId]);
 
-  const handleLoadMore = () => {
-    if (hasMore && !loading) {
+  // ---- 重试发送 ----
+  const handleRetry = useCallback(
+    async (msgId: number) => {
+      const msg = messages.find(m => m.id === msgId);
+      if (!msg) return;
+
+      setStatusMap(prev => new Map(prev).set(msgId, 'sending'));
+
+      try {
+        const result = await chatService.sendMessage(conversationId, msg.content);
+        setMessages(prev =>
+          prev.map(m => (m.id === msgId ? result : m)),
+        );
+        setStatusMap(prev => {
+          const next = new Map(prev);
+          next.delete(msgId);
+          next.set(result.id, 'sent');
+          return next;
+        });
+      } catch {
+        setStatusMap(prev => new Map(prev).set(msgId, 'failed'));
+        Toast.show('发送失败');
+      }
+    },
+    [messages, conversationId],
+  );
+
+  // ---- 删除消息 ----
+  const handleDelete = useCallback((msgId: number) => {
+    setMessages(prev => prev.filter(m => m.id !== msgId));
+    setStatusMap(prev => {
+      const next = new Map(prev);
+      next.delete(msgId);
+      return next;
+    });
+  }, []);
+
+  // ---- 加载更多 ----
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !loading && !loadingMore) {
       const nextPage = page + 1;
       setPage(nextPage);
       loadMessages(nextPage);
     }
-  };
+  }, [hasMore, loading, loadingMore, page, loadMessages]);
 
-  const renderItem = useCallback(({ item }: { item: ChatMessage }) => {
-    const isMine = item.senderId !== friendUserId;
-    return (
-      <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}>
-        {!isMine && (
-          <Avatar uri={friendAvatarUrl} size={32} />
-        )}
-        <View style={[styles.messageBubble, isMine ? dynamicStyles.bubbleMine : dynamicStyles.bubbleOther, isMine ? styles.bubbleMine : styles.bubbleOther]}>
-          <Text style={[styles.messageText, isMine ? dynamicStyles.messageTextMine : dynamicStyles.messageTextOther]}>
-            {item.content}
-          </Text>
-          <Text style={[styles.messageTime, isMine ? dynamicStyles.messageTimeMine : dynamicStyles.messageTimeOther]}>
-            {formatMessageTime(item.createdAt)}
-          </Text>
-        </View>
-        {isMine && (
-          <Avatar uri={myAvatarUrl} size={32} />
-        )}
-      </View>
-    );
-  }, [friendUserId, friendAvatarUrl, myAvatarUrl, dynamicStyles]);
+  // ---- FlatList 渲染 ----
+  const renderItem = useCallback(
+    ({ item }: { item: ChatListItem }) => {
+      if (item.kind === 'time') {
+        return <ChatTimeItem timestamp={item.createdAt} />;
+      }
+      const { message, status } = item;
+      const isMine = message.senderId !== friendUserId;
+      return (
+        <ChatMessageItem
+          content={message.content}
+          isMine={isMine}
+          status={isMine ? status : undefined}
+          myAvatarUrl={myAvatarUrl}
+          otherAvatarUrl={friendAvatarUrl}
+          onRetry={() => handleRetry(message.id)}
+          onDelete={() => handleDelete(message.id)}
+        />
+      );
+    },
+    [friendUserId, myAvatarUrl, friendAvatarUrl, handleRetry, handleDelete],
+  );
 
+  const keyExtractor = useCallback((item: ChatListItem) => item.id, []);
+
+  // ---- 加载中 ----
   if (loading) {
     return (
       <View style={[styles.loadingContainer, dynamicStyles.loadingContainer]}>
@@ -238,13 +319,10 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
     );
   }
 
-  return (
-    <KeyboardAvoidingView
-      style={[styles.container, dynamicStyles.container]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
-    >
-      {/* Header - centered title */}
+  // ---- 页面内容 ----
+  const content = (
+    <>
+      {/* Header */}
       <View style={[styles.header, dynamicStyles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
           style={[styles.backBtn, dynamicStyles.backBtn]}
@@ -259,22 +337,43 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         <View style={styles.headerRight} />
       </View>
 
-      {/* Messages */}
+      {/* 消息列表 */}
       <FlatList
         ref={flatListRef}
-        data={messages}
-        keyExtractor={item => String(item.id)}
+        data={listData}
+        keyExtractor={keyExtractor}
         renderItem={renderItem}
         contentContainerStyle={styles.messageList}
-        inverted={false}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingMoreWrap}>
+              <ActivityIndicator size="small" color={colors.TEXT.TERTIARY} />
+              <Text style={[styles.loadingMoreText, { color: colors.TEXT.QUATERNARY }]}>
+                加载更多...
+              </Text>
+            </View>
+          ) : null
+        }
       />
 
-      {/* Input Bar */}
-      <View style={[styles.inputBar, dynamicStyles.inputBar, { paddingBottom: insets.bottom + SPACING.SM }]}>
-        <View style={styles.inputWrap}>
+      {/* 对方正在输入提示 */}
+      {showTyping && (
+        <ChatTypingItem avatarUrl={friendAvatarUrl} />
+      )}
+
+      {/* 输入栏 - 胶囊式设计 */}
+      <View
+        style={[
+          styles.inputBar,
+          dynamicStyles.inputBar,
+          { paddingBottom: insets.bottom + SPACING.SM },
+        ]}
+      >
+        <View style={[styles.inputContainer, dynamicStyles.inputContainer]}>
           <TextInput
             style={[styles.textInput, dynamicStyles.textInput]}
             value={inputText}
@@ -283,20 +382,36 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
             placeholderTextColor={colors.TEXT.PLACEHOLDER}
             multiline
             maxLength={500}
-            editable={!sending}
           />
           <TouchableOpacity
-            style={[styles.sendBtn, dynamicStyles.sendBtn, (!inputText.trim() || sending) && styles.sendBtnDisabled]}
+            style={[
+              styles.sendBtn,
+              inputText.trim() ? dynamicStyles.sendBtn : dynamicStyles.sendBtnDisabled,
+            ]}
             onPress={handleSend}
-            disabled={!inputText.trim() || sending}
+            disabled={!inputText.trim()}
             activeOpacity={0.7}
           >
             <Text style={[styles.sendBtnText, dynamicStyles.sendBtnText]}>发送</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </>
   );
+
+  if (Platform.OS === 'ios') {
+    return (
+      <KeyboardAvoidingView
+        style={[styles.container, dynamicStyles.container]}
+        behavior="padding"
+        keyboardVerticalOffset={insets.top}
+      >
+        {content}
+      </KeyboardAvoidingView>
+    );
+  }
+
+  return <View style={[styles.container, dynamicStyles.container]}>{content}</View>;
 };
 
 const styles = StyleSheet.create({
@@ -333,82 +448,48 @@ const styles = StyleSheet.create({
     width: 36,
   },
   messageList: {
-    paddingHorizontal: SPACING.MD,
-    paddingVertical: SPACING.MD,
-    paddingBottom: SPACING.XL,
-  },
-  messageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: SPACING.MD,
-  },
-  messageRowMine: {
-    justifyContent: 'flex-end',
-    gap: SPACING.SM,
-  },
-  messageRowOther: {
-    justifyContent: 'flex-start',
-    gap: SPACING.SM,
-  },
-  messageBubble: {
-    maxWidth: '65%',
-    borderRadius: BORDER_RADIUS.LG,
-    paddingHorizontal: SPACING.MD,
     paddingVertical: SPACING.SM,
+    flexGrow: 1,
   },
-  bubbleMine: {
-    borderBottomRightRadius: 4,
+  loadingMoreWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.MD,
+    gap: SPACING.SM,
   },
-  bubbleOther: {
-    borderWidth: 1,
-    borderBottomLeftRadius: 4,
+  loadingMoreText: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
   },
-  messageText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-    lineHeight: TYPOGRAPHY.FONT_SIZE.BASE * TYPOGRAPHY.LINE_HEIGHT.NORMAL,
-  },
-  messageTextMine: {
-  },
-  messageTextOther: {
-  },
-  messageTime: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    marginTop: 2,
-  },
-  messageTimeMine: {
-    textAlign: 'right',
-  },
-  messageTimeOther: {
-  },
+  // 输入栏 - 胶囊式布局
   inputBar: {
     paddingHorizontal: SPACING.LG,
     paddingTop: SPACING.SM,
     borderTopWidth: 1,
   },
-  inputWrap: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.FULL,
+    paddingLeft: SPACING.LG,
+    paddingRight: 4,
     gap: SPACING.SM,
+    minHeight: 44,
   },
   textInput: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.XL,
-    paddingHorizontal: SPACING.LG,
     paddingVertical: SPACING.SM,
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
     maxHeight: 100,
   },
   sendBtn: {
-    borderRadius: BORDER_RADIUS.XL,
+    borderRadius: BORDER_RADIUS.FULL,
     paddingHorizontal: SPACING.LG,
     paddingVertical: SPACING.SM,
     justifyContent: 'center',
     alignItems: 'center',
-    height: 40,
-  },
-  sendBtnDisabled: {
-    opacity: 0.4,
+    height: 36,
   },
   sendBtnText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
