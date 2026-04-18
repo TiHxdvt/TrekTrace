@@ -12,10 +12,11 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
   InteractionManager,
+  type KeyboardEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
@@ -60,6 +61,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   const [hasMore, setHasMore] = useState(true);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | undefined>();
   const [showTyping, setShowTyping] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // 消息发送状态 Map: messageId → 'sending' | 'sent' | 'failed'
   const [statusMap, setStatusMap] = useState<Map<number, MessageStatus>>(new Map());
@@ -113,6 +115,25 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
     storageService.getUser().then((user: User | null) => {
       if (user?.avatarUrl) setMyAvatarUrl(user.avatarUrl);
     });
+  }, []);
+
+  // ---- 键盘高度监听 ----
+  // ChatOverlay 是绝对定位容器，KeyboardAvoidingView 在里面无效
+  // 所以手动监听键盘高度，加在输入栏的 paddingBottom 上
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e: KeyboardEvent) => setKeyboardHeight(e.endCoordinates.height);
+    const onHide = () => setKeyboardHeight(0);
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
   // ---- 加载消息 ----
@@ -370,7 +391,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         style={[
           styles.inputBar,
           dynamicStyles.inputBar,
-          { paddingBottom: insets.bottom + SPACING.SM },
+          { paddingBottom: keyboardHeight + insets.bottom + SPACING.SM },
         ]}
       >
         <View style={[styles.inputContainer, dynamicStyles.inputContainer]}>
@@ -398,18 +419,6 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       </View>
     </>
   );
-
-  if (Platform.OS === 'ios') {
-    return (
-      <KeyboardAvoidingView
-        style={[styles.container, dynamicStyles.container]}
-        behavior="padding"
-        keyboardVerticalOffset={insets.top}
-      >
-        {content}
-      </KeyboardAvoidingView>
-    );
-  }
 
   return <View style={[styles.container, dynamicStyles.container]}>{content}</View>;
 };
