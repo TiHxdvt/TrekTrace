@@ -28,22 +28,28 @@
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-	  <!-- Do not change NSAllowsArbitraryLoads to true, or you will risk app rejection! -->
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>途迹需要获取您的位置来记录运动轨迹和展示地图</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>途迹需要获取您的位置来在后台持续记录运动轨迹</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>用于保存运动轨迹卡片到相册</string>
 	<key>NSCameraUsageDescription</key>
 	<string>需要访问相机以拍摄头像照片</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>途迹需要获取您的位置来在后台持续记录运动轨迹</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>途迹需要获取您的位置来记录运动轨迹和展示地图</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>用于保存运动轨迹卡片到相册</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>需要访问相册以选择头像照片</string>
+	<key>RCTNewArchEnabled</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -60,10 +66,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>location</string>
-		<string>fetch</string>
-	</array>
 </dict>
 </plist>
