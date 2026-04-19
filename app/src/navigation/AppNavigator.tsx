@@ -17,6 +17,8 @@ import { MessagesScreen } from '../screens/MessagesScreen';
 import { MainTabParamList } from './types';
 import { storageService, authServiceEvents } from '../services/storageService';
 import { websocketService } from '../services/websocketService';
+import { initDatabase } from '../database';
+import { syncOnAppStart } from '../services/chatSyncService';
 import { SHADOWS } from '../theme';
 import { useTheme } from '../contexts/ThemeContext';
 import {
@@ -256,8 +258,19 @@ export const AppNavigator: React.FC = () => {
   }, []);
 
   // Connect WebSocket when authenticated, disconnect on logout
+  // Also init local DB and sync chat data on login
   React.useEffect(() => {
     if (isAuthenticated) {
+      // Initialize local SQLite DB
+      initDatabase().then(() => {
+        // Sync chat data from server to local DB
+        syncOnAppStart().catch(e => {
+          console.warn('[AppNavigator] syncOnAppStart failed:', e);
+        });
+      }).catch(e => {
+        console.warn('[AppNavigator] initDatabase failed:', e);
+      });
+
       websocketService.connect();
     } else {
       websocketService.disconnect();
