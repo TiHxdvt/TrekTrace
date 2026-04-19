@@ -14,7 +14,7 @@ export type ChatListItem =
   | { kind: 'message'; id: string; message: ChatMessage; status: MessageStatus };
 
 /** 消息发送状态 */
-export type MessageStatus = 'sending' | 'sent' | 'failed';
+export type MessageStatus = 'sending' | 'sent' | 'failed' | 'read';
 
 /**
  * 将消息列表转换为 FlatList 数据

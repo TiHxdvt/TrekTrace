@@ -233,4 +233,10 @@ export interface ChatMessage {
   content: string;
   type: string;
   createdAt: string;
+  mediaUrl?: string;
+  mediaType?: string;
+  mediaSize?: number;
+  latitude?: number;
+  longitude?: number;
+  isRead?: boolean;
 }
