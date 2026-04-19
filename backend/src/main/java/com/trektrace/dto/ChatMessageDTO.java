@@ -14,6 +14,12 @@ public class ChatMessageDTO {
     private String content;
     private String type;
     private String createdAt;
+    private String mediaUrl;
+    private String mediaType;
+    private Long mediaSize;
+    private Double latitude;
+    private Double longitude;
+    private Boolean isRead;
 
     public ChatMessageDTO() {}
 
@@ -24,6 +30,11 @@ public class ChatMessageDTO {
         this.content = message.getContent();
         this.type = message.getType().name();
         this.createdAt = message.getCreatedAt() != null ? message.getCreatedAt().toString() : null;
+        this.mediaUrl = message.getMediaUrl();
+        this.mediaType = message.getMediaType();
+        this.mediaSize = message.getMediaSize();
+        this.latitude = message.getLatitude();
+        this.longitude = message.getLongitude();
 
         if (message.getSender() != null) {
             this.senderNickname = message.getSender().getNickname();

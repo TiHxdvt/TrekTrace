@@ -40,6 +40,7 @@ public class SecurityConfig {
                 auth
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/api/avatars/**").permitAll()
+                    .requestMatchers("/api/chat/media/**").permitAll()
                     .requestMatchers("/ws/**").permitAll();
                 if (swaggerEnabled) {
                     auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll();

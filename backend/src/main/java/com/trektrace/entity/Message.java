@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 public class Message {
 
     public enum MessageType {
-        TEXT, SYSTEM
+        TEXT, SYSTEM, IMAGE, AUDIO, LOCATION, RECALLED
     }
 
     @Id
@@ -27,12 +27,27 @@ public class Message {
     @Column(name = "sender_id", nullable = false)
     private Long senderId;
 
-    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
+    @Column(name = "type", nullable = false, columnDefinition = "VARCHAR(20)")
     private MessageType type = MessageType.TEXT;
+
+    @Column(name = "media_url")
+    private String mediaUrl;
+
+    @Column(name = "media_type")
+    private String mediaType;
+
+    @Column(name = "media_size")
+    private Long mediaSize;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
