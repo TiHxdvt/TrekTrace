@@ -7,6 +7,7 @@ import com.trektrace.repository.ConversationParticipantRepository;
 import com.trektrace.repository.ConversationRepository;
 import com.trektrace.repository.MessageRepository;
 import com.trektrace.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -14,12 +15,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
+
+    @Value("${app.upload.dir:/app/uploads}")
+    private String uploadDir;
 
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
@@ -64,7 +71,9 @@ public class ChatService {
     }
 
     @Transactional
-    public ChatMessageDTO sendMessage(Long senderId, Long conversationId, String content) {
+    public ChatMessageDTO sendMessage(Long senderId, Long conversationId, String content,
+                                       String mediaType, String mediaUrl, Long mediaSize,
+                                       Double latitude, Double longitude) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在"));
 
@@ -74,8 +83,26 @@ public class ChatService {
         Message message = new Message();
         message.setConversationId(conversationId);
         message.setSenderId(senderId);
-        message.setContent(content);
-        message.setType(Message.MessageType.TEXT);
+        message.setContent(content != null ? content : "");
+
+        // 根据参数确定消息类型
+        if (mediaType != null) {
+            message.setMediaType(mediaType);
+            message.setMediaUrl(mediaUrl);
+            message.setMediaSize(mediaSize);
+            switch (mediaType) {
+                case "IMAGE" -> message.setType(Message.MessageType.IMAGE);
+                case "AUDIO" -> message.setType(Message.MessageType.AUDIO);
+                default -> message.setType(Message.MessageType.TEXT);
+            }
+        } else if (latitude != null && longitude != null) {
+            message.setType(Message.MessageType.LOCATION);
+            message.setLatitude(latitude);
+            message.setLongitude(longitude);
+        } else {
+            message.setType(Message.MessageType.TEXT);
+        }
+
         messageRepository.save(message);
 
         // Properly update conversation timestamp
@@ -89,6 +116,41 @@ public class ChatService {
 
         // Also push to each participant's personal queue
         List<ConversationParticipant> participants = participantRepository.findByConversationId(conversationId);
+        for (ConversationParticipant p : participants) {
+            webSocketService.sendToUser(p.getUserId(), "/queue/messages", dto);
+        }
+
+        return dto;
+    }
+
+    @Transactional
+    public ChatMessageDTO recallMessage(Long userId, Long messageId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "消息不存在"));
+
+        if (!message.getSenderId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能撤回自己的消息");
+        }
+
+        if (message.getCreatedAt() != null
+                && message.getCreatedAt().isBefore(LocalDateTime.now().minusMinutes(2))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "消息已超过2分钟，无法撤回");
+        }
+
+        message.setType(Message.MessageType.RECALLED);
+        message.setContent(null);
+        message.setMediaUrl(null);
+        message.setMediaType(null);
+        message.setMediaSize(null);
+        message.setLatitude(null);
+        message.setLongitude(null);
+        messageRepository.save(message);
+
+        ChatMessageDTO dto = new ChatMessageDTO(message);
+
+        // 推送撤回通知给会话所有参与者
+        webSocketService.sendToConversation(message.getConversationId(), dto);
+        List<ConversationParticipant> participants = participantRepository.findByConversationId(message.getConversationId());
         for (ConversationParticipant p : participants) {
             webSocketService.sendToUser(p.getUserId(), "/queue/messages", dto);
         }
@@ -163,8 +225,10 @@ public class ChatService {
         participantRepository.findByConversationIdAndUserId(conversationId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "你不是该会话的参与者"));
 
-        return messageRepository.findByConversationIdOrderByIdDesc(conversationId, PageRequest.of(page, size))
+        Page<ChatMessageDTO> dtos = messageRepository.findByConversationIdOrderByIdDesc(conversationId, PageRequest.of(page, size))
                 .map(ChatMessageDTO::new);
+        populateIsRead(dtos.getContent(), userId, conversationId);
+        return dtos;
     }
 
     @Transactional
@@ -177,5 +241,104 @@ public class ChatService {
             participant.setLastReadMessageId(messageId);
             participantRepository.save(participant);
         }
+    }
+
+    /**
+     * 增量同步：拉取指定用户参与的所有会话中，ID 大于 after 的消息（上限 500 条）
+     */
+    public List<ChatMessageDTO> syncMessages(Long userId, Long after) {
+        Set<Long> userConvIds = conversationRepository.findByUserId(userId)
+                .stream().map(Conversation::getId).collect(Collectors.toSet());
+
+        if (userConvIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Message> messages = messageRepository.findByConversationIdsAndAfter(
+                userConvIds, after, PageRequest.of(0, 500));
+
+        List<ChatMessageDTO> dtos = messages.stream()
+                .map(ChatMessageDTO::new)
+                .collect(Collectors.toList());
+
+        // 按 conversationId 分组后分别填充 isRead
+        Map<Long, List<ChatMessageDTO>> byConvId = dtos.stream()
+                .collect(Collectors.groupingBy(ChatMessageDTO::getConversationId));
+        for (Map.Entry<Long, List<ChatMessageDTO>> entry : byConvId.entrySet()) {
+            populateIsRead(entry.getValue(), userId, entry.getKey());
+        }
+
+        return dtos;
+    }
+
+    /**
+     * 删除会话及其所有消息（仅参与者可操作）
+     */
+    @Transactional
+    public void deleteConversation(Long userId, Long conversationId) {
+        participantRepository.findByConversationIdAndUserId(conversationId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "你不是该会话的参与者"));
+
+        // 收集媒体文件 URL 并删除物理文件
+        List<Message> messages = messageRepository.findByConversationIdOrderByIdDesc(conversationId, PageRequest.of(0, Integer.MAX_VALUE)).getContent();
+        List<String> mediaUrls = messages.stream()
+                .map(Message::getMediaUrl)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        deleteMediaFiles(mediaUrls);
+
+        messageRepository.deleteByConversationId(conversationId);
+        participantRepository.deleteByConversationId(conversationId);
+        conversationRepository.deleteById(conversationId);
+    }
+
+    /**
+     * 删除单条消息（仅发送者可操作）
+     */
+    @Transactional
+    public void deleteMessage(Long userId, Long messageId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "消息不存在"));
+
+        if (!message.getSenderId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能删除自己的消息");
+        }
+
+        messageRepository.delete(message);
+    }
+
+    /**
+     * 删除媒体文件（物理文件）
+     */
+    private void deleteMediaFiles(List<String> mediaUrls) {
+        if (mediaUrls == null || mediaUrls.isEmpty()) return;
+
+        Path chatDir = Paths.get(uploadDir, "chat").toAbsolutePath().normalize();
+        for (String url : mediaUrls) {
+            // url 格式: /api/chat/media/filename
+            String filename = url.substring(url.lastIndexOf('/') + 1);
+            try {
+                Path file = chatDir.resolve(filename);
+                Files.deleteIfExists(file);
+            } catch (Exception e) {
+                // 文件删除失败不影响会话删除
+            }
+        }
+    }
+
+    /**
+     * 填充消息的 isRead 字段
+     * 根据 conversationId 对应参与者记录的 lastReadMessageId 判断
+     */
+    private void populateIsRead(List<ChatMessageDTO> dtos, Long userId, Long conversationId) {
+        if (dtos == null || dtos.isEmpty()) return;
+
+        participantRepository.findByConversationIdAndUserId(conversationId, userId)
+                .ifPresent(participant -> {
+                    Long lastReadId = participant.getLastReadMessageId();
+                    for (ChatMessageDTO dto : dtos) {
+                        dto.setIsRead(lastReadId != null && dto.getId() != null && dto.getId() <= lastReadId);
+                    }
+                });
     }
 }
