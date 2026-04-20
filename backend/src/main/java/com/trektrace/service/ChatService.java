@@ -138,7 +138,7 @@ public class ChatService {
         }
 
         message.setType(Message.MessageType.RECALLED);
-        message.setContent(null);
+        message.setContent("");
         message.setMediaUrl(null);
         message.setMediaType(null);
         message.setMediaSize(null);
