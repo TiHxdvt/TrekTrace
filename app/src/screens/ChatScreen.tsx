@@ -31,7 +31,7 @@ import { websocketService } from '../services/websocketService';
 import * as chatDB from '../services/chatDatabaseService';
 import { syncConversationMessages, sendLocalMessage, getCurrentUserId } from '../services/chatSyncService';
 import { ChatMessage, User } from '../types';
-import { IconAltArrowLeft } from '../components/SolarIcons';
+import { IconAltArrowLeft, IconSmileCircle, IconAddCircle } from '../components/SolarIcons';
 import { ChatTimeItem } from '../components/chat/ChatTimeItem';
 import { ChatMessageItem } from '../components/chat/ChatMessageItem';
 import { ChatTypingItem } from '../components/chat/ChatTypingItem';
@@ -219,21 +219,30 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       try {
         if (!chatDB.messageExists(msg.id)) {
           chatDB.insertMessage(msg);
-          // 更新会话最后消息
-          const lastContent = msg.type === 'IMAGE' ? '[图片]'
-            : msg.type === 'AUDIO' ? '[语音]'
-            : msg.type === 'LOCATION' ? '[位置]'
-            : msg.type === 'RECALLED' ? '[已撤回]'
-            : msg.content;
-          chatDB.updateConversationLastMessage(conversationId, lastContent, msg.createdAt);
+        } else if (msg.type === 'RECALLED') {
+          chatDB.updateMessageRecalled(msg.id);
         }
+        // 更新会话最后消息
+        const lastContent = msg.type === 'IMAGE' ? '[图片]'
+          : msg.type === 'AUDIO' ? '[语音]'
+          : msg.type === 'LOCATION' ? '[位置]'
+          : msg.type === 'RECALLED' ? '[已撤回]'
+          : msg.content;
+        chatDB.updateConversationLastMessage(conversationId, lastContent, msg.createdAt);
       } catch {
         // DB 操作失败不影响 UI
       }
 
       setMessages(prev => {
-        // 如果已存在同 id 的消息（包括乐观更新被 WebSocket 先到达），跳过
-        if (prev.some(m => m.id === msg.id)) return prev;
+        // 如果已存在同 id 的消息，检查是否为更新（如撤回）
+        const existingIdx = prev.findIndex(m => m.id === msg.id);
+        if (existingIdx !== -1) {
+          // 撤回等更新：替换已有消息
+          if (msg.type === 'RECALLED' || prev[existingIdx].type !== msg.type) {
+            return prev.map(m => m.id === msg.id ? msg : m);
+          }
+          return prev;
+        }
         // 如果是自己的消息，移除对应的乐观临时消息（通过 conversationId + type + mediaUrl 匹配）
         const filtered = prev.filter(m => {
           if (m.id < 0 && m.conversationId === msg.conversationId && m.type === msg.type) {
@@ -419,7 +428,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       const Geolocation = (await import('@react-native-community/geolocation')).default;
 
       Geolocation.getCurrentPosition(
-        async (position: any) => {
+        async (position) => {
           const { latitude, longitude } = position.coords;
           const myUserId = await getCurrentUserId();
           const now = new Date().toISOString();
@@ -525,7 +534,6 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
 
   // ---- 附件面板操作 ----
   const handleCamera = useCallback(async () => {
-    setShowAttachment(false);
     try {
       const { launchCamera } = await import('react-native-image-picker');
       launchCamera({ mediaType: 'photo', quality: 0.8 }, (response) => {
@@ -542,7 +550,6 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   }, [handleSendImage]);
 
   const handleGallery = useCallback(async () => {
-    setShowAttachment(false);
     try {
       const { launchImageLibrary } = await import('react-native-image-picker');
       launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
@@ -667,68 +674,80 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         <ChatTypingItem avatarUrl={friendAvatarUrl} />
       )}
 
-      {/* 输入栏 */}
-      <View
-        style={[
-          styles.inputBar,
-          dynamicStyles.inputBar,
-          { paddingBottom: (showEmoji || showAttachment ? 0 : keyboardHeight) + insets.bottom + SPACING.SM },
-        ]}
-      >
-        <View style={[styles.inputContainer, dynamicStyles.inputContainer]}>
-          {/* + 附件按钮 */}
-          <TouchableOpacity
-            style={[styles.iconBtn, dynamicStyles.attachBtn]}
-            onPress={() => {
-              setShowAttachment(prev => !prev);
-              setShowEmoji(false);
-              Keyboard.dismiss();
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.iconBtnText}>+</Text>
-          </TouchableOpacity>
+      {/* 输入区域 */}
+      <View style={styles.inputAreaWrapper}>
+        {/* 附件弹出列表 */}
+        <ChatAttachmentPanel
+          visible={showAttachment}
+          onClose={() => setShowAttachment(false)}
+          onCamera={handleCamera}
+          onGallery={handleGallery}
+          onLocation={handleSendLocation}
+        />
 
-          {/* 文本输入 */}
-          <TextInput
-            style={[styles.textInput, dynamicStyles.textInput]}
-            value={inputText}
-            onChangeText={setInputText}
-            onFocus={() => {
-              setShowEmoji(false);
-              setShowAttachment(false);
-            }}
-            placeholder="输入消息..."
-            placeholderTextColor={colors.TEXT.PLACEHOLDER}
-            multiline
-            maxLength={500}
-          />
+        {/* 输入栏 */}
+        <View
+          style={[
+            styles.inputBar,
+            dynamicStyles.inputBar,
+            { paddingBottom: (showEmoji || showAttachment ? 0 : keyboardHeight) + insets.bottom + SPACING.SM },
+          ]}
+        >
+          <View style={[styles.inputContainer, dynamicStyles.inputContainer]}>
+            {/* + 附件按钮 */}
+            <TouchableOpacity
+              style={[styles.iconBtn, dynamicStyles.attachBtn]}
+              onPress={() => {
+                setShowAttachment(prev => !prev);
+                setShowEmoji(false);
+                Keyboard.dismiss();
+              }}
+              activeOpacity={0.7}
+            >
+              <IconAddCircle size={28} color={colors.TEXT.SECONDARY} />
+            </TouchableOpacity>
 
-          {/* Emoji 按钮 */}
-          <TouchableOpacity
-            style={[styles.iconBtn, dynamicStyles.emojiBtn]}
-            onPress={() => {
-              setShowEmoji(prev => !prev);
-              setShowAttachment(false);
-              Keyboard.dismiss();
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.iconBtnText}>😀</Text>
-          </TouchableOpacity>
+            {/* 文本输入 */}
+            <TextInput
+              style={[styles.textInput, dynamicStyles.textInput]}
+              value={inputText}
+              onChangeText={setInputText}
+              onFocus={() => {
+                setShowEmoji(false);
+                setShowAttachment(false);
+              }}
+              placeholder="输入消息..."
+              placeholderTextColor={colors.TEXT.PLACEHOLDER}
+              multiline
+              maxLength={500}
+            />
 
-          {/* 发送按钮 */}
-          <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              inputText.trim() ? dynamicStyles.sendBtn : dynamicStyles.sendBtnDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim()}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.sendBtnText, dynamicStyles.sendBtnText]}>发送</Text>
-          </TouchableOpacity>
+            {/* Emoji 按钮 */}
+            <TouchableOpacity
+              style={[styles.iconBtn, dynamicStyles.emojiBtn]}
+              onPress={() => {
+                setShowEmoji(prev => !prev);
+                setShowAttachment(false);
+                Keyboard.dismiss();
+              }}
+              activeOpacity={0.7}
+            >
+              <IconSmileCircle size={28} color={colors.TEXT.SECONDARY} />
+            </TouchableOpacity>
+
+            {/* 发送按钮 */}
+            <TouchableOpacity
+              style={[
+                styles.sendBtn,
+                inputText.trim() ? dynamicStyles.sendBtn : dynamicStyles.sendBtnDisabled,
+              ]}
+              onPress={handleSend}
+              disabled={!inputText.trim()}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.sendBtnText, dynamicStyles.sendBtnText]}>发送</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -749,15 +768,6 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
           </View>
         </View>
       )}
-
-      {/* 附件面板 */}
-      <ChatAttachmentPanel
-        visible={showAttachment}
-        onClose={() => setShowAttachment(false)}
-        onCamera={handleCamera}
-        onGallery={handleGallery}
-        onLocation={handleSendLocation}
-      />
     </>
   );
 
@@ -811,6 +821,10 @@ const styles = StyleSheet.create({
   loadingMoreText: {
     fontSize: TYPOGRAPHY.FONT_SIZE.SM,
   },
+  // 输入区域容器（用于定位附件弹出列表）
+  inputAreaWrapper: {
+    position: 'relative',
+  },
   // 输入栏
   inputBar: {
     paddingHorizontal: SPACING.LG,
@@ -840,9 +854,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 2,
-  },
-  iconBtnText: {
-    fontSize: 18,
   },
   sendBtn: {
     borderRadius: BORDER_RADIUS.FULL,

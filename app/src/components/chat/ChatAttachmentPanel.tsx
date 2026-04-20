@@ -1,20 +1,20 @@
 /**
- * 聊天附件选择面板
- * 底部弹出面板：拍照 / 相册 / 位置
+ * 聊天附件选择 — 紧凑弹出列表
+ * 点击 + 按钮后向上弹出小列表：拍照 / 相册 / 位置
+ * 复用 StatsTypeFilter 的动画模式（maxHeight + opacity）
  */
 
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
   Pressable,
+  StyleSheet,
+  Animated,
 } from 'react-native';
-import { SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../theme';
+import { SPACING, BORDER_RADIUS, TYPOGRAPHY, ANIMATION } from '../../theme';
 import { useTheme } from '../../contexts/ThemeContext';
-import { IconMapPointBold, IconGps } from '../SolarIcons';
+import { IconCamera, IconGallery, IconPointOnMap } from '../SolarIcons';
 
 interface ChatAttachmentPanelProps {
   visible: boolean;
@@ -24,101 +24,104 @@ interface ChatAttachmentPanelProps {
   onLocation: () => void;
 }
 
+const ITEM_HEIGHT = 38;
+const MAX_MENU_H = 3 * ITEM_HEIGHT;
+
+const OPTIONS = [
+  { key: 'camera' as const, Icon: IconCamera, label: '拍照' },
+  { key: 'gallery' as const, Icon: IconGallery, label: '相册' },
+  { key: 'location' as const, Icon: IconPointOnMap, label: '位置' },
+];
+
 export const ChatAttachmentPanel: React.FC<ChatAttachmentPanelProps> = memo(({
   visible,
   onClose,
   onCamera,
-  onGallery,
   onLocation,
+  onGallery,
 }) => {
   const { colors } = useTheme();
+  const expandAnim = useRef(new Animated.Value(0)).current;
+  const menuHeight = useRef(new Animated.Value(0)).current;
 
-  if (!visible) return null;
+  useEffect(() => {
+    Animated.timing(expandAnim, {
+      toValue: visible ? 1 : 0,
+      duration: ANIMATION.FAST,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.timing(menuHeight, {
+      toValue: visible ? MAX_MENU_H : 0,
+      duration: ANIMATION.FAST,
+      useNativeDriver: false,
+    }).start();
+  }, [visible, expandAnim, menuHeight]);
+
+  const contentOpacity = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    menu: {
+      backgroundColor: colors.OVERLAY.SUMMARY,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      borderRadius: BORDER_RADIUS.LG,
+      overflow: 'hidden',
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.XS,
+      paddingVertical: SPACING.XS + 2,
+      paddingLeft: SPACING.SM,
+      paddingRight: SPACING.MD,
+    },
+    menuLabel: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      fontWeight: '500',
+      color: colors.TEXT.SECONDARY,
+    },
+  }), [colors]);
+
+  const handleSelect = useCallback((key: 'camera' | 'gallery' | 'location') => {
+    onClose();
+    const actions = { camera: onCamera, gallery: onGallery, location: onLocation };
+    actions[key]();
+  }, [onClose, onCamera, onGallery, onLocation]);
 
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable onPress={() => {}} style={[styles.panel, { backgroundColor: colors.OVERLAY.HEAVY }]}>
-          <View style={styles.handle} />
-          <Text style={[styles.title, { color: colors.TEXT.PRIMARY }]}>发送附件</Text>
-
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.OVERLAY.MEDIUM, borderColor: colors.BORDER.MEDIUM }]}
-              onPress={onCamera}
-              activeOpacity={0.7}
+    <Animated.View
+      style={[styles.container, { maxHeight: menuHeight }]}
+      pointerEvents={visible ? 'auto' : 'none'}
+    >
+      <Animated.View style={{ opacity: contentOpacity }}>
+        <View style={dynamicStyles.menu}>
+          {OPTIONS.map(opt => (
+            <Pressable
+              key={opt.key}
+              style={dynamicStyles.menuItem}
+              onPress={() => handleSelect(opt.key)}
             >
-              <Text style={styles.actionIcon}>📷</Text>
-              <Text style={[styles.actionText, { color: colors.TEXT.SECONDARY }]}>拍照</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.OVERLAY.MEDIUM, borderColor: colors.BORDER.MEDIUM }]}
-              onPress={onGallery}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionIcon}>🖼️</Text>
-              <Text style={[styles.actionText, { color: colors.TEXT.SECONDARY }]}>相册</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.OVERLAY.MEDIUM, borderColor: colors.BORDER.MEDIUM }]}
-              onPress={onLocation}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionIcon}>📍</Text>
-              <Text style={[styles.actionText, { color: colors.TEXT.SECONDARY }]}>位置</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+              <opt.Icon size={22} color={colors.TEXT.SECONDARY} />
+              <Text style={dynamicStyles.menuLabel}>{opt.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Animated.View>
+    </Animated.View>
   );
 });
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  panel: {
-    borderTopLeftRadius: BORDER_RADIUS.XXL,
-    borderTopRightRadius: BORDER_RADIUS.XXL,
-    paddingHorizontal: SPACING.XL,
-    paddingTop: SPACING.SM,
-    paddingBottom: SPACING.XXL,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    alignSelf: 'center',
-    marginBottom: SPACING.MD,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-    marginBottom: SPACING.LG,
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  actionBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: BORDER_RADIUS.LG,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionIcon: {
-    fontSize: 28,
-    marginBottom: SPACING.XS,
-  },
-  actionText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+  container: {
+    position: 'absolute',
+    bottom: '100%',
+    left: SPACING.LG,
+    marginBottom: SPACING.SM,
+    overflow: 'hidden',
+    zIndex: 50,
   },
 });
