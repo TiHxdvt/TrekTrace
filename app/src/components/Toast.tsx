@@ -136,7 +136,7 @@ export const ToastRoot: React.FC = () => {
     <Animated.View
       style={[
         styles.container,
-        { bottom: insets.bottom + 60 },
+        { bottom: insets.bottom + 90 },
         { opacity: opacity.current },
       ]}
       pointerEvents="box-none"
