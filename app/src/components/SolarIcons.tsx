@@ -60,6 +60,11 @@ import SvgCheckCircle from '../icons/solar-check-circle-linear.svg';
 import SvgShieldCross from '../icons/solar-shield-cross-linear.svg';
 import SvgQrCode from '../icons/solar-qr-code-linear.svg';
 import SvgCheckReadLinear from '../icons/solar-check-read-linear.svg';
+import SvgSmileCircleLinear from '../icons/solar-smile-circle-linear.svg';
+import SvgAddCircleLinear from '../icons/solar-add-circle-linear.svg';
+import SvgCameraLinear from '../icons/solar-camera-linear.svg';
+import SvgGalleryMinimalisticLinear from '../icons/solar-gallery-minimalistic-linear.svg';
+import SvgPointOnMapLinear from '../icons/solar-point-on-map-linear.svg';
 
 // ==================== 导航栏图标 ====================
 export const IconMapPoint = createIcon(SvgMapPoint);
@@ -150,3 +155,12 @@ export const IconQrCode = createIcon(SvgQrCode);
 
 // ==================== 聊天消息状态图标 ====================
 export const IconCheckRead = createIcon(SvgCheckReadLinear);
+
+// ==================== 聊天输入栏图标 ====================
+export const IconSmileCircle = createIcon(SvgSmileCircleLinear);
+export const IconAddCircle = createIcon(SvgAddCircleLinear);
+
+// ==================== 聊天附件图标 ====================
+export const IconCamera = createIcon(SvgCameraLinear);
+export const IconGallery = createIcon(SvgGalleryMinimalisticLinear);
+export const IconPointOnMap = createIcon(SvgPointOnMapLinear);
