@@ -30,7 +30,7 @@ export const chatService = {
     latitude?: number;
     longitude?: number;
   }): Promise<ChatMessage> {
-    const body: any = { content: content || '' };
+    const body: Record<string, unknown> = { content: content || '' };
     if (mediaOptions) {
       if (mediaOptions.mediaType) body.mediaType = mediaOptions.mediaType;
       if (mediaOptions.mediaUrl) body.mediaUrl = mediaOptions.mediaUrl;

@@ -6,7 +6,9 @@ import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
-@Table(name = "verification_codes")
+@Table(name = "verification_codes", indexes = {
+        @Index(name = "idx_vc_phone", columnList = "phone")
+})
 @Data
 public class VerificationCode {
     

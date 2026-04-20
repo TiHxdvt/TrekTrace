@@ -36,10 +36,10 @@
       android:networkSecurityConfig="@xml/network_security_config"
       android:supportsRtl="true">
 
-      <!-- 高德地图 API Key -->
+      <!-- 高德地图 API Key（从 local.properties 注入） -->
       <meta-data
           android:name="com.amap.api.v2.apikey"
-          android:value="6518a83abe3771f3a920bf329cbdefb0" />
+          android:value="${AMAP_API_KEY}" />
 
       <!-- 后台轨迹记录服务 -->
       <service

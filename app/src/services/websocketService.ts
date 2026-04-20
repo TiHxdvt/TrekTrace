@@ -11,7 +11,7 @@ import { APP_CONFIG } from '../config';
 
 const RECONNECT_DELAY = 5000;
 
-type MessageHandler = (message: any) => void;
+type MessageHandler = (message: Record<string, unknown>) => void;
 
 interface SubscriptionEntry {
   handler: MessageHandler;

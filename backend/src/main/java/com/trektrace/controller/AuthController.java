@@ -26,6 +26,11 @@ public class AuthController {
     private final Map<String, Long> rateLimitMap = new ConcurrentHashMap<>();
     private static final long RATE_LIMIT_MS = 60_000; // 1 minute between sends
 
+    // Login attempt rate limiter: key -> [count, timestamp]
+    private final Map<String, long[]> loginAttemptMap = new ConcurrentHashMap<>();
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final long LOGIN_LOCKOUT_MS = 15 * 60_000; // 15 minutes lockout
+
     @Autowired
     private UserService userService;
 
@@ -70,9 +75,6 @@ public class AuthController {
         // Send verification code
         smsService.sendVerificationCode(phone, code);
 
-        if (smsService.isMock()) {
-            return ResponseEntity.ok(Map.of("code", code));
-        }
         return ResponseEntity.ok().build();
     }
 
@@ -117,8 +119,35 @@ public class AuthController {
                     .body(Map.of("error", "手机号和密码不能为空"));
         }
 
-        User user = userService.authenticatePassword(phone, password);
-        String token = userService.generateToken(user.getId());
-        return ResponseEntity.ok(new LoginResponse(token, user));
+        // Login attempt rate limiting
+        String rateKey = "pwd:" + phone;
+        long now = System.currentTimeMillis();
+        long[] attempt = loginAttemptMap.get(rateKey);
+        if (attempt != null) {
+            long elapsed = now - attempt[1];
+            if (elapsed < LOGIN_LOCKOUT_MS && attempt[0] >= MAX_LOGIN_ATTEMPTS) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(Map.of("error", "登录尝试过多，请15分钟后重试"));
+            }
+            if (elapsed >= LOGIN_LOCKOUT_MS) {
+                loginAttemptMap.remove(rateKey);
+            }
+        }
+
+        try {
+            User user = userService.authenticatePassword(phone, password);
+            loginAttemptMap.remove(rateKey);
+            String token = userService.generateToken(user.getId());
+            return ResponseEntity.ok(new LoginResponse(token, user));
+        } catch (Exception e) {
+            loginAttemptMap.compute(rateKey, (k, v) -> {
+                if (v == null || (now - v[1]) >= LOGIN_LOCKOUT_MS) {
+                    return new long[]{1, now};
+                }
+                v[0]++;
+                return v;
+            });
+            throw e;
+        }
     }
 }

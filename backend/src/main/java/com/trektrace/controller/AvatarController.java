@@ -80,6 +80,10 @@ public class AvatarController {
         Path targetPath = avatarsDir.resolve(filename);
         try {
             Files.createDirectories(avatarsDir);
+            // 路径遍历防护：确保目标路径仍在 avatars 目录下
+            if (!targetPath.normalize().startsWith(avatarsDir)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "非法文件路径"));
+            }
             file.transferTo(targetPath);
         } catch (IOException e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "文件保存失败"));

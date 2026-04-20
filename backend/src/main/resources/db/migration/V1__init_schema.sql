@@ -1,16 +1,15 @@
--- 途迹 TrekTrace 数据库设计
--- 更新时间: 2026-04-21
--- 本文件与 Flyway 迁移脚本 (V1__init_schema.sql) 保持同步
+-- TrekTrace 初始数据库 schema
+-- V1__init_schema.sql
 
 -- 用户表
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    account BIGINT UNIQUE,                       -- 用户账号 (100000 + id)
-    phone VARCHAR(11) NOT NULL UNIQUE,           -- 手机号
-    nickname VARCHAR(50),                        -- 昵称
-    avatar_url VARCHAR(512),                     -- 头像 URL
-    password VARCHAR(255),                       -- BCrypt 密码哈希
-    nickname_updated_at DATETIME,                -- 昵称最后修改时间（7天冷却）
+    account BIGINT UNIQUE,
+    phone VARCHAR(11) NOT NULL UNIQUE,
+    nickname VARCHAR(50),
+    avatar_url VARCHAR(512),
+    password VARCHAR(255),
+    nickname_updated_at DATETIME,
     data_visibility ENUM('PUBLIC','FRIENDS','PRIVATE') NOT NULL DEFAULT 'FRIENDS',
     status ENUM('ACTIVE','DELETED') NOT NULL DEFAULT 'ACTIVE',
     created_at DATETIME,
@@ -24,9 +23,9 @@ CREATE TABLE IF NOT EXISTS activities (
     type ENUM('HIKING','RUNNING','CYCLING') NOT NULL,
     start_time DATETIME,
     end_time DATETIME,
-    duration INT,                                -- 秒
-    distance DECIMAL(10,2),                      -- 米
-    elevation_gain DECIMAL(10,2),                -- 爬升米
+    duration INT,
+    distance DECIMAL(10,2),
+    elevation_gain DECIMAL(10,2),
     status ENUM('ONGOING','PAUSED','COMPLETED') NOT NULL,
     created_at DATETIME,
     updated_at DATETIME,
@@ -40,8 +39,8 @@ CREATE TABLE IF NOT EXISTS track_points (
     activity_id BIGINT NOT NULL,
     latitude DECIMAL(10,8) NOT NULL,
     longitude DECIMAL(11,8) NOT NULL,
-    altitude DECIMAL(8,2),                       -- 米
-    speed DECIMAL(5,2),                          -- m/s
+    altitude DECIMAL(8,2),
+    speed DECIMAL(5,2),
     timestamp DATETIME NOT NULL,
     INDEX idx_track_points_activity_id (activity_id)
 );
@@ -84,7 +83,7 @@ CREATE TABLE IF NOT EXISTS messages (
     conversation_id BIGINT NOT NULL,
     sender_id BIGINT NOT NULL,
     content TEXT,
-    type VARCHAR(20) NOT NULL DEFAULT 'TEXT',     -- TEXT/SYSTEM/IMAGE/AUDIO/LOCATION/RECALLED
+    type VARCHAR(20) NOT NULL DEFAULT 'TEXT',
     media_url VARCHAR(512),
     media_type VARCHAR(20),
     media_size BIGINT,

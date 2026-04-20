@@ -6,7 +6,9 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
-@Table(name = "track_points")
+@Table(name = "track_points", indexes = {
+        @Index(name = "idx_track_points_activity_id", columnList = "activity_id")
+})
 @Data
 public class TrackPoint {
     

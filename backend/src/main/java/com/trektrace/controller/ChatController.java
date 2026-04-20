@@ -111,6 +111,10 @@ public class ChatController {
 
         try {
             Files.createDirectories(chatDir);
+            // 路径遍历防护：确保目标路径仍在 chat 目录下
+            if (!targetPath.normalize().startsWith(chatDir)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "非法文件路径"));
+            }
             file.transferTo(targetPath);
         } catch (IOException e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "文件保存失败"));

@@ -251,17 +251,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     try {
       setSendingCode(true);
-      const code = await authService.sendVerificationCode(phone);
+      await authService.sendVerificationCode(phone);
 
       setCountdown(60);
       countdownEndRef.current = Date.now() + 60 * 1000;
       setCountdownActive(true);
 
-      if (code) {
-        Toast.show(`验证码：${code}`, { copyText: code });
-      } else {
-        Toast.show('验证码已发送');
-      }
+      Toast.show('验证码已发送');
     } catch (error: any) {
       console.error('Send code error:', error);
       Toast.show('验证码发送失败，请稍后重试');

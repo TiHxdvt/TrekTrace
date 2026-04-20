@@ -8,7 +8,10 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
-@Table(name = "activities")
+@Table(name = "activities", indexes = {
+        @Index(name = "idx_activities_user_id", columnList = "user_id"),
+        @Index(name = "idx_activities_start_time", columnList = "start_time")
+})
 @Data
 public class Activity {
     
