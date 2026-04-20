@@ -13,16 +13,16 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import {
   View,
   Text,
-  Switch,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
   Animated,
+  Easing,
   Dimensions,
   InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TYPOGRAPHY, SPACING } from '../theme';
+import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { storageService } from '../services/storageService';
 import { Dialog } from '../components/Dialog';
 import { Avatar } from '../components/Avatar';
@@ -40,12 +40,173 @@ import {
   IconAltArrowRight,
   IconQrCode,
 } from '../components/SolarIcons';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme, ThemeMode } from '../contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// ─── 三段式主题选择器 ───
+
+const THEME_OPTIONS: { mode: ThemeMode; label: string }[] = [
+  { mode: 'system', label: '自动' },
+  { mode: 'light', label: '浅色' },
+  { mode: 'dark', label: '深色' },
+];
+
+const SELECTOR_HEIGHT = 36;
+const SELECTOR_OPTION_WIDTH = 48;
+const COLLAPSED_WIDTH = SELECTOR_OPTION_WIDTH;
+const EXPANDED_WIDTH = SELECTOR_OPTION_WIDTH * 3;
+
+const ThemeSelector: React.FC<{
+  value: ThemeMode;
+  onChange: (mode: ThemeMode) => void;
+  expanded: boolean;
+  onExpand: () => void;
+  onCollapse: () => void;
+}> = ({ value, onChange, expanded, onExpand, onCollapse }) => {
+  const { colors } = useTheme();
+  const currentIndex = THEME_OPTIONS.findIndex(o => o.mode === value);
+
+  const containerWidth = useRef(new Animated.Value(COLLAPSED_WIDTH)).current;
+  const optionsOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const targetWidth = expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
+    const targetOpacity = expanded ? 1 : 0;
+    Animated.parallel([
+      Animated.timing(containerWidth, {
+        toValue: targetWidth,
+        duration: 200,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        useNativeDriver: false,
+      }),
+      Animated.timing(optionsOpacity, {
+        toValue: targetOpacity,
+        duration: 150,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [expanded, containerWidth, optionsOpacity]);
+
+  const handleSelect = useCallback((mode: ThemeMode) => {
+    onChange(mode);
+    onCollapse();
+  }, [onChange, onCollapse]);
+
+  const currentLabel = THEME_OPTIONS[currentIndex].label;
+
+  return (
+    <Animated.View
+      style={[
+        selectorStyles.animatedContainer,
+        {
+          width: containerWidth,
+          height: SELECTOR_HEIGHT,
+          backgroundColor: colors.OVERLAY.LIGHT,
+          borderColor: colors.BORDER.MEDIUM,
+        },
+      ]}
+    >
+      {/* 折叠态 */}
+      <Animated.View
+        style={[
+          selectorStyles.collapsedLayer,
+          { opacity: Animated.subtract(new Animated.Value(1), optionsOpacity) },
+        ]}
+        pointerEvents={expanded ? 'none' : 'auto'}
+      >
+        <TouchableOpacity
+          style={selectorStyles.collapsedTouchable}
+          onPress={onExpand}
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[
+              selectorStyles.optionText,
+              { color: colors.TEXT.PRIMARY, fontWeight: '600' },
+            ]}
+            numberOfLines={1}
+          >
+            {currentLabel}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
+      {/* 展开态 */}
+      <Animated.View
+        style={[selectorStyles.optionsRow, { opacity: optionsOpacity }]}
+        pointerEvents={expanded ? 'auto' : 'none'}
+      >
+        {THEME_OPTIONS.map(({ mode, label }) => {
+          const isActive = value === mode;
+          return (
+            <TouchableOpacity
+              key={mode}
+              style={selectorStyles.option}
+              onPress={() => handleSelect(mode)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  selectorStyles.optionText,
+                  {
+                    color: isActive ? colors.TEXT.PRIMARY : colors.TEXT.TERTIARY,
+                    fontWeight: isActive ? '600' : '400',
+                  },
+                ]}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </Animated.View>
+    </Animated.View>
+  );
+};
+
+const selectorStyles = StyleSheet.create({
+  animatedContainer: {
+    borderRadius: BORDER_RADIUS.FULL,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1,
+  },
+  collapsedLayer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  collapsedTouchable: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionsRow: {
+    ...StyleSheet.absoluteFillObject,
+    width: EXPANDED_WIDTH,
+    flexDirection: 'row',
+    zIndex: 1,
+  },
+  option: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionText: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+  },
+});
+
 // 模块级状态
-let _refreshDrawerData: (() => void) | null = null;
+let _pendingUserData: {
+  name: string;
+  account: number | null;
+  phone: string;
+  avatar: string | null;
+} | null = null;
 
 function maskPhone(phone: string): string {
   if (phone.length >= 7) return phone.slice(0, 3) + '****' + phone.slice(-4);
@@ -55,12 +216,22 @@ function maskPhone(phone: string): string {
 // ─── 菜单内容 ───
 
 const DrawerContent: React.FC = () => {
-  const [userName, setUserName] = useState('用户');
-  const [userAccount, setUserAccount] = useState<number | null>(null);
-  const [userPhone, setUserPhone] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const { isDarkMode, toggleDarkMode, colors } = useTheme();
+  const userData = _pendingUserData;
+  const userName = userData?.name ?? '用户';
+  const userAccount = userData?.account ?? null;
+  const userPhone = userData?.phone ?? '';
+  const avatarUrl = userData?.avatar ?? null;
+  const { themeMode, setThemeMode, colors } = useTheme();
+  const [themeSelectorExpanded, setThemeSelectorExpanded] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const expandThemeSelector = useCallback(() => {
+    setThemeSelectorExpanded(true);
+  }, []);
+
+  const collapseThemeSelector = useCallback(() => {
+    setThemeSelectorExpanded(false);
+  }, []);
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
     drawer: {
@@ -88,27 +259,6 @@ const DrawerContent: React.FC = () => {
     },
     logoutText: { fontSize: TYPOGRAPHY.FONT_SIZE.MD, fontWeight: '500', color: colors.ERROR },
   }), [colors]);
-
-  const loadUserData = useCallback(async () => {
-    try {
-      const user = await storageService.getUser();
-      if (user) {
-        setUserName(user.nickname || '用户');
-        setUserAccount(user.account ?? null);
-        setUserPhone(user.phone ? maskPhone(user.phone) : '');
-        setAvatarUrl(user.avatarUrl || null);
-      }
-    } catch {
-      // 静默失败，保持默认值
-    }
-  }, []);
-
-  useEffect(() => {
-    InteractionManager.runAfterInteractions(loadUserData);
-    // 注册刷新函数，每次抽屉打开时调用
-    _refreshDrawerData = loadUserData;
-    return () => { _refreshDrawerData = null; };
-  }, [loadUserData]);
 
   const handleLogout = () => {
     Dialog.show('退出登录', '确定要退出登录吗？', [
@@ -189,16 +339,23 @@ const DrawerContent: React.FC = () => {
 
         <Text style={[dynamicStyles.sectionTitle, { marginTop: SPACING.XXL }]}>更多</Text>
 
-        <View style={styles.menuItem}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={collapseThemeSelector}
+          activeOpacity={1}
+        >
           <View style={dynamicStyles.menuIconWrap}><IconMoonStars size={22} color={colors.TEXT.SECONDARY} /></View>
-          <Text style={dynamicStyles.menuLabel}>深色模式</Text>
-          <Switch
-            value={isDarkMode}
-            onValueChange={toggleDarkMode}
-            trackColor={{ false: colors.OVERLAY.MEDIUM, true: colors.PRIMARY }}
-            thumbColor={colors.TEXT.PRIMARY}
-          />
-        </View>
+          <Text style={dynamicStyles.menuLabel}>外观</Text>
+          <View onStartShouldSetResponder={() => true}>
+            <ThemeSelector
+              value={themeMode}
+              onChange={setThemeMode}
+              expanded={themeSelectorExpanded}
+              onExpand={expandThemeSelector}
+              onCollapse={collapseThemeSelector}
+            />
+          </View>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => go('Permission')} activeOpacity={0.7}>
           <View style={dynamicStyles.menuIconWrap}><IconSettingsMinimalistic size={22} color={colors.TEXT.SECONDARY} /></View>
@@ -225,7 +382,6 @@ export const DrawerOverlayRoot: React.FC = () => {
   const [visible, setVisible] = useState(false);
   const isOpenRef = useRef(false);
   const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
     drawer: {
@@ -246,31 +402,36 @@ export const DrawerOverlayRoot: React.FC = () => {
   } as const;
 
   useEffect(() => {
-    DrawerOverlay._animateOpen = () => {
+    DrawerOverlay._animateOpen = async () => {
+      // 在组件挂载前预加载用户数据，避免动画中 setState 导致闪烁
+      try {
+        const user = await storageService.getUser();
+        if (user) {
+          _pendingUserData = {
+            name: user.nickname || '用户',
+            account: user.account ?? null,
+            phone: user.phone ? maskPhone(user.phone) : '',
+            avatar: user.avatarUrl || null,
+          };
+        }
+      } catch {
+        // 静默失败
+      }
       setVisible(true);
       isOpenRef.current = true;
       DrawerOverlay.isOpen = true;
-      _refreshDrawerData?.();
-      Animated.parallel([
-        Animated.spring(translateX, { toValue: 0, ...springConfig }),
-        Animated.spring(backdropOpacity, { toValue: 1, ...springConfig }),
-      ]).start();
+      Animated.spring(translateX, { toValue: 0, ...springConfig }).start();
     };
     DrawerOverlay._animateClose = (cb?: () => void) => {
-      Animated.parallel([
-        Animated.spring(translateX, { toValue: -SCREEN_WIDTH, ...springConfig }),
-        Animated.spring(backdropOpacity, { toValue: 0, ...springConfig }),
-      ]).start(({ finished }) => { if (finished) { isOpenRef.current = false; DrawerOverlay.isOpen = false; setVisible(false); cb?.(); } });
+      Animated.spring(translateX, { toValue: -SCREEN_WIDTH, ...springConfig }).start(({ finished }) => { if (finished) { isOpenRef.current = false; DrawerOverlay.isOpen = false; setVisible(false); cb?.(); } });
     };
-  }, [translateX, backdropOpacity]);
+  }, [translateX]);
 
   if (!visible) return null;
 
   return (
     <View style={styles.root} pointerEvents="box-none">
-      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]} pointerEvents="auto">
-        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => DrawerOverlay.close()} />
-      </Animated.View>
+      <TouchableOpacity style={styles.tapToClose} activeOpacity={1} onPress={() => DrawerOverlay.close()} />
       <Animated.View style={[dynamicStyles.drawer, { transform: [{ translateX }] }]} pointerEvents="auto">
         <DrawerContent />
       </Animated.View>
@@ -291,7 +452,7 @@ export const DrawerOverlay = {
   close(callback?: () => void) {
     this._animateClose?.(callback);
   },
-  _animateOpen: () => {},
+  _animateOpen: async () => {},
   _animateClose: (_cb?: () => void) => {},
 };
 
@@ -302,9 +463,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 100,
   },
-  backdrop: {
+  tapToClose: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   panel: { flex: 1 },
   header: {
@@ -317,7 +477,6 @@ const styles = StyleSheet.create({
   },
   userArea: { flexDirection: 'row', alignItems: 'center', gap: SPACING.LG, flex: 1 },
   userInfo: { flex: 1, gap: 4 },
-  userPhone: { fontSize: TYPOGRAPHY.FONT_SIZE.BASE },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL },
   menuItem: {
