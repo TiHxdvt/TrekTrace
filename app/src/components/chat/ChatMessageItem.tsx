@@ -4,7 +4,7 @@
  * 支持多媒体类型：TEXT / IMAGE / AUDIO / LOCATION / RECALLED
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Pressable,
   Clipboard,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { LongPressGestureHandler, State, HandlerStateChangeEvent, LongPressGestureHandlerEventPayload } from 'react-native-gesture-handler';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -26,22 +27,10 @@ import { ChatImageMessage } from './ChatImageMessage';
 import { ChatAudioMessage } from './ChatAudioMessage';
 import { ChatLocationMessage } from './ChatLocationMessage';
 
-interface ChatMessageItemProps {
-  content: string;
-  isMine: boolean;
-  status?: MessageStatus;
-  myAvatarUrl?: string;
-  otherAvatarUrl?: string;
-  onRetry?: () => void;
-  onDelete?: () => void;
-  onRecall?: () => void;
-  mediaType?: string;
-  mediaUrl?: string;
-  mediaSize?: number;
-  latitude?: number;
-  longitude?: number;
-  createdAt?: string;
-}
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const MENU_H = 36;
+const ARROW_SIZE = 6;
+const MENU_GAP = 6;
 
 // ==================== 消息状态指示 ====================
 
@@ -79,11 +68,17 @@ const MessageStatusIcon: React.FC<{ status?: MessageStatus; onRetry?: () => void
   }
 };
 
-// ==================== 长按操作菜单 ====================
+// ==================== 长按操作菜单（水平气泡条） ====================
+
+interface MenuPosition {
+  centerX: number;
+  y: number;
+  placement: 'above' | 'below';
+}
 
 interface ActionMenuProps {
   visible: boolean;
-  position: { x: number; y: number };
+  position: MenuPosition;
   onCopy: () => void;
   onDelete?: () => void;
   onRecall?: () => void;
@@ -103,38 +98,72 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
   canRecall,
 }) => {
   const { colors } = useTheme();
+  const [pillW, setPillW] = useState(0);
+
+  // 关闭时重置宽度，避免 FlatList 回收复用导致定位偏差
+  useEffect(() => {
+    if (!visible) setPillW(0);
+  }, [visible]);
+
+  // 构建菜单项（关闭时直接跳过后续计算）
+  const items = useMemo(() => {
+    const list: { key: string; label: string; color: string; action: () => void }[] = [
+      { key: 'copy', label: '复制', color: colors.TEXT.PRIMARY, action: onCopy },
+    ];
+    if (isMine && canRecall && onRecall) {
+      list.push({ key: 'recall', label: '撤回', color: colors.WARNING, action: onRecall });
+    }
+    if (isMine && onDelete) {
+      list.push({ key: 'delete', label: '删除', color: colors.ERROR, action: onDelete });
+    }
+    return list;
+  }, [colors, isMine, canRecall, onCopy, onRecall, onDelete]);
 
   if (!visible) return null;
 
   const bgColor = colors.OVERLAY.HEAVY;
-  const borderColor = colors.BORDER.MEDIUM;
+  const bColor = colors.BORDER.MEDIUM;
+
+  // 定位：水平居中于 centerX，限制在屏幕内
+  const estW = pillW || items.length * 64 + 16;
+  const menuLeft = Math.max(12, Math.min(SCREEN_WIDTH - estW - 12, position.centerX - estW / 2));
+  const arrowCenterX = Math.max(12, Math.min(estW - 12, position.centerX - menuLeft));
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <View
-          style={[
-            styles.menu,
-            {
-              top: position.y,
-              left: position.x,
-              backgroundColor: bgColor,
-              borderColor,
-            },
-          ]}
-        >
-          <TouchableOpacity style={styles.menuItem} onPress={onCopy}>
-            <Text style={[styles.menuItemText, { color: colors.TEXT.PRIMARY }]}>复制</Text>
-          </TouchableOpacity>
-          {isMine && canRecall && onRecall && (
-            <TouchableOpacity style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: borderColor }]} onPress={onRecall}>
-              <Text style={[styles.menuItemText, { color: colors.WARNING }]}>撤回</Text>
-            </TouchableOpacity>
+        <View style={[styles.menuContainer, { top: position.y, left: menuLeft }]}>
+          {/* 下方箭头（菜单在消息下方时，箭头朝上） */}
+          {position.placement === 'below' && (
+            <View
+              style={[
+                styles.arrowUp,
+                { borderBottomColor: bgColor, marginLeft: arrowCenterX - ARROW_SIZE },
+              ]}
+            />
           )}
-          {isMine && onDelete && (
-            <TouchableOpacity style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: borderColor }]} onPress={onDelete}>
-              <Text style={[styles.menuItemText, { color: colors.ERROR }]}>删除</Text>
-            </TouchableOpacity>
+          {/* 水平气泡条 */}
+          <View
+            style={[styles.menuPill, { backgroundColor: bgColor, borderColor: bColor }]}
+            onLayout={e => setPillW(e.nativeEvent.layout.width)}
+          >
+            {items.map((item, i) => (
+              <React.Fragment key={item.key}>
+                {i > 0 && <View style={[styles.divider, { backgroundColor: bColor }]} />}
+                <TouchableOpacity style={styles.menuItem} onPress={item.action}>
+                  <Text style={[styles.menuItemText, { color: item.color }]}>{item.label}</Text>
+                </TouchableOpacity>
+              </React.Fragment>
+            ))}
+          </View>
+          {/* 上方箭头（菜单在消息上方时，箭头朝下） */}
+          {position.placement === 'above' && (
+            <View
+              style={[
+                styles.arrowDown,
+                { borderTopColor: bgColor, marginLeft: arrowCenterX - ARROW_SIZE },
+              ]}
+            />
           )}
         </View>
       </Pressable>
@@ -143,6 +172,23 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 };
 
 // ==================== 主组件 ====================
+
+interface ChatMessageItemProps {
+  content: string;
+  isMine: boolean;
+  status?: MessageStatus;
+  myAvatarUrl?: string;
+  otherAvatarUrl?: string;
+  onRetry?: () => void;
+  onDelete?: () => void;
+  onRecall?: () => void;
+  mediaType?: string;
+  mediaUrl?: string;
+  mediaSize?: number;
+  latitude?: number;
+  longitude?: number;
+  createdAt?: string;
+}
 
 export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   content,
@@ -162,7 +208,11 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 }) => {
   const { colors } = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [menuPosition, setMenuPosition] = useState<MenuPosition>({
+    centerX: 0,
+    y: 0,
+    placement: 'above',
+  });
   const itemRef = useRef<View>(null);
 
   // 是否可撤回（2 分钟内）
@@ -177,17 +227,18 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     (event: HandlerStateChangeEvent<LongPressGestureHandlerEventPayload>) => {
       if (event.nativeEvent.state === State.ACTIVE) {
         itemRef.current?.measure((x, y, width, height, pageX, pageY) => {
-          const menuWidth = 100;
-          const menuX = isMine ? pageX - menuWidth - 10 : pageX + width + 10;
-          setMenuPosition({
-            x: Math.max(16, menuX),
-            y: pageY - 10,
-          });
+          const aboveY = pageY - MENU_H - ARROW_SIZE - MENU_GAP;
+          const belowY = pageY + height + MENU_GAP;
+          const placement: 'above' | 'below' = aboveY > 40 ? 'above' : 'below';
+          const menuY = placement === 'above' ? aboveY : belowY;
+          const centerX = pageX + width / 2;
+
+          setMenuPosition({ centerX, y: menuY, placement });
           setMenuVisible(true);
         });
       }
     },
-    [isMine],
+    [],
   );
 
   // ---- 操作 ----
@@ -215,20 +266,20 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     ]);
   }, [onRecall]);
 
-  // ---- 撤回消息渲染 ----
-  if (mediaType === 'RECALLED' || (!content && !mediaUrl && !latitude)) {
-    // 检查 type 是否为 RECALLED
-    return (
-      <View style={[styles.row, styles.rowCenter]}>
-        <Text style={[styles.recalledText, { color: colors.TEXT.QUATERNARY }]}>
-          {isMine ? '你撤回了一条消息' : '对方撤回了一条消息'}
-        </Text>
-      </View>
-    );
-  }
-
   // ---- 气泡内容 ----
+  const isRecalled = mediaType === 'RECALLED' || (!content && !mediaUrl && !latitude);
+
   const renderBubbleContent = () => {
+    if (isRecalled) {
+      return (
+        <View style={[styles.row, styles.rowCenter]}>
+          <Text style={[styles.recalledText, { color: colors.TEXT.QUATERNARY }]}>
+            {isMine ? '你撤回了一条消息' : '对方撤回了一条消息'}
+          </Text>
+        </View>
+      );
+    }
+
     switch (mediaType) {
       case 'IMAGE':
         return mediaUrl ? (
@@ -270,6 +321,11 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   const textColor = isMine ? '#ffffff' : colors.TEXT.SECONDARY;
 
   const bubbleContent = renderBubbleContent();
+
+  // 撤回消息：居中，不显示头像和状态
+  if (isRecalled) {
+    return bubbleContent;
+  }
 
   if (!isMine) {
     return (
@@ -366,24 +422,48 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
   },
-  menu: {
+  menuContainer: {
     position: 'absolute',
-    borderRadius: BORDER_RADIUS.LG,
-    paddingVertical: 4,
-    minWidth: 90,
+    alignItems: 'flex-start',
+  },
+  menuPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.FULL,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    overflow: 'hidden',
   },
   menuItem: {
-    paddingVertical: SPACING.MD,
-    paddingHorizontal: SPACING.LG,
+    paddingHorizontal: SPACING.MD,
+    paddingVertical: SPACING.SM,
   },
   menuItemText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    textAlign: 'center',
+    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+    fontWeight: '500',
+  },
+  divider: {
+    width: StyleSheet.hairlineWidth,
+    height: 16,
+    alignSelf: 'center',
+  },
+  arrowUp: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: ARROW_SIZE,
+    borderRightWidth: ARROW_SIZE,
+    borderBottomWidth: ARROW_SIZE,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginBottom: -1,
+  },
+  arrowDown: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: ARROW_SIZE,
+    borderRightWidth: ARROW_SIZE,
+    borderTopWidth: ARROW_SIZE,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -1,
   },
 });
