@@ -64,3 +64,6 @@ uploads/
 *.bak
 *.tmp
 *.temp
+
+# Review docs (internal, not for commit)
+docs/full-review.md
