@@ -1,7 +1,10 @@
 package com.trektrace.service;
 
 import com.trektrace.entity.User;
+import com.trektrace.repository.ActivityRepository;
+import com.trektrace.repository.FriendshipRepository;
 import com.trektrace.repository.UserRepository;
+import com.trektrace.repository.VerificationCodeRepository;
 import com.trektrace.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,13 +23,17 @@ import static org.mockito.Mockito.*;
 class UserServiceTest {
 
     @Mock private UserRepository userRepository;
+    @Mock private VerificationCodeRepository verificationCodeRepository;
     @Mock private JwtUtil jwtUtil;
+    @Mock private TokenBlacklistService tokenBlacklistService;
+    @Mock private FriendshipRepository friendshipRepository;
+    @Mock private ActivityRepository activityRepository;
 
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, jwtUtil);
+        userService = new UserService(userRepository, verificationCodeRepository, jwtUtil, tokenBlacklistService, friendshipRepository, activityRepository);
     }
 
     @Test
@@ -90,7 +97,7 @@ class UserServiceTest {
 
         String longNickname = "一二三四五六七八"; // 8 Chinese chars = width 16 > 14
         assertThrows(ResponseStatusException.class,
-                () -> userService.updateProfile(1L, longNickname, null));
+                () -> userService.updateProfile(1L, longNickname, null, null, null, null, null));
     }
 
     @Test
@@ -101,7 +108,7 @@ class UserServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        User result = userService.updateProfile(1L, "新昵称", null);
+        User result = userService.updateProfile(1L, "新昵称", null, null, null, null, null);
 
         assertEquals("新昵称", result.getNickname());
         assertNotNull(result.getNicknameUpdatedAt());

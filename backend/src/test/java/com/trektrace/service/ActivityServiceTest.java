@@ -3,14 +3,17 @@ package com.trektrace.service;
 import com.trektrace.dto.ActivityUploadRequest;
 import com.trektrace.entity.Activity;
 import com.trektrace.repository.ActivityRepository;
+import com.trektrace.repository.FriendshipRepository;
 import com.trektrace.repository.TrackPointRepository;
 import com.trektrace.repository.UserRepository;
+import com.trektrace.validation.TrackDataValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Optional;
 
@@ -24,12 +27,14 @@ class ActivityServiceTest {
     @Mock private ActivityRepository activityRepository;
     @Mock private TrackPointRepository trackPointRepository;
     @Mock private UserRepository userRepository;
+    @Mock private FriendshipRepository friendshipRepository;
+    @Mock private TrackDataValidator trackDataValidator;
 
     private ActivityService activityService;
 
     @BeforeEach
     void setUp() {
-        activityService = new ActivityService(activityRepository, trackPointRepository, userRepository);
+        activityService = new ActivityService(activityRepository, trackPointRepository, userRepository, friendshipRepository, trackDataValidator, new ObjectMapper());
     }
 
     @Test
