@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -280,15 +281,15 @@ public class ChatController {
     }
 
     @MessageMapping("/chat.send")
-    public ChatMessageDTO handleStompMessage(@Payload SendMessageRequest request, Authentication auth) {
-        Long userId = (Long) auth.getPrincipal();
+    public ChatMessageDTO handleStompMessage(@Payload SendMessageRequest request, Principal principal) {
+        Long userId = Long.valueOf(principal.getName());
         return chatService.sendMessage(userId, request.getConversationId(), request.getContent(),
                 null, null, null, null, null, null);
     }
 
     @MessageMapping("/chat.typing")
-    public void handleTypingEvent(@Payload TypingEventDTO event, Authentication auth) {
-        Long userId = (Long) auth.getPrincipal();
+    public void handleTypingEvent(@Payload TypingEventDTO event, Principal principal) {
+        Long userId = Long.valueOf(principal.getName());
         event.setUserId(userId);
         webSocketService.sendToConversationExclude(
                 event.getConversationId(), userId,
