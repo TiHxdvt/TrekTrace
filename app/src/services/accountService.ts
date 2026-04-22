@@ -31,4 +31,8 @@ export const accountService = {
   changePassword: async (oldPassword: string, newPassword: string): Promise<void> => {
     await api.put('/user/password', { oldPassword, newPassword });
   },
+
+  bindEmail: async (email: string): Promise<void> => {
+    await api.post('/auth/bind-email', { email });
+  },
 };

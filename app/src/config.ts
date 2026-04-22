@@ -11,13 +11,16 @@ export const APP_CONFIG = {
   /** API 基础 URL */
   API_BASE_URL: __DEV__
     ? `http://localhost:${PORT}/api`
-    : `http://${PROD_HOST}:${PORT}/api`,
+    : `https://${PROD_HOST}/api`,
 
   /** WebSocket 基础 URL */
   WS_BASE_URL: __DEV__
     ? `http://localhost:${PORT}/ws`
-    : `http://${PROD_HOST}:${PORT}/ws`,
+    : `wss://${PROD_HOST}/ws`,
 
-  /** 高德地图 SDK Key */
-  AMAP_API_KEY: '6518a83abe3771f3a920bf329cbdefb0',
+  /** 高德地图 SDK Key (set via env or native build config) */
+  AMAP_API_KEY: (typeof process !== 'undefined' && process.env?.AMAP_API_KEY) || '',
+
+  /** 和风天气 API Key (set via env or leave empty to disable) */
+  QWEATHER_API_KEY: (typeof process !== 'undefined' && process.env?.QWEATHER_API_KEY) || '',
 } as const;

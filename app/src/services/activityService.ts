@@ -7,6 +7,8 @@ import api from './api';
 import {
   ActivityUploadRequest,
   ActivityResponseDTO,
+  ActivityListParams,
+  PaginatedResponse,
   TrackPointUploadDTO,
 } from '../types';
 
@@ -18,6 +20,27 @@ export const activityService = {
 
   async getActivities(): Promise<ActivityResponseDTO[]> {
     const response = await api.get<ActivityResponseDTO[]>('/activities');
+    return response.data;
+  },
+
+  async getActivitiesPaged(params: ActivityListParams = {}): Promise<PaginatedResponse<ActivityResponseDTO>> {
+    const query: Record<string, string> = {};
+    if (params.page !== undefined) query.page = String(params.page);
+    if (params.size !== undefined) query.size = String(params.size);
+    if (params.type) query.type = params.type;
+    if (params.startDate) query.startDate = params.startDate;
+    if (params.endDate) query.endDate = params.endDate;
+    const qs = new URLSearchParams(query).toString();
+    const response = await api.get<PaginatedResponse<ActivityResponseDTO>>(
+      `/activities/paged${qs ? '?' + qs : ''}`,
+    );
+    return response.data;
+  },
+
+  async getActiveDates(year: number, month: number): Promise<string[]> {
+    const response = await api.get<string[]>(
+      `/activities/active-dates?year=${year}&month=${month}`,
+    );
     return response.data;
   },
 
@@ -33,5 +56,9 @@ export const activityService = {
 
   async deleteActivity(id: number): Promise<void> {
     await api.delete(`/activities/${id}`);
+  },
+
+  async batchDeleteActivities(ids: number[]): Promise<void> {
+    await api.delete('/activities/batch', { data: ids });
   },
 };

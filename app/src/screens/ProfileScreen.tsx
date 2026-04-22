@@ -25,11 +25,14 @@ import { Toast } from '../components/Toast';
 import { Dialog } from '../components/Dialog';
 import { Avatar } from '../components/Avatar';
 
+import { IconAltArrowRight } from '../components/SolarIcons';
+import { SubScreenOverlay } from '../components/SubScreenOverlay';
+
 type NavProp = { goBack: () => void };
 
 const IMAGE_PICKER_OPTIONS = {
   mediaType: 'photo' as const,
-  quality: 0.8 as const,
+  quality: 0.7 as const,
   maxWidth: 512,
   maxHeight: 512,
 };
@@ -83,6 +86,10 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
   const [uploading, setUploading] = useState(false);
   const [nickname, setNickname] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [weight, setWeight] = useState('');
+  const [bio, setBio] = useState('');
+  const [gender, setGender] = useState<string | null>(null);
+  const [heightVal, setHeightVal] = useState('');
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
     sectionTitle: {
@@ -145,6 +152,10 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
       setProfile(data);
       setNickname(data.nickname || '');
       setAvatarUrl(data.avatarUrl || '');
+      setWeight(data.weight != null ? String(data.weight) : '');
+      setBio(data.bio || '');
+      setGender(data.gender || null);
+      setHeightVal(data.height != null ? String(data.height) : '');
     } catch {
       Toast.show('加载个人信息失败');
     } finally {
@@ -225,8 +236,24 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
   const handleSave = async () => {
     setSaving(true);
     try {
+      const weightNum = weight ? parseFloat(weight) : undefined;
+      const heightNum = heightVal ? parseFloat(heightVal) : undefined;
+      if (weightNum !== undefined && (weightNum < 20 || weightNum > 300)) {
+        Toast.show('体重范围：20-300kg');
+        setSaving(false);
+        return;
+      }
+      if (heightNum !== undefined && (heightNum < 50 || heightNum > 300)) {
+        Toast.show('身高范围：50-300cm');
+        setSaving(false);
+        return;
+      }
       const updated = await userService.updateProfile({
         nickname: nickname || undefined,
+        weight: weightNum && !isNaN(weightNum) ? weightNum : undefined,
+        bio: bio || undefined,
+        gender: gender || undefined,
+        height: heightNum && !isNaN(heightNum) ? heightNum : undefined,
       });
       setProfile(updated);
       // Update local storage
@@ -311,6 +338,103 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
           </View>
         </View>
 
+        {/* 个人简介 */}
+        <Text style={dynamicStyles.sectionTitle}>个人简介</Text>
+        <View style={dynamicStyles.card}>
+          <View style={styles.editSection}>
+            <TextInput
+              style={[dynamicStyles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+              value={bio}
+              onChangeText={(text) => setBio(text.slice(0, 200))}
+              placeholder="写点什么介绍一下自己吧..."
+              placeholderTextColor={colors.TEXT.PLACEHOLDER}
+              multiline
+              maxLength={200}
+            />
+            <Text style={dynamicStyles.itemValue}>{bio.length}/200</Text>
+          </View>
+        </View>
+
+        {/* 身体数据 */}
+        <Text style={dynamicStyles.sectionTitle}>身体数据</Text>
+        <View style={dynamicStyles.card}>
+          {/* 性别 */}
+          <View style={styles.editSection}>
+            <Text style={[dynamicStyles.itemTitle, { marginBottom: SPACING.SM }]}>性别</Text>
+            <View style={styles.genderRow}>
+              {[
+                { key: 'MALE', label: '男' },
+                { key: 'FEMALE', label: '女' },
+                { key: 'OTHER', label: '其他' },
+              ].map((opt) => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[
+                    styles.genderBtn,
+                    {
+                      backgroundColor: gender === opt.key ? colors.PRIMARY : colors.OVERLAY.MEDIUM,
+                      borderColor: gender === opt.key ? colors.PRIMARY : colors.BORDER.MEDIUM,
+                    },
+                  ]}
+                  onPress={() => setGender(gender === opt.key ? null : opt.key)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{
+                    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+                    color: gender === opt.key ? '#ffffff' : colors.TEXT.SECONDARY,
+                  }}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={dynamicStyles.divider} />
+
+          <View style={styles.editSection}>
+            <View style={styles.editLabelRow}>
+              <Text style={dynamicStyles.itemTitle}>身高</Text>
+              <Text style={dynamicStyles.itemValue}>cm</Text>
+            </View>
+            <TextInput
+              style={dynamicStyles.input}
+              value={heightVal}
+              onChangeText={setHeightVal}
+              placeholder="输入身高（50-300cm）"
+              placeholderTextColor={colors.TEXT.PLACEHOLDER}
+              keyboardType="decimal-pad"
+            />
+          </View>
+
+          <View style={dynamicStyles.divider} />
+
+          <View style={styles.editSection}>
+            <View style={styles.editLabelRow}>
+              <Text style={dynamicStyles.itemTitle}>体重</Text>
+              <Text style={dynamicStyles.itemValue}>kg</Text>
+            </View>
+            <TextInput
+              style={dynamicStyles.input}
+              value={weight}
+              onChangeText={setWeight}
+              placeholder="输入体重（20-300kg）"
+              placeholderTextColor={colors.TEXT.PLACEHOLDER}
+              keyboardType="decimal-pad"
+            />
+          </View>
+        </View>
+
+        {/* 隐私设置 */}
+        <TouchableOpacity
+          style={[dynamicStyles.card, styles.item]}
+          onPress={() => SubScreenOverlay.close(() => SubScreenOverlay.open('AccountPrivacy'))}
+          activeOpacity={0.7}
+        >
+          <Text style={dynamicStyles.itemTitle}>隐私设置</Text>
+          <IconAltArrowRight size={18} color={colors.TEXT.QUINARY} />
+        </TouchableOpacity>
+
         {/* Save button */}
         <TouchableOpacity
           style={[dynamicStyles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -344,6 +468,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: SPACING.LG,
+  },
+  genderRow: {
+    flexDirection: 'row',
+    gap: SPACING.SM,
+  },
+  genderBtn: {
+    paddingHorizontal: SPACING.LG,
+    paddingVertical: SPACING.SM,
+    borderRadius: BORDER_RADIUS.MD,
+    borderWidth: 1,
   },
   saveBtnDisabled: { opacity: 0.5 },
 });

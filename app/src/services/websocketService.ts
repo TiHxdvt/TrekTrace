@@ -115,7 +115,7 @@ class WebSocketService {
           const body = JSON.parse(message.body);
           entry.handler(body);
         } catch {
-          entry.handler(message.body);
+          entry.handler({ body: message.body } as Record<string, unknown>);
         }
       });
       entry.stompSub = stompSub;
@@ -128,6 +128,18 @@ class WebSocketService {
 
   isConnected(): boolean {
     return this.connected;
+  }
+
+  send(destination: string, body: Record<string, unknown>): void {
+    if (!this.client?.active || !this.connected) return;
+    try {
+      this.client.publish({
+        destination,
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      console.warn('[WS] Send failed:', destination, e);
+    }
   }
 }
 

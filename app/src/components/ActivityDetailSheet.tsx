@@ -21,6 +21,7 @@ import {
   Dimensions,
   ScrollView,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -30,6 +31,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
 import { formatDuration, formatPaceFromDistance } from '../utils/format';
 import { prepareChartData, downsample } from '../utils/trackData';
+import { generateGPX, generateKML } from '../utils/gpxExport';
+import Share from 'react-native-share';
 import { RouteMiniMap } from './RouteMiniMap';
 import { DataChart, niceScale, distanceLabels } from './stats/StatsChart';
 import { activityService } from '../services/activityService';
@@ -392,6 +395,19 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
       fontSize: TYPOGRAPHY.FONT_SIZE.SM,
       color: colors.TEXT.QUATERNARY,
     },
+    exportBtn: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: BORDER_RADIUS.MD,
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+    },
+    exportBtnText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+      fontWeight: '600',
+      color: colors.TEXT.SECONDARY,
+    },
   }), [colors]);
 
   const sheetSlideY = slideAnim.interpolate({
@@ -515,6 +531,45 @@ export const ActivityDetailSheet: React.FC<ActivityDetailSheetProps> = ({
                           </Text>
                         </View>
                         <RouteMiniMap points={mapPoints} />
+                        {/* Export buttons */}
+                        {trackPoints && trackPoints.length >= 2 && (
+                          <View style={styles.exportRow}>
+                            <Pressable
+                              style={dynamicStyles.exportBtn}
+                              onPress={async () => {
+                                try {
+                                  const xml = generateGPX(visibleActivity!, trackPoints);
+                                  await Share.open({
+                                    title: '导出 GPX',
+                                    message: xml,
+                                    filename: `trektrace_${visibleActivity!.id}.gpx`,
+                                    type: 'application/gpx+xml',
+                                    saveToFiles: true,
+                                  });
+                                } catch {}
+                              }}
+                            >
+                              <Text style={dynamicStyles.exportBtnText}>导出 GPX</Text>
+                            </Pressable>
+                            <Pressable
+                              style={dynamicStyles.exportBtn}
+                              onPress={async () => {
+                                try {
+                                  const xml = generateKML(visibleActivity!, trackPoints);
+                                  await Share.open({
+                                    title: '导出 KML',
+                                    message: xml,
+                                    filename: `trektrace_${visibleActivity!.id}.kml`,
+                                    type: 'application/vnd.google-earth.kml+xml',
+                                    saveToFiles: true,
+                                  });
+                                } catch {}
+                              }}
+                            >
+                              <Text style={dynamicStyles.exportBtnText}>导出 KML</Text>
+                            </Pressable>
+                          </View>
+                        )}
                         {chartDataSets && (
                           <View style={styles.chartArea}>
                             <View style={dynamicStyles.sectionDivider} />
@@ -608,5 +663,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 48,
     gap: 12,
+  },
+  exportRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginTop: 12,
   },
 });

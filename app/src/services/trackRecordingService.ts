@@ -394,6 +394,13 @@ class TrackRecordingServiceImpl {
     };
   }
 
+  // ---------- Update Weather ----------
+  updateWeather(weather: { condition: string; temperature: number }): void {
+    if (!this.session) return;
+    this.session.weather = weather;
+    this.persist();
+  }
+
   // ======================== Private ========================
 
   private smoothElevation(rawAlt: number): number {
@@ -500,6 +507,8 @@ class TrackRecordingServiceImpl {
       distance: this.session.totalDistance,
       elevationGain: this.session.elevationGain,
       trackPoints,
+      weatherCondition: this.session.weather?.condition,
+      temperature: this.session.weather?.temperature,
     });
   }
 }

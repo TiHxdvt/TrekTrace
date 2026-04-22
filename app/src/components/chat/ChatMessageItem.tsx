@@ -13,10 +13,10 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
-  Clipboard,
   Alert,
   Dimensions,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { LongPressGestureHandler, State, HandlerStateChangeEvent, LongPressGestureHandlerEventPayload } from 'react-native-gesture-handler';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Avatar } from '../Avatar';
@@ -187,7 +187,10 @@ interface ChatMessageItemProps {
   mediaSize?: number;
   latitude?: number;
   longitude?: number;
+  duration?: number;
   createdAt?: string;
+  senderNickname?: string;
+  isGroupChat?: boolean;
 }
 
 export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
@@ -204,7 +207,10 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   mediaSize,
   latitude,
   longitude,
+  duration,
   createdAt,
+  senderNickname,
+  isGroupChat,
 }) => {
   const { colors } = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -287,7 +293,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         ) : null;
       case 'AUDIO':
         return mediaUrl ? (
-          <ChatAudioMessage mediaUrl={mediaUrl} isMine={isMine} status={status} />
+          <ChatAudioMessage mediaUrl={mediaUrl} isMine={isMine} duration={duration} status={status} />
         ) : null;
       case 'LOCATION':
         return latitude != null && longitude != null ? (
@@ -333,7 +339,14 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         <LongPressGestureHandler onHandlerStateChange={handleLongPress} minDurationMs={500}>
           <View style={[styles.row, styles.rowOther]} ref={itemRef}>
             <Avatar uri={otherAvatarUrl} size={32} />
-            {bubbleContent}
+            <View style={styles.bubbleWrapper}>
+              {isGroupChat && senderNickname && (
+                <Text style={[styles.senderNickname, { color: colors.TEXT.TERTIARY }]} numberOfLines={1}>
+                  {senderNickname}
+                </Text>
+              )}
+              {bubbleContent}
+            </View>
           </View>
         </LongPressGestureHandler>
         <ActionMenu
@@ -397,6 +410,15 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.LG,
     paddingHorizontal: SPACING.MD,
     paddingVertical: SPACING.SM,
+  },
+  bubbleWrapper: {
+    maxWidth: '65%',
+    gap: 2,
+  },
+  senderNickname: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+    fontWeight: '500',
+    paddingHorizontal: SPACING.XS,
   },
   bubbleBorder: {
     borderWidth: 1,

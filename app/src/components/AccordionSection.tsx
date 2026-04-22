@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
 import { useTheme } from '../contexts/ThemeContext';
-import { IconArrowDown } from './SolarIcons';
+import { IconArrowDown, IconCheckCircle } from './SolarIcons';
 import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
 import { formatDistance, formatDuration } from '../utils/format';
 import type { ActivityResponseDTO, ActivityType } from '../types';
@@ -29,6 +29,9 @@ interface AccordionSectionProps {
   isExpanded: boolean;
   onToggle: () => void;
   onActivityPress: (activity: ActivityResponseDTO) => void;
+  editMode?: boolean;
+  selectedIds?: Set<number>;
+  onToggleSelect?: (id: number) => void;
 }
 
 export const AccordionSection: React.FC<AccordionSectionProps> = ({
@@ -37,6 +40,9 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
   isExpanded,
   onToggle,
   onActivityPress,
+  editMode = false,
+  selectedIds,
+  onToggleSelect,
 }) => {
   const expandAnim = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
   const { colors } = useTheme();
@@ -191,13 +197,27 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
               activities.map((activity, index) => {
                 const date = new Date(activity.startTime);
                 const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+                const isSelected = selectedIds?.has(activity.id);
                 return (
                   <React.Fragment key={activity.id}>
                     <TouchableOpacity
                       style={styles.activityRow}
-                      onPress={() => onActivityPress(activity)}
+                      onPress={() => {
+                        if (editMode && onToggleSelect) {
+                          onToggleSelect(activity.id);
+                        } else {
+                          onActivityPress(activity);
+                        }
+                      }}
                       activeOpacity={0.6}
                     >
+                      {editMode ? (
+                        isSelected ? (
+                          <IconCheckCircle size={20} color={colors.PRIMARY} />
+                        ) : (
+                          <View style={[styles.emptyCircle, { borderColor: colors.BORDER.MEDIUM }]} />
+                        )
+                      ) : null}
                       <Text style={dynamicStyles.activityDate}>{dateStr}</Text>
                       <Text style={dynamicStyles.activityDistance}>
                         {formatDistance(activity.distance)}
@@ -208,11 +228,13 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
                       <Text style={dynamicStyles.activityElevation}>
                         {Math.round(activity.elevationGain)}m
                       </Text>
-                      <IconArrowDown
-                        size={14}
-                        color={colors.TEXT.QUINARY}
-                        style={{ transform: [{ rotate: '-90deg' }] }}
-                      />
+                      {!editMode && (
+                        <IconArrowDown
+                          size={14}
+                          color={colors.TEXT.QUINARY}
+                          style={{ transform: [{ rotate: '-90deg' }] }}
+                        />
+                      )}
                     </TouchableOpacity>
                     {index < activities.length - 1 && <View style={dynamicStyles.rowDivider} />}
                   </React.Fragment>
@@ -254,5 +276,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.MD,
     gap: SPACING.SM,
+  },
+  emptyCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
   },
 });

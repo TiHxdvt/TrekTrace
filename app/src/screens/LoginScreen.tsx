@@ -22,7 +22,7 @@ import { FullScreenBlur } from '../components/FullScreenBlur';
 import { IconEyeClosed, IconEyeScan } from '../components/SolarIcons';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
-import { saveToken } from '../services/api';
+import { saveToken, saveRefreshToken } from '../services/api';
 import { BORDER_RADIUS, TYPOGRAPHY, SPACING } from '../theme';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -59,6 +59,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [codeError, setCodeError] = useState('');
   const [accountError, setAccountError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+
+  // 忘记密码弹窗状态
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetPhone, setResetPhone] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetNewPwd, setResetNewPwd] = useState('');
+  const [resetConfirmPwd, setResetConfirmPwd] = useState('');
+  const [resetSending, setResetSending] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetCountdown, setResetCountdown] = useState(0);
+  const resetCountdownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetCountdownEndRef = useRef(0);
+  const [resetCountdownActive, setResetCountdownActive] = useState(false);
+  const [resetStep, setResetStep] = useState<1 | 2>(1);
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
     container: {
@@ -181,6 +195,56 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     termsLink: {
       color: colors.PRIMARY_LIGHT,
     },
+    resetModalOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: SPACING.XXL,
+    },
+    resetModalCard: {
+      backgroundColor: colors.BACKGROUND,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.XL,
+      padding: SPACING.XXL,
+      width: '100%',
+      maxWidth: 380,
+      gap: SPACING.MD,
+    },
+    resetModalTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.LG,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+      textAlign: 'center',
+      marginBottom: SPACING.SM,
+    },
+    resetModalInput: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+      borderWidth: 1,
+      borderColor: colors.BORDER.MEDIUM,
+      borderRadius: BORDER_RADIUS.MD,
+      paddingHorizontal: SPACING.LG,
+      paddingVertical: SPACING.MD,
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.PRIMARY,
+    },
+    resetModalBtnCancel: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+    },
+    resetModalBtnCancelText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.TERTIARY,
+    },
+    resetModalBtnConfirm: {
+      backgroundColor: colors.PRIMARY,
+    },
+    resetModalBtnConfirmText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
+    btnDisabled: { opacity: 0.5 },
   }), [colors]);
 
   // 倒计时逻辑 — 基于绝对时间戳，后台回来也能正确显示剩余时间
@@ -207,6 +271,92 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       }
     };
   }, [countdownActive]);
+
+  // 重置密码倒计时逻辑
+  useEffect(() => {
+    if (!resetCountdownActive) return;
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((resetCountdownEndRef.current - Date.now()) / 1000));
+      setResetCountdown(remaining);
+      if (remaining > 0) {
+        resetCountdownRef.current = setTimeout(tick, 1000);
+      } else {
+        resetCountdownEndRef.current = 0;
+        setResetCountdownActive(false);
+      }
+    };
+
+    tick();
+    return () => {
+      if (resetCountdownRef.current) {
+        clearTimeout(resetCountdownRef.current);
+      }
+    };
+  }, [resetCountdownActive]);
+
+  // 打开重置密码弹窗
+  const handleOpenReset = () => {
+    setResetPhone(loginMode === 'sms' ? phone : account);
+    setResetCode('');
+    setResetNewPwd('');
+    setResetConfirmPwd('');
+    setResetStep(1);
+    setShowResetModal(true);
+  };
+
+  // 重置密码发送验证码
+  const handleResetSendCode = async () => {
+    if (!resetPhone || !validatePhone(resetPhone)) {
+      Toast.show('请输入正确的手机号');
+      return;
+    }
+    try {
+      setResetSending(true);
+      await authService.sendVerificationCode(resetPhone);
+      setResetCountdown(60);
+      resetCountdownEndRef.current = Date.now() + 60 * 1000;
+      setResetCountdownActive(true);
+      setResetStep(2);
+      Toast.show('验证码已发送');
+    } catch {
+      Toast.show('验证码发送失败');
+    } finally {
+      setResetSending(false);
+    }
+  };
+
+  // 提交重置密码
+  const handleResetSubmit = async () => {
+    if (!resetCode || resetCode.length !== 6) {
+      Toast.show('请输入6位验证码');
+      return;
+    }
+    if (!resetNewPwd || resetNewPwd.length < 6) {
+      Toast.show('密码至少6位');
+      return;
+    }
+    if (!/^(?=.*[A-Za-z])(?=.*\d)/.test(resetNewPwd)) {
+      Toast.show('密码需包含字母和数字');
+      return;
+    }
+    if (resetNewPwd !== resetConfirmPwd) {
+      Toast.show('两次密码不一致');
+      return;
+    }
+    try {
+      setResetLoading(true);
+      await authService.resetPassword(resetPhone, resetCode, resetNewPwd);
+      Toast.show('密码重置成功，请使用新密码登录');
+      setShowResetModal(false);
+      setLoginMode('password');
+      setAccount(resetPhone);
+    } catch {
+      Toast.show('重置失败，请检查验证码');
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   // 切换模式时保留手机号，清空其他字段和错误
   const handleSwitchMode = (mode: LoginMode) => {
@@ -296,6 +446,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       const response = await authService.login(phone, code);
 
       await saveToken(response.token);
+      if (response.refreshToken) {
+        await saveRefreshToken(response.refreshToken);
+      }
       await storageService.saveUser(response.user);
 
       onLoginSuccess();
@@ -332,6 +485,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       const response = await authService.loginWithPassword(account, password);
 
       await saveToken(response.token);
+      if (response.refreshToken) {
+        await saveRefreshToken(response.refreshToken);
+      }
       await storageService.saveUser(response.user);
 
       onLoginSuccess();
@@ -506,7 +662,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                     <Text style={dynamicStyles.switchModeLink}>切换</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => Toast.show('功能开发中')}
+                    onPress={handleOpenReset}
                     activeOpacity={0.7}
                     style={styles.forgotPasswordLink}
                   >
@@ -540,6 +696,79 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* 重置密码弹窗 */}
+      {showResetModal && (
+        <View style={dynamicStyles.resetModalOverlay}>
+          <View style={dynamicStyles.resetModalCard}>
+            <Text style={dynamicStyles.resetModalTitle}>重置密码</Text>
+
+            {/* Step 1: 输入手机号 */}
+            {resetStep === 1 && (
+              <>
+                <TextInput
+                  style={dynamicStyles.resetModalInput}
+                  value={resetPhone}
+                  onChangeText={setResetPhone}
+                  placeholder="请输入手机号"
+                  placeholderTextColor={colors.TEXT.PLACEHOLDER}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                />
+                <View style={styles.resetModalBtnRow}>
+                  <TouchableOpacity style={[styles.resetModalBtn, dynamicStyles.resetModalBtnCancel]} onPress={() => setShowResetModal(false)}>
+                    <Text style={dynamicStyles.resetModalBtnCancelText}>取消</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.resetModalBtn, dynamicStyles.resetModalBtnConfirm]} onPress={handleResetSendCode} disabled={resetSending}>
+                    <Text style={dynamicStyles.resetModalBtnConfirmText}>{resetSending ? '发送中...' : '发送验证码'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Step 2: 输入验证码 + 新密码 */}
+            {resetStep === 2 && (
+              <>
+                <TextInput
+                  style={dynamicStyles.resetModalInput}
+                  value={resetCode}
+                  onChangeText={setResetCode}
+                  placeholder="请输入验证码"
+                  placeholderTextColor={colors.TEXT.PLACEHOLDER}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+                <TextInput
+                  style={dynamicStyles.resetModalInput}
+                  value={resetNewPwd}
+                  onChangeText={setResetNewPwd}
+                  placeholder="新密码（需包含字母和数字，6-72位）"
+                  placeholderTextColor={colors.TEXT.PLACEHOLDER}
+                  secureTextEntry
+                  maxLength={72}
+                />
+                <TextInput
+                  style={dynamicStyles.resetModalInput}
+                  value={resetConfirmPwd}
+                  onChangeText={setResetConfirmPwd}
+                  placeholder="确认新密码"
+                  placeholderTextColor={colors.TEXT.PLACEHOLDER}
+                  secureTextEntry
+                  maxLength={72}
+                />
+                <View style={styles.resetModalBtnRow}>
+                  <TouchableOpacity style={[styles.resetModalBtn, dynamicStyles.resetModalBtnCancel]} onPress={() => setShowResetModal(false)}>
+                    <Text style={dynamicStyles.resetModalBtnCancelText}>取消</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.resetModalBtn, dynamicStyles.resetModalBtnConfirm, resetLoading && dynamicStyles.btnDisabled]} onPress={handleResetSubmit} disabled={resetLoading}>
+                    <Text style={dynamicStyles.resetModalBtnConfirmText}>{resetLoading ? '重置中...' : '确认重置'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -634,5 +863,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: SPACING.LG,
     gap: SPACING.XS,
+  },
+
+  // Reset Password Modal
+  resetModalBtnRow: {
+    flexDirection: 'row',
+    gap: SPACING.MD,
+    marginTop: SPACING.SM,
+  },
+  resetModalBtn: {
+    flex: 1,
+    paddingVertical: SPACING.MD,
+    borderRadius: BORDER_RADIUS.MD,
+    alignItems: 'center',
   },
 });

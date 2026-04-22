@@ -3,7 +3,7 @@
  * 显示播放按钮、波形条、时长
  */
 
-import React, { memo, useCallback, useState } from 'react';
+import React, { memo, useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 import { SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { IconPlay, IconPause } from '../SolarIcons';
-import { Toast } from '../Toast';
+import * as audioService from '../../services/audioService';
 
 interface ChatAudioMessageProps {
   mediaUrl: string;
@@ -30,14 +30,37 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = memo(({
   status,
 }) => {
   const { colors } = useTheme();
-  const [playing] = useState(false);
-  const [currentTime] = useState(0);
+  const [playing, setPlaying] = useState(false);
 
   const handlePlayPause = useCallback(async () => {
-    Toast.show('录音功能暂不可用');
-  }, []);
+    if (status === 'sending') return;
 
-  const displayDuration = playing ? currentTime : (duration || 0);
+    if (playing) {
+      audioService.stopPlayback();
+      setPlaying(false);
+      return;
+    }
+
+    setPlaying(true);
+
+    // 构建完整的 URL（如果是相对路径则加上服务器地址）
+    let audioUrl = mediaUrl;
+    if (audioUrl && !audioUrl.startsWith('http') && !audioUrl.startsWith('file://')) {
+      const api = (await import('../../services/api')).default;
+      const baseUrl = api?.defaults?.baseURL || '';
+      audioUrl = baseUrl + audioUrl;
+    }
+
+    try {
+      audioService.playAudio(audioUrl, () => {
+        setPlaying(false);
+      });
+    } catch {
+      setPlaying(false);
+    }
+  }, [playing, mediaUrl, status]);
+
+  const displayDuration = duration || 0;
   const minutes = Math.floor(displayDuration / 60);
   const seconds = displayDuration % 60;
   const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -45,18 +68,15 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = memo(({
   // 波形条（确定性，不依赖 random）
   const bars = React.useMemo(() => {
     const seed = [3, 7, 2, 8, 5, 1, 9, 4, 6, 2, 7, 3, 8, 1, 5, 9, 4, 6, 2, 7];
-    const progress = duration ? currentTime / duration : 0;
     return seed.map((s, i) => {
-      const isPlayed = i / 20 < progress;
       const h = 8 + Math.sin(i * 0.8) * 12 + (s % 6);
-      return { height: Math.max(6, h), isPlayed };
+      return { height: Math.max(6, h) };
     });
-  }, [duration, currentTime]);
+  }, []);
 
   const bubbleBg = isMine ? colors.PRIMARY : colors.OVERLAY.MEDIUM;
   const textColor = isMine ? '#ffffff' : colors.TEXT.SECONDARY;
-  const barActiveColor = isMine ? 'rgba(255,255,255,0.9)' : colors.PRIMARY;
-  const barInactiveColor = isMine ? 'rgba(255,255,255,0.3)' : colors.TEXT.TERTIARY;
+  const barColor = isMine ? 'rgba(255,255,255,0.5)' : colors.TEXT.TERTIARY;
 
   return (
     <View
@@ -84,7 +104,7 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = memo(({
               styles.bar,
               {
                 height: bar.height,
-                backgroundColor: bar.isPlayed ? barActiveColor : barInactiveColor,
+                backgroundColor: barColor,
               },
             ]}
           />

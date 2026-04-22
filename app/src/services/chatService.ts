@@ -29,6 +29,7 @@ export const chatService = {
     mediaSize?: number;
     latitude?: number;
     longitude?: number;
+    duration?: number;
   }): Promise<ChatMessage> {
     const body: Record<string, unknown> = { content: content || '' };
     if (mediaOptions) {
@@ -37,6 +38,7 @@ export const chatService = {
       if (mediaOptions.mediaSize) body.mediaSize = mediaOptions.mediaSize;
       if (mediaOptions.latitude != null) body.latitude = mediaOptions.latitude;
       if (mediaOptions.longitude != null) body.longitude = mediaOptions.longitude;
+      if (mediaOptions.duration != null) body.duration = mediaOptions.duration;
     }
     const res = await api.post(`/chat/conversations/${conversationId}/messages`, body);
     return res.data;
@@ -88,5 +90,58 @@ export const chatService = {
   /** 删除单条消息（只能删自己的） */
   async deleteMessage(messageId: number): Promise<void> {
     await api.delete(`/chat/messages/${messageId}`);
+  },
+
+  /** 在指定会话中搜索消息 */
+  async searchMessages(conversationId: number, keyword: string, page = 0, size = 20): Promise<ChatMessage[]> {
+    const res = await api.get(`/chat/conversations/${conversationId}/messages/search`, {
+      params: { keyword, page, size },
+    });
+    return res.data;
+  },
+
+  /** 全局搜索消息 */
+  async searchAllMessages(keyword: string, page = 0, size = 20): Promise<ChatMessage[]> {
+    const res = await api.get('/chat/messages/search', {
+      params: { keyword, page, size },
+    });
+    return res.data;
+  },
+
+  /** 设置会话置顶 */
+  async setPinned(conversationId: number, pinned: boolean): Promise<void> {
+    await api.put(`/chat/conversations/${conversationId}/pin`, { pinned });
+  },
+
+  /** 设置会话免打扰 */
+  async setMuted(conversationId: number, muted: boolean): Promise<void> {
+    await api.put(`/chat/conversations/${conversationId}/mute`, { muted });
+  },
+
+  /** 创建群聊 */
+  async createGroup(name: string, memberIds: number[]): Promise<Conversation> {
+    const res = await api.post('/chat/conversations/group', { name, memberIds });
+    return res.data;
+  },
+
+  /** 修改群名 */
+  async updateGroupName(conversationId: number, name: string): Promise<void> {
+    await api.put(`/chat/conversations/${conversationId}/name`, { name });
+  },
+
+  /** 添加群成员 */
+  async addMembers(conversationId: number, memberIds: number[]): Promise<void> {
+    await api.post(`/chat/conversations/${conversationId}/members`, { memberIds });
+  },
+
+  /** 移除群成员 */
+  async removeMember(conversationId: number, userId: number): Promise<void> {
+    await api.delete(`/chat/conversations/${conversationId}/members/${userId}`);
+  },
+
+  /** 获取群成员列表 */
+  async getMembers(conversationId: number): Promise<Array<{ userId: number; nickname?: string; avatarUrl?: string; role?: string }>> {
+    const res = await api.get(`/chat/conversations/${conversationId}/members`);
+    return res.data;
   },
 };

@@ -31,7 +31,7 @@ import { websocketService } from '../services/websocketService';
 import * as chatDB from '../services/chatDatabaseService';
 import { syncConversationMessages, sendLocalMessage, getCurrentUserId } from '../services/chatSyncService';
 import { ChatMessage, User } from '../types';
-import { IconAltArrowLeft, IconSmileCircle, IconAddCircle } from '../components/SolarIcons';
+import { IconAltArrowLeft, IconSmileCircle, IconAddCircle, IconMagnifer } from '../components/SolarIcons';
 import { ChatTimeItem } from '../components/chat/ChatTimeItem';
 import { ChatMessageItem } from '../components/chat/ChatMessageItem';
 import { ChatTypingItem } from '../components/chat/ChatTypingItem';
@@ -49,13 +49,16 @@ interface ChatScreenParams {
   friendNickname?: string;
   friendAvatarUrl?: string;
   friendUserId: number;
+  conversationType?: string;
+  conversationName?: string;
 }
 
 export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatScreenParams } }> = ({
   navigation,
   route,
 }) => {
-  const { conversationId, friendNickname, friendAvatarUrl, friendUserId } = route.params;
+  const { conversationId, friendNickname, friendAvatarUrl, friendUserId, conversationType, conversationName } = route.params;
+  const isGroupChat = conversationType === 'GROUP';
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
@@ -71,12 +74,18 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   const [showAttachment, setShowAttachment] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchResults, setSearchResults] = useState<ChatMessage[]>([]);
+  const [searching, setSearching] = useState(false);
 
   // 消息发送状态 Map: localId → 'sending' | 'sent' | 'failed' | 'read'
   const [statusMap, setStatusMap] = useState<Map<number, MessageStatus>>(new Map());
 
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const typingDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageSize = 50;
 
   const dynamicStyles = useMemo(
@@ -214,7 +223,8 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   // ---- WebSocket 实时消息 → 写入本地 DB ----
   useEffect(() => {
     const topic = `/topic/conversation/${conversationId}`;
-    const handler = (msg: ChatMessage) => {
+    const handler = (msgRaw: Record<string, unknown>) => {
+      const msg = msgRaw as unknown as ChatMessage;
       // 写入本地 DB
       try {
         if (!chatDB.messageExists(msg.id)) {
@@ -243,13 +253,16 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
           }
           return prev;
         }
-        // 如果是自己的消息，移除对应的乐观临时消息（通过 conversationId + type + mediaUrl 匹配）
+        // 如果是自己的消息，移除对应的乐观临时消息（通过 conversationId + type + 匹配 + 时间窗口）
+        const MSG_WINDOW_MS = 5000; // 5 秒窗口内视为同一条消息
         const filtered = prev.filter(m => {
-          if (m.id < 0 && m.conversationId === msg.conversationId && m.type === msg.type) {
+          if (m.id < 0 && m.conversationId === msg.conversationId && m.type === msg.type && m.senderId === msg.senderId) {
+            const age = Date.now() - (m as any)._createdAt;
+            if (age > MSG_WINDOW_MS) return true; // 超出时间窗口，保留
             // 乐观消息：检查是否匹配
             if (msg.type === 'LOCATION' && m.latitude === msg.latitude && m.longitude === msg.longitude) return false;
             if (msg.mediaUrl && m.mediaUrl === msg.mediaUrl) return false;
-            if (msg.content && m.content === msg.content && m.senderId === msg.senderId) return false;
+            if (msg.content && m.content === msg.content) return false;
           }
           return true;
         });
@@ -268,9 +281,57 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
     return () => {
       websocketService.unsubscribe(topic);
       websocketService.unsubscribe('/user/queue/messages');
+      websocketService.unsubscribe('/user/queue/typing');
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, [conversationId, friendUserId]);
+
+  // ---- 订阅 typing 事件 ----
+  useEffect(() => {
+    const handler = (dataRaw: Record<string, unknown>) => {
+      const data = dataRaw as { typing: boolean; userId: number };
+      if (data.typing) {
+        setShowTyping(true);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => setShowTyping(false), 3000);
+      } else {
+        setShowTyping(false);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      }
+    };
+
+    websocketService.subscribe('/user/queue/typing', handler);
+
+    return () => {
+      websocketService.unsubscribe('/user/queue/typing');
+    };
+  }, []);
+
+  // ---- 发送 typing 事件 ----
+  const sendTypingEvent = useCallback((typing: boolean) => {
+    try {
+      websocketService.send('/app/chat.typing', {
+        conversationId,
+        typing,
+      });
+    } catch {
+      // 发送失败不影响体验
+    }
+  }, [conversationId]);
+
+  // ---- 输入变化时发送 typing ----
+  const handleInputChange = useCallback((text: string) => {
+    setInputText(text);
+    if (text.trim()) {
+      sendTypingEvent(true);
+      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+      typingDebounceRef.current = setTimeout(() => {
+        sendTypingEvent(false);
+      }, 3000);
+    } else {
+      sendTypingEvent(false);
+    }
+  }, [sendTypingEvent]);
 
   // ---- listData 计算 ----
   const listData = useMemo(
@@ -410,6 +471,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       const serverMsg = await chatService.sendMessage(conversationId, '[语音]', {
         mediaType: 'AUDIO',
         mediaUrl: uploadResult.url,
+        duration,
       });
 
       replaceOptimistic(optimisticMsg.id, serverMsg);
@@ -565,14 +627,57 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
     }
   }, [handleSendImage]);
 
+  // ---- 消息搜索 ----
+  const handleSearch = useCallback(async (keyword: string) => {
+    if (!keyword.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      const results = await chatService.searchMessages(conversationId, keyword);
+      setSearchResults(results);
+    } catch {
+      Toast.show('搜索失败');
+    } finally {
+      setSearching(false);
+    }
+  }, [conversationId]);
+
+  const handleSearchResultPress = useCallback((msg: ChatMessage) => {
+    setShowSearch(false);
+    setSearchKeyword('');
+    setSearchResults([]);
+    // Scroll to the message by finding its index in listData
+    const index = listData.findIndex(item => item.kind === 'message' && item.message.id === msg.id);
+    if (index !== -1) {
+      flatListRef.current?.scrollToIndex({ index, animated: true });
+    }
+  }, [listData]);
+
   // ---- 语音录制 ----
   const handleStartRecording = useCallback(async () => {
-    Toast.show('录音功能暂不可用');
+    try {
+      const audioService = await import('../services/audioService');
+      await audioService.startRecording();
+      setIsRecording(true);
+    } catch {
+      Toast.show('录音启动失败');
+    }
   }, []);
 
   const handleStopRecording = useCallback(async () => {
     setIsRecording(false);
-  }, []);
+    try {
+      const audioService = await import('../services/audioService');
+      const { uri, duration: audioDuration } = await audioService.stopRecording();
+      if (uri && audioDuration > 0) {
+        handleSendAudio(uri, audioDuration);
+      }
+    } catch {
+      Toast.show('录音失败');
+    }
+  }, [handleSendAudio]);
 
   // ---- 加载更多 ----
   const handleLoadMore = useCallback(() => {
@@ -610,7 +715,10 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
           mediaSize={message.mediaSize}
           latitude={message.latitude}
           longitude={message.longitude}
+          duration={message.duration}
           createdAt={message.createdAt}
+          senderNickname={message.senderNickname}
+          isGroupChat={isGroupChat}
         />
       );
     },
@@ -635,15 +743,47 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       <View style={[styles.header, dynamicStyles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
           style={[styles.backBtn, dynamicStyles.backBtn]}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (showSearch) {
+              setShowSearch(false);
+              setSearchKeyword('');
+              setSearchResults([]);
+            } else {
+              navigation.goBack();
+            }
+          }}
           activeOpacity={0.7}
         >
           <IconAltArrowLeft size={20} color={colors.TEXT.PRIMARY} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, dynamicStyles.headerTitle]} numberOfLines={1}>
-          {friendNickname || '用户'}
-        </Text>
-        <View style={styles.headerRight} />
+        {showSearch ? (
+          <TextInput
+            style={[styles.searchInput, { color: colors.TEXT.PRIMARY, backgroundColor: colors.OVERLAY.MEDIUM, borderColor: colors.BORDER.MEDIUM }]}
+            value={searchKeyword}
+            onChangeText={(text) => {
+              setSearchKeyword(text);
+              if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+              searchTimerRef.current = setTimeout(() => handleSearch(text), 300);
+            }}
+            placeholder="搜索消息..."
+            placeholderTextColor={colors.TEXT.PLACEHOLDER}
+            autoFocus
+          />
+        ) : (
+          <Text style={[styles.headerTitle, dynamicStyles.headerTitle]} numberOfLines={1}>
+            {isGroupChat ? (conversationName || '群聊') : (friendNickname || '用户')}
+          </Text>
+        )}
+        {!showSearch && (
+          <TouchableOpacity
+            style={[styles.backBtn, dynamicStyles.backBtn]}
+            onPress={() => setShowSearch(true)}
+            activeOpacity={0.7}
+          >
+            <IconMagnifer size={20} color={colors.TEXT.PRIMARY} />
+          </TouchableOpacity>
+        )}
+        {!showSearch && <View style={styles.headerRight} />}
       </View>
 
       {/* 消息列表 */}
@@ -670,8 +810,38 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       />
 
       {/* 对方正在输入提示 */}
-      {showTyping && (
+      {showTyping && !showSearch && (
         <ChatTypingItem avatarUrl={friendAvatarUrl} />
+      )}
+
+      {/* 搜索结果 */}
+      {showSearch && searchResults.length > 0 && (
+        <View style={[styles.searchResultsOverlay, { backgroundColor: colors.BACKGROUND }]}>
+          <FlatList
+            data={searchResults}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.searchResultItem, { borderBottomColor: colors.BORDER.LIGHT }]}
+                onPress={() => handleSearchResultPress(item)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.searchResultContent, { color: colors.TEXT.SECONDARY }]} numberOfLines={2}>
+                  {item.content}
+                </Text>
+                <Text style={[styles.searchResultTime, { color: colors.TEXT.QUATERNARY }]}>
+                  {item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN') : ''}
+                </Text>
+              </TouchableOpacity>
+            )}
+            style={styles.searchResultsList}
+          />
+        </View>
+      )}
+      {showSearch && searching && (
+        <View style={[styles.searchResultsOverlay, { backgroundColor: colors.BACKGROUND, justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator color={colors.PRIMARY} />
+        </View>
       )}
 
       {/* 输入区域 */}
@@ -711,7 +881,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
             <TextInput
               style={[styles.textInput, dynamicStyles.textInput]}
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={handleInputChange}
               onFocus={() => {
                 setShowEmoji(false);
                 setShowAttachment(false);
@@ -806,6 +976,37 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 36,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+    borderRadius: BORDER_RADIUS.FULL,
+    borderWidth: 1,
+    paddingHorizontal: SPACING.MD,
+    paddingVertical: SPACING.SM,
+    marginHorizontal: SPACING.SM,
+  },
+  searchResultsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  searchResultsList: {
+    flex: 1,
+  },
+  searchResultItem: {
+    paddingHorizontal: SPACING.LG,
+    paddingVertical: SPACING.MD,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  searchResultContent: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+  },
+  searchResultTime: {
+    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+    marginTop: SPACING.XS,
   },
   messageList: {
     paddingVertical: SPACING.SM,

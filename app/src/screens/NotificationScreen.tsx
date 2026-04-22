@@ -17,6 +17,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
 import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { notificationService, NotificationItem } from '../services/notificationService';
+import { websocketService } from '../services/websocketService';
 import { Toast } from '../components/Toast';
 import { IconBell, IconCheckCircle } from '../components/SolarIcons';
 
@@ -107,6 +108,17 @@ export const NotificationScreen: React.FC<{ navigation: NavProp }> = ({ navigati
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
+
+  // Listen for real-time notification push via WebSocket
+  useEffect(() => {
+    const destination = '/user/queue/notifications';
+    const handler = (msg: Record<string, unknown>) => {
+      const notification = msg as unknown as NotificationItem;
+      setNotifications(prev => [notification, ...prev]);
+    };
+    websocketService.subscribe(destination, handler);
+    return () => { websocketService.unsubscribe(destination); };
+  }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);

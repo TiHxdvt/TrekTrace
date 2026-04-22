@@ -18,10 +18,12 @@ const STORAGE_KEYS = {
   TOKEN: 'token',
   USER: 'user',
   ACTIVITIES_CACHE: 'activities_cache',
+  CACHE_TIMESTAMP: 'activities_cache_timestamp',
   SETTINGS: 'settings',
 } as const;
 
 const KEYCHAIN_SERVICE = 'com.trektrace.auth';
+const KEYCHAIN_REFRESH_SERVICE = 'com.trektrace.refresh';
 
 // 轻量认证事件系统
 type AuthListener = () => void;
@@ -70,6 +72,33 @@ export const storageService = {
     } catch {
       // No-op: token may not exist in Keychain
     }
+    // Also clear AsyncStorage fallback to prevent stale tokens
+    await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+  },
+
+  // Refresh token storage
+  saveRefreshToken: async (token: string): Promise<void> => {
+    await Keychain.setGenericPassword('trektrace_refresh', token, {
+      service: KEYCHAIN_REFRESH_SERVICE,
+      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+  },
+
+  getRefreshToken: async (): Promise<string | null> => {
+    try {
+      const result = await Keychain.getGenericPassword({ service: KEYCHAIN_REFRESH_SERVICE });
+      return result ? result.password : null;
+    } catch {
+      return null;
+    }
+  },
+
+  removeRefreshToken: async (): Promise<void> => {
+    try {
+      await Keychain.resetGenericPassword({ service: KEYCHAIN_REFRESH_SERVICE });
+    } catch {
+      // No-op
+    }
   },
 
   /**
@@ -105,6 +134,7 @@ export const storageService = {
   clearAuthData: async (): Promise<void> => {
     await Promise.all([
       Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICE }).catch(() => {}),
+      Keychain.resetGenericPassword({ service: KEYCHAIN_REFRESH_SERVICE }).catch(() => {}),
       AsyncStorage.removeItem(STORAGE_KEYS.USER),
     ]);
     authServiceEvents.notify();
@@ -142,6 +172,38 @@ export const storageService = {
   },
 
   /**
+   * 保存活动缓存 + 时间戳
+   */
+  saveActivitiesCacheWithTimestamp: async (activities: ActivityResponseDTO[]): Promise<void> => {
+    await Promise.all([
+      AsyncStorage.setItem(STORAGE_KEYS.ACTIVITIES_CACHE, JSON.stringify(activities)),
+      AsyncStorage.setItem(STORAGE_KEYS.CACHE_TIMESTAMP, String(Date.now())),
+    ]);
+  },
+
+  /**
+   * 获取缓存时间戳（ms），null 表示无缓存
+   */
+  getCacheTimestamp: async (): Promise<number | null> => {
+    try {
+      const ts = await AsyncStorage.getItem(STORAGE_KEYS.CACHE_TIMESTAMP);
+      return ts ? Number(ts) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * 清除活动缓存和时间戳
+   */
+  clearActivitiesCache: async (): Promise<void> => {
+    await Promise.all([
+      AsyncStorage.removeItem(STORAGE_KEYS.ACTIVITIES_CACHE),
+      AsyncStorage.removeItem(STORAGE_KEYS.CACHE_TIMESTAMP),
+    ]);
+  },
+
+  /**
    * 保存设置
    */
   saveSettings: async (settings: AppSettings): Promise<void> => {
@@ -167,6 +229,7 @@ export const storageService = {
   clearAll: async (): Promise<void> => {
     await Promise.all([
       Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICE }).catch(() => {}),
+      Keychain.resetGenericPassword({ service: KEYCHAIN_REFRESH_SERVICE }).catch(() => {}),
       AsyncStorage.clear(),
     ]);
   },

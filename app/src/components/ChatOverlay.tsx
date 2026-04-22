@@ -32,6 +32,8 @@ export type ChatOverlayParams = {
   friendNickname?: string;
   friendAvatarUrl?: string;
   friendUserId: number;
+  conversationType?: string;
+  conversationName?: string;
 };
 
 // 模块级状态

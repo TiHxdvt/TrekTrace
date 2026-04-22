@@ -35,22 +35,24 @@ export interface PendingMessage {
 
 // ---- 会话 CRUD ----
 
-/** 获取所有会话（按更新时间倒序） */
+/** 获取所有会话（置顶优先，再按更新时间倒序） */
 export function getConversations(): Conversation[] {
   const db = getDatabase();
   const result = db.executeSync(
-    `SELECT * FROM conversations ORDER BY updated_at DESC`,
+    `SELECT * FROM conversations ORDER BY is_pinned DESC, updated_at DESC`,
   );
 
   return result.rows.map((row: any) => ({
     id: row.id,
     type: row.type,
     name: row.name,
-    otherUser: {
-      userId: row.other_user_id,
-      nickname: row.other_user_nickname,
-      avatarUrl: row.other_user_avatar_url,
-    },
+    otherUser: row.other_user_id
+      ? {
+          userId: row.other_user_id,
+          nickname: row.other_user_nickname,
+          avatarUrl: row.other_user_avatar_url,
+        }
+      : undefined,
     lastMessage: row.last_message_content
       ? {
           content: row.last_message_content,
@@ -58,6 +60,8 @@ export function getConversations(): Conversation[] {
         }
       : undefined,
     unreadCount: row.unread_count ?? 0,
+    isPinned: row.is_pinned === 1,
+    isMuted: row.is_muted === 1,
   }));
 }
 
@@ -67,8 +71,8 @@ export function upsertConversation(conv: Conversation): void {
   db.executeSync(
     `INSERT OR REPLACE INTO conversations
       (id, type, name, other_user_id, other_user_nickname, other_user_avatar_url,
-       last_message_content, last_message_created_at, unread_count, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       last_message_content, last_message_created_at, unread_count, updated_at, is_pinned, is_muted)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       conv.id,
       conv.type,
@@ -80,6 +84,8 @@ export function upsertConversation(conv: Conversation): void {
       conv.lastMessage?.createdAt ?? null,
       conv.unreadCount ?? 0,
       conv.lastMessage?.createdAt ?? new Date().toISOString(),
+      conv.isPinned ? 1 : 0,
+      conv.isMuted ? 1 : 0,
     ],
   );
 }
@@ -142,7 +148,7 @@ export function getMessages(convId: number, limit = 50, offset = 0): ChatMessage
     `SELECT COUNT(*) as cnt FROM messages WHERE conversation_id = ? AND is_deleted = 0`,
     [convId],
   );
-  const total = countResult.rows[0]?.cnt ?? 0;
+  const total = Number(countResult.rows[0]?.cnt ?? 0);
 
   // 计算有效的 offset（从末尾往前取）
   const effectiveOffset = Math.max(0, total - offset - limit);
@@ -169,6 +175,7 @@ export function getMessages(convId: number, limit = 50, offset = 0): ChatMessage
     mediaSize: row.media_size ?? undefined,
     latitude: row.latitude ?? undefined,
     longitude: row.longitude ?? undefined,
+    duration: row.duration ?? undefined,
   }));
 }
 
@@ -194,6 +201,7 @@ export function getAllMessages(convId: number): ChatMessage[] {
     mediaSize: row.media_size ?? undefined,
     latitude: row.latitude ?? undefined,
     longitude: row.longitude ?? undefined,
+    duration: row.duration ?? undefined,
   }));
 }
 
@@ -203,8 +211,8 @@ export function insertMessage(msg: ChatMessage): void {
   db.executeSync(
     `INSERT OR IGNORE INTO messages
       (id, local_id, conversation_id, sender_id, content, type, status, created_at, server_created_at, is_deleted,
-       media_url, media_type, media_size, latitude, longitude)
-     VALUES (?, ?, ?, ?, ?, ?, 'sent', ?, ?, 0, ?, ?, ?, ?, ?)`,
+       media_url, media_type, media_size, latitude, longitude, duration)
+     VALUES (?, ?, ?, ?, ?, ?, 'sent', ?, ?, 0, ?, ?, ?, ?, ?, ?)`,
     [
       msg.id,
       `server-${msg.id}`,
@@ -219,6 +227,7 @@ export function insertMessage(msg: ChatMessage): void {
       msg.mediaSize ?? null,
       msg.latitude ?? null,
       msg.longitude ?? null,
+      msg.duration ?? null,
     ],
   );
 }

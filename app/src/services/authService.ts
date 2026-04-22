@@ -4,7 +4,7 @@
  */
 
 import api from './api';
-import { LoginRequest, LoginResponse, PasswordLoginRequest, SendCodeRequest, User } from '../types';
+import { LoginRequest, LoginResponse, PasswordLoginRequest, SendCodeRequest, ResetPasswordRequest, User } from '../types';
 
 export const authService = {
   /**
@@ -38,6 +38,27 @@ export const authService = {
     const data: PasswordLoginRequest = { phone, password };
     const response = await api.post<LoginResponse>('/auth/login-password', data);
     return response.data;
+  },
+
+  /**
+   * 刷新 token
+   * @param refreshToken 刷新令牌
+   * @returns 新的登录响应
+   */
+  refreshToken: async (refreshToken: string): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>('/auth/refresh', { refreshToken });
+    return response.data;
+  },
+
+  /**
+   * 重置密码
+   * @param phone 手机号
+   * @param code 验证码
+   * @param newPassword 新密码
+   */
+  resetPassword: async (phone: string, code: string, newPassword: string): Promise<void> => {
+    const data: ResetPasswordRequest = { phone, code, newPassword };
+    await api.post('/auth/reset-password', data);
   },
 
   /**
