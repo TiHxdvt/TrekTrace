@@ -58,6 +58,7 @@ export interface LoginRequest {
 // 登录响应
 export interface LoginResponse {
   token: string;
+  refreshToken: string;
   user: User;
 }
 
@@ -72,19 +73,30 @@ export interface SendCodeRequest {
   phone: string;
 }
 
+// 重置密码请求
+export interface ResetPasswordRequest {
+  phone: string;
+  code: string;
+  newPassword: string;
+}
+
 // 活动列表查询参数
 export interface ActivityListParams {
   page?: number;
   size?: number;
   type?: ActivityType;
+  startDate?: string;
+  endDate?: string;
 }
 
-// 分页响应
+// 分页响应（匹配 Spring Data Page 格式）
 export interface PaginatedResponse<T> {
-  activities: T[];
-  total: number;
-  page: number;
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
   size: number;
+  last: boolean;
 }
 
 // 统计数据
@@ -133,6 +145,10 @@ export interface RecordingSession {
   elevationGain: number; // 米
   segments: TrackSegment[];
   uploadedToServer: boolean;
+  weather?: {
+    condition: string;
+    temperature: number;
+  };
 }
 
 // 按暂停分段的轨迹段
@@ -183,6 +199,8 @@ export interface ActivityUploadRequest {
   distance: number;
   elevationGain: number;
   trackPoints: TrackPointUploadDTO[];
+  weatherCondition?: string;
+  temperature?: number;
 }
 
 export interface TrackPointUploadDTO {
@@ -204,6 +222,8 @@ export interface ActivityResponseDTO {
   elevationGain: number;
   status: string;
   createdAt: string;
+  weatherCondition?: string;
+  temperature?: number;
 }
 
 // ========== 聊天相关类型 ==========
@@ -217,11 +237,19 @@ export interface Conversation {
     nickname?: string;
     avatarUrl?: string;
   };
+  participants?: Array<{
+    userId: number;
+    nickname?: string;
+    avatarUrl?: string;
+    role?: string;
+  }>;
   lastMessage?: {
     content: string;
     createdAt: string;
   };
   unreadCount: number;
+  isPinned?: boolean;
+  isMuted?: boolean;
 }
 
 export interface ChatMessage {
@@ -238,5 +266,6 @@ export interface ChatMessage {
   mediaSize?: number;
   latitude?: number;
   longitude?: number;
+  duration?: number;
   isRead?: boolean;
 }

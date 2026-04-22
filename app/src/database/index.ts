@@ -12,6 +12,7 @@ import {
   CREATE_SYNC_METADATA_TABLE,
   CREATE_INDEXES,
   MIGRATION_V2,
+  MIGRATION_V3,
 } from './schema';
 
 const DB_NAME = 'trektrace_chat.db';
@@ -55,6 +56,10 @@ export async function initDatabase(): Promise<void> {
     runMigrationV2();
   }
 
+  if (currentVersion < 3) {
+    runMigrationV3();
+  }
+
   setMeta('schema_version', String(SCHEMA_VERSION));
 
   console.log('[DB] Database initialized, version:', SCHEMA_VERSION);
@@ -73,6 +78,20 @@ function runMigrationV2(): void {
     }
   }
   console.log('[DB] Migration V2 applied');
+}
+
+/** 执行 V2→V3 迁移 */
+function runMigrationV3(): void {
+  for (const sql of MIGRATION_V3) {
+    try {
+      db!.executeSync(sql);
+    } catch (e: any) {
+      if (!String(e?.message || '').includes('duplicate column')) {
+        console.warn('[DB] Migration warning:', e?.message);
+      }
+    }
+  }
+  console.log('[DB] Migration V3 applied');
 }
 
 /** 关闭数据库 */

@@ -3,7 +3,7 @@
  * 用于微信式本地优先聊天架构
  */
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const CREATE_CONVERSATIONS_TABLE = `
 CREATE TABLE IF NOT EXISTS conversations (
@@ -78,4 +78,11 @@ export const MIGRATION_V2 = [
   'ALTER TABLE messages ADD COLUMN latitude REAL;',
   'ALTER TABLE messages ADD COLUMN longitude REAL;',
   'ALTER TABLE messages ADD COLUMN local_media_path TEXT;',
+];
+
+/** V2 → V3 迁移：添加置顶/免打扰/语音时长字段 */
+export const MIGRATION_V3 = [
+  'ALTER TABLE conversations ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;',
+  'ALTER TABLE conversations ADD COLUMN is_muted INTEGER NOT NULL DEFAULT 0;',
+  'ALTER TABLE messages ADD COLUMN duration INTEGER;',
 ];

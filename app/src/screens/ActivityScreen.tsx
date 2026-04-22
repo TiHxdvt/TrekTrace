@@ -13,9 +13,7 @@ import {
   PermissionsAndroid,
   Platform,
   Animated,
-  StatusBar,
   Dimensions,
-  Vibration,
   Alert,
   Linking,
 } from 'react-native';
@@ -27,492 +25,172 @@ import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '../navigation/types';
 import { DrawerOverlay } from '../components/DrawerOverlay';
-import Svg, { Circle, Polyline as SvgPolyline } from 'react-native-svg';
-import { BORDER_RADIUS, TYPOGRAPHY } from '../theme';
-import { useTheme } from '../contexts/ThemeContext';
-import { APP_CONFIG } from '../config';
 import {
   IconHamburgerMenu,
   IconMagnifer,
   IconMicrophone,
-  IconRunning,
-  IconBicycle,
-  IconBonfire,
-  IconCompass,
-  IconGps,
-  IconPlay,
-  IconPause,
-  IconStop,
-  IconShareBold,
 } from '../components/SolarIcons';
 import { captureRef } from 'react-native-view-shot';
 import Share from 'react-native-share';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
+import { useTheme } from '../contexts/ThemeContext';
+import { APP_CONFIG } from '../config';
 import { trackRecordingService } from '../services/trackRecordingService';
 import { backgroundLocationService } from '../services/backgroundLocationService';
-import { mockLocationService, SIM_PROFILES, StartPosition } from '../services/mockLocationService';
-import { formatDuration, formatPace } from '../utils/format';
-import { haversineDistance } from '../utils/geo';
-import { ACTIVITY_TYPE_META } from '../constants/activityMeta';
-import type {
-  ActivityType,
-  RecordingSession,
-  RecordingStats,
-  RawLocationPoint,
-} from '../types';
+import { weatherService } from '../services/weatherService';
+import type { RawLocationPoint, ActivityType } from '../types';
 
-type ActivityTypeLocal = 'running' | 'cycling' | 'hiking';
-type GpsStrength = 'none' | 'weak' | 'medium' | 'strong';
-
-const ACTIVITY_CYCLE: ActivityTypeLocal[] = ['hiking', 'running', 'cycling'];
-const PANEL_HEIGHT = 105;
-const LONG_PRESS_DURATION = 1500;
-
-const ACTIVITY_ICONS: Record<ActivityTypeLocal, React.FC<{ size?: number; color?: string }>> = {
-  running: IconRunning,
-  cycling: IconBicycle,
-  hiking: IconBonfire,
-};
-
-const ACTIVITY_TYPE_MAP: Record<ActivityTypeLocal, ActivityType> = {
-  hiking: 'HIKING',
-  running: 'RUNNING',
-  cycling: 'CYCLING',
-};
-
-// Summary replay animation constants
-const SUMMARY_REPLAY_DURATION = 3500;
-const MIN_RECORDING_DISTANCE = 20; // 米 — 低于此距离不保存记录
-
-// Animated SVG Circle for circular progress ring
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-// Uniform sampling for share card SVG track
-function samplePoints(coords: Array<{latitude: number; longitude: number}>, maxCount: number) {
-  if (coords.length <= maxCount) return coords;
-  const step = (coords.length - 1) / (maxCount - 1);
-  const result = [];
-  for (let i = 0; i < maxCount; i++) {
-    result.push(coords[Math.round(i * step)]);
-  }
-  return result;
-}
+// Extracted modules
+import { ACTIVITY_CYCLE, ACTIVITY_TYPE_MAP, MIN_RECORDING_DISTANCE } from './activity/constants';
+import type { ActivityTypeLocal, GpsStrength } from './activity/constants';
+import { styles } from './activity/styles';
+import { createDynamicStyles } from './activity/dynamicStyles';
+import { useRecordingState } from './activity/useRecordingState';
+import { useSummaryReplay } from './activity/useSummaryReplay';
+import { useMockGps } from './activity/useMockGps';
+import { useTrackVisualization } from './activity/useTrackVisualization';
+import { MapOverlayButtons } from './activity/MapOverlayButtons';
+import { RecordingStatsPanel } from './activity/RecordingStatsPanel';
+import { SummaryOverlay } from './activity/SummaryOverlay';
+import { ShareCard } from './activity/ShareCard';
+import { calculateLaps } from '../utils/lapCalculator';
+import { toElevationProfile } from '../utils/elevationProfile';
 
 export const ActivityScreen: React.FC = () => {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, 'ActivityTab'>>();
   const { colors, isDarkMode } = useTheme();
-  const [activityIndex, setActivityIndex] = useState(0); // 默认徒步
   const insets = useSafeAreaInsets();
+
+  // ---- Core state ----
+  const [activityIndex, setActivityIndex] = useState(0);
   const mapViewRef = useRef<MapView>(null);
   const hasMovedToLocation = useRef(false);
   const latestLocation = useRef<{ latitude: number; longitude: number } | null>(null);
   const shouldFollowRef = useRef(true);
   const currentZoomRef = useRef(16);
+
   const [hasGps, setHasGps] = useState(false);
   const [gpsStrength, setGpsStrength] = useState<GpsStrength>('none');
   const gpsStrengthRef = useRef<GpsStrength>('none');
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const pulseAnim = useRef<Animated.Value>(new Animated.Value(1)).current;
+  const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState(false);
 
-  // Recording state from service
-  const [session, setSession] = useState<RecordingSession | null>(null);
-  const [stats, setStats] = useState<RecordingStats>({
-    distance: 0,
-    duration: 0,
-    currentPace: 0,
-    elevationGain: 0,
-    currentSpeed: 0,
-  });
-  const [polylineSegments, setPolylineSegments] = useState<Array<Array<{ latitude: number; longitude: number }>>>([]);
+  // ---- Recording state ----
+  const isRecordingRef = useRef(false);
+  const isStoppingRef = useRef(false);
+  const longPressProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
 
-  // Summary overlay state — reuses main map, no second MapView
-  const [showSummary, setShowSummary] = useState(false);
+  const {
+    session, stats, polylineSegments,
+    isIdle, isRecording, isPaused,
+    showSummary, setShowSummary, lockedActivityType,
+  } = useRecordingState();
+
   const showSummaryRef = useRef(false);
+  useEffect(() => { showSummaryRef.current = showSummary; }, [showSummary]);
 
-  // Share card state
+  // ---- Summary replay ----
+  const { replayProgress, startSummaryReplay, stopSummaryReplay } = useSummaryReplay();
+
+  // ---- Track visualization ----
+  const { coloredSegments, displaySegments, shareTrackPoints, animatedStats } =
+    useTrackVisualization(session, polylineSegments, stats, replayProgress, showSummary, showShareCard);
+
+  // F2: Lap stats (only computed when summary is shown)
+  const laps = useMemo(() => {
+    if (!showSummary || !session?.segments) return [];
+    return calculateLaps(session.segments, session.activityType);
+  }, [showSummary, session?.segments, session?.activityType]);
+
+  // F3: Elevation profile
+  const elevationProfile = useMemo(() => {
+    if (!session?.segments) return [];
+    return toElevationProfile(session.segments);
+  }, [session?.segments]);
+
+  // ---- Share card ----
   const [showShareCard, setShowShareCard] = useState(false);
   const shareCardRef = useRef<View>(null);
 
-  // Summary replay animation — Animated.Value drives everything, listener updates state
-  const [replayProgress, setReplayProgress] = useState(0); // 0..1
-  const replayAnimRef = useRef<Animated.Value | null>(null);
-  const replayListenerRef = useRef<string | null>(null);
+  // ---- Mock GPS ----
+  const {
+    isSimulating, isSimulatingRef,
+    startSim, handleStopSim, handleSimButton,
+  } = useMockGps({
+    mapViewRef, latestLocation, hasMovedToLocation, currentZoomRef,
+    isRecordingRef, shouldFollowRef, showSummaryRef,
+    setHasGps, setGpsStrength, gpsStrengthRef,
+  });
 
-  const startSummaryReplay = useCallback(() => {
-    // Clean up previous animation
-    if (replayListenerRef.current && replayAnimRef.current) {
-      replayAnimRef.current.removeListener(replayListenerRef.current);
-    }
-    if (replayAnimRef.current) {
-      replayAnimRef.current.stopAnimation();
-    }
+  // Keep Drawer callback refs up to date
+  const startSimRef = useRef(startSim);
+  startSimRef.current = startSim;
+  const stopSimRef = useRef(handleStopSim);
+  stopSimRef.current = handleStopSim;
 
-    setReplayProgress(0);
-    const anim = new Animated.Value(0);
-    replayAnimRef.current = anim;
-
-    // Throttled state update: only trigger re-render at ~100ms intervals
-    let lastUpdateTime = 0;
-    const UPDATE_INTERVAL_MS = 100;
-
-    replayListenerRef.current = anim.addListener(({ value }) => {
-      const now = Date.now();
-      if (now - lastUpdateTime >= UPDATE_INTERVAL_MS || value >= 1) {
-        lastUpdateTime = now;
-        setReplayProgress(value);
-      }
-    });
-
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: SUMMARY_REPLAY_DURATION,
-      useNativeDriver: false, // Must be false — drives non-style props via listener
-    }).start(({ finished }) => {
-      if (finished) setReplayProgress(1);
-      if (replayListenerRef.current) {
-        anim.removeListener(replayListenerRef.current);
-        replayListenerRef.current = null;
-      }
-    });
-  }, []);
-
-  const stopSummaryReplay = useCallback((reset?: boolean) => {
-    if (replayListenerRef.current && replayAnimRef.current) {
-      replayAnimRef.current.removeListener(replayListenerRef.current);
-      replayListenerRef.current = null;
-    }
-    if (replayAnimRef.current) {
-      replayAnimRef.current.stopAnimation();
-    }
-    if (reset) setReplayProgress(1);
-  }, []);
-
-  // Long press stop state
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
-
-  // Prevent accidental tap after stop — stays true until UI fully transitions
-  const isStoppingRef = useRef(false);
-  // Activity type locked at start — prevents switching during/after stop
-  const lockedActivityType = useRef<ActivityType | null>(null);
-
-  // Use ref for isRecording to avoid handleLocation re-creation
-  const isRecordingRef = useRef(false);
-
-  // Mock GPS simulation state (__DEV__ only)
-  const [isSimulating, setIsSimulating] = useState(false);
-
-  // Map type — follows theme reactively
+  // ---- Derived state ----
+  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
   const mapType = useMemo(() => isDarkMode ? MapType.Night : MapType.Standard, [isDarkMode]);
-
-  // Refs for Drawer callbacks (to always get latest state)
-  const isSimulatingRef = useRef(false);
-
-  // Derived state
-  const isIdle = !session || session.status === 'idle' || session.status === 'stopped';
-  const isRecording = session?.status === 'recording';
-  const isPaused = session?.status === 'paused';
-
-  // Keep ref in sync
-  useEffect(() => {
-    isRecordingRef.current = isRecording;
-  }, [isRecording]);
-
-  // Keep isSimulating ref in sync
-  useEffect(() => {
-    isSimulatingRef.current = isSimulating;
-  }, [isSimulating]);
-
-  // Refs for Drawer callbacks (avoid stale closures)
-  const startSimRef = useRef<(profileKey: string, startPos: StartPosition | null) => void>(() => {});
-  const stopSimRef = useRef<() => void>(() => {});
-
-  // Subscribe to recording service
-  useEffect(() => {
-    const unsubscribe = trackRecordingService.subscribe((s, st) => {
-      setSession(s);
-      setStats(st);
-      setPolylineSegments(trackRecordingService.getPolylineSegments());
-    });
-    return unsubscribe;
-  }, []);
+  const selectedType = ACTIVITY_CYCLE[activityIndex];
 
   // Hide/show floating tab bar when summary is visible
   useEffect(() => {
     navigation.setOptions({ tabBarVisible: !showSummary } as any);
   }, [navigation, showSummary]);
 
-  // Derive colored segments from polyline data + session type (computed only when data changes)
-  const coloredSegments = useMemo(() => {
-    if (!session || polylineSegments.length === 0) return [];
+  // GPS strength colors
+  const gpsColors: Record<GpsStrength, string> = useMemo(() => ({
+    none: colors.TEXT.DISABLED,
+    weak: colors.ERROR,
+    medium: colors.WARNING,
+    strong: colors.SUCCESS,
+  }), [colors]);
 
-    const activityType = session.activityType;
+  // Dynamic styles
+  const dynamicStyles = useMemo(() => createDynamicStyles(colors, isDarkMode), [colors, isDarkMode]);
 
-    const SPEED_THRESHOLDS: Record<ActivityType, { slow: number; fast: number }> = {
-      HIKING: { slow: 1.0, fast: 2.0 },
-      RUNNING: { slow: 2.0, fast: 4.0 },
-      CYCLING: { slow: 5.0, fast: 10.0 },
-    };
-
-    const { slow, fast } = SPEED_THRESHOLDS[activityType];
-
-    // Colors: green(#22c55e) → yellow(#f59e0b) → red(#ef4444)
-    const GREEN = { r: 34, g: 197, b: 94 };
-    const YELLOW = { r: 245, g: 158, b: 11 };
-    const RED = { r: 239, g: 68, b: 68 };
-
-    const lerpColor = (
-      c1: { r: number; g: number; b: number },
-      c2: { r: number; g: number; b: number },
-      t: number,
-    ): string => {
-      const r = Math.round(c1.r + (c2.r - c1.r) * t);
-      const g = Math.round(c1.g + (c2.g - c1.g) * t);
-      const b = Math.round(c1.b + (c2.b - c1.b) * t);
-      return `rgb(${r},${g},${b})`;
-    };
-
-    // Map speed to color
-    const speedToColor = (speed: number): string => {
-      if (speed <= slow) {
-        const t = speed / Math.max(0.01, slow);
-        return lerpColor(GREEN, YELLOW, Math.min(1, t));
-      } else if (speed <= fast) {
-        const t = (speed - slow) / (fast - slow);
-        return lerpColor(YELLOW, RED, t);
-      }
-      return `rgb(${RED.r},${RED.g},${RED.b})`;
-    };
-
-    return session.segments
-      .filter(s => s.points.length >= 2)
-      .map(s => {
-        const coords = s.points.map(p => ({ latitude: p.latitude, longitude: p.longitude }));
-        const colors = s.points.map(p => speedToColor(p.speed ?? 0));
-        return { coords, colors };
-      });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- only session.segments and activityType are used; full session dependency would recompute every second
-  }, [polylineSegments, session?.activityType, session?.segments]);
-
-  // Slice coloredSegments by replayProgress for track replay animation
-  // During replay, interpolate virtual points in large gaps (> 50m) for smooth animation
-  const displaySegments = useMemo(() => {
-    // Only interpolate during active replay
-    const needsInterpolation = showSummary && replayProgress < 1 && coloredSegments.length > 0;
-    if (!needsInterpolation) return coloredSegments;
-
-    const INTERPOLATION_GAP_THRESHOLD = 50; // meters — gaps larger than this get interpolated
-    const INTERPOLATION_STEP = 10; // meters — virtual point spacing
-
-    // Interpolate gaps in each segment
-    const interpolated = coloredSegments.map(seg => {
-      const newCoords: Array<{ latitude: number; longitude: number }> = [];
-      const newColors: string[] = [];
-
-      for (let i = 0; i < seg.coords.length; i++) {
-        newCoords.push(seg.coords[i]);
-        newColors.push(seg.colors[i]);
-
-        if (i < seg.coords.length - 1) {
-          const gap = haversineDistance(
-            seg.coords[i].latitude, seg.coords[i].longitude,
-            seg.coords[i + 1].latitude, seg.coords[i + 1].longitude,
-          );
-          if (gap > INTERPOLATION_GAP_THRESHOLD) {
-            const steps = Math.floor(gap / INTERPOLATION_STEP);
-            for (let s = 1; s < steps; s++) {
-              const t = s / steps;
-              newCoords.push({
-                latitude: seg.coords[i].latitude + (seg.coords[i + 1].latitude - seg.coords[i].latitude) * t,
-                longitude: seg.coords[i].longitude + (seg.coords[i + 1].longitude - seg.coords[i].longitude) * t,
-              });
-              newColors.push(seg.colors[i]); // use previous point's color
-            }
-          }
-        }
-      }
-
-      return { coords: newCoords, colors: newColors };
-    });
-
-    // Slice by replayProgress
-    const totalPoints = interpolated.reduce((sum, s) => sum + s.coords.length, 0);
-    const targetCount = Math.max(1, Math.round(totalPoints * replayProgress));
-
-    const result: typeof interpolated = [];
-    let accumulated = 0;
-
-    for (const seg of interpolated) {
-      const remaining = targetCount - accumulated;
-      if (remaining <= 0) break;
-
-      if (remaining >= seg.coords.length) {
-        result.push(seg);
-        accumulated += seg.coords.length;
-      } else {
-        result.push({
-          coords: seg.coords.slice(0, remaining),
-          colors: seg.colors.slice(0, remaining),
-        });
-        accumulated += remaining;
-        break;
-      }
-    }
-
-    return result;
-  }, [coloredSegments, replayProgress, showSummary]);
-
-  // Normalize track coords to SVG viewBox (0-200) for share card
-  const shareTrackPoints = useMemo(() => {
-    if (!showShareCard || coloredSegments.length === 0) return [];
-
-    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
-    let totalPoints = 0;
-    for (const seg of coloredSegments) {
-      for (const p of seg.coords) {
-        if (p.latitude < minLat) minLat = p.latitude;
-        if (p.latitude > maxLat) maxLat = p.latitude;
-        if (p.longitude < minLon) minLon = p.longitude;
-        if (p.longitude > maxLon) maxLon = p.longitude;
-        totalPoints++;
-      }
-    }
-    if (totalPoints < 2) return [];
-
-    const padLat = (maxLat - minLat) * 0.15 || 0.01;
-    const padLon = (maxLon - minLon) * 0.15 || 0.01;
-
-    const VB = 200;
-    return coloredSegments.map(seg => {
-      const sampled = samplePoints(seg.coords, 60);
-      return sampled.map(p => ({
-        x: VB * (p.longitude - minLon + padLon) / (maxLon - minLon + padLon * 2),
-        y: VB * (1 - (p.latitude - minLat + padLat) / (maxLat - minLat + padLat * 2)),
-      }));
-    });
-  }, [showShareCard, coloredSegments]);
-
-  // Animated stats for number rolling effect in summary
-  const animatedStats = useMemo(() => {
-    const p = replayProgress;
-    return {
-      distance: stats.distance * p,
-      duration: Math.round(stats.duration * p),
-      currentPace: stats.currentPace > 0 ? stats.currentPace * p : 0,
-      elevationGain: stats.elevationGain * p,
-    };
-  }, [stats, replayProgress]);
-
-  // Crash recovery on mount
+  // ---- GPS pulse animation ----
   useEffect(() => {
-    const checkRecovery = async () => {
-      const recovered = await trackRecordingService.recoverSession();
-      if (recovered) {
-        if (recovered.status === 'stopped') {
-          // Stopped recording with unsaved data — show summary directly
-          lockedActivityType.current = recovered.activityType;
-          showSummaryRef.current = true;
-          setShowSummary(true);
-        } else if (recovered.status === 'recording') {
-          Dialog.show(
-            '恢复记录',
-            '检测到未完成的运动记录，是否恢复？',
-            [
-              {
-                text: '丢弃',
-                style: 'destructive',
-                onPress: () => {
-                  backgroundLocationService.stop();
-                  trackRecordingService.discardRecording();
-                },
-              },
-              {
-                text: '恢复',
-                style: 'default',
-                onPress: () => {
-                  // Restart background location service
-                  backgroundLocationService.start(recovered.activityType).catch(() => {
-                    // If permission denied, still resume recording (just no background tracking)
-                  });
-                },
-              },
-            ],
-          );
-        }
-      }
-    };
-    checkRecovery();
-  }, []);
-
-  // GPS 定位中脉冲动画
-  useEffect(() => {
-    if (gpsStrength === 'none') {
-      pulseAnim.setValue(1);
-      return;
-    }
+    if (gpsStrength === 'none') { pulseAnim.setValue(1); return; }
     const animation = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 0.3,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
       ]),
     );
     animation.start();
     return () => animation.stop();
   }, [gpsStrength, pulseAnim]);
 
-  // 初始化高德地图 SDK + 请求定位权限
-  const [mapReady, setMapReady] = useState(false);
-  const [mapError, setMapError] = useState(false);
-
+  // ---- Init map SDK ----
   useEffect(() => {
     const init = async () => {
       try {
         AMapSdk.init(APP_CONFIG.AMAP_API_KEY);
-
         if (Platform.OS === 'android') {
           const granted = await PermissionsAndroid.requestMultiple([
             'android.permission.ACCESS_FINE_LOCATION',
             'android.permission.ACCESS_COARSE_LOCATION',
           ]).catch(() => null as any);
-          if (granted) {
-            setLocationEnabled(true);
-          }
+          if (granted) setLocationEnabled(true);
         } else {
           setLocationEnabled(true);
         }
-
         setMapReady(true);
-      } catch {
-        setMapError(true);
-      }
+      } catch { setMapError(true); }
     };
     init();
-    return () => {
-      if (gpsTimeoutRef.current) clearTimeout(gpsTimeoutRef.current);
-    };
+    return () => { if (gpsTimeoutRef.current) clearTimeout(gpsTimeoutRef.current); };
   }, []);
 
-  // 首次获取定位后，移动相机到当前位置
+  // ---- Location handler ----
   const handleLocation = useCallback((event: NativeSyntheticEvent<{
     timestamp: number;
-    coords: {
-      latitude: number;
-      longitude: number;
-      accuracy: number;
-      altitude: number;
-      speed: number;
-      heading: number;
-    };
+    coords: { latitude: number; longitude: number; accuracy: number; altitude: number; speed: number; heading: number; };
   }>) => {
     const { coords } = event.nativeEvent;
     const { latitude, longitude, accuracy, altitude, speed, heading } = coords;
@@ -520,7 +198,6 @@ export const ActivityScreen: React.FC = () => {
       latestLocation.current = { latitude, longitude };
       if (!hasGps) setHasGps(true);
 
-      // 根据 GPS 精度判断信号强度，仅在变化时更新避免高频重渲染
       let newStrength: GpsStrength;
       if (accuracy <= 10) newStrength = 'strong';
       else if (accuracy <= 30) newStrength = 'medium';
@@ -531,7 +208,6 @@ export const ActivityScreen: React.FC = () => {
         setGpsStrength(newStrength);
       }
 
-      // 重置 GPS 超时计时器，10s 无更新则降级为 weak
       if (gpsTimeoutRef.current) clearTimeout(gpsTimeoutRef.current);
       gpsTimeoutRef.current = setTimeout(() => {
         if (gpsStrengthRef.current !== 'none') {
@@ -543,343 +219,61 @@ export const ActivityScreen: React.FC = () => {
       if (!hasMovedToLocation.current) {
         hasMovedToLocation.current = true;
         mapViewRef.current?.moveCamera(
-          { target: { latitude, longitude }, zoom: currentZoomRef.current },
-          500,
+          { target: { latitude, longitude }, zoom: currentZoomRef.current }, 500,
         );
       }
 
-      // Feed GPS data to recording service — only in simulation mode
-      // In real mode, backgroundLocationService handles all GPS data
       if (isRecordingRef.current) {
         if (isSimulatingRef.current) {
           const rawPoint: RawLocationPoint = {
-            latitude,
-            longitude,
-            altitude: altitude ?? 0,
-            accuracy,
-            speed: speed ?? 0,
-            heading: heading ?? 0,
+            latitude, longitude, altitude: altitude ?? 0, accuracy,
+            speed: speed ?? 0, heading: heading ?? 0,
             timestamp: event.nativeEvent.timestamp,
           };
           trackRecordingService.processLocation(rawPoint);
         }
-
-        // Follow user on map
         if (shouldFollowRef.current) {
           mapViewRef.current?.moveCamera(
-            { target: { latitude, longitude }, zoom: currentZoomRef.current },
-            300,
+            { target: { latitude, longitude }, zoom: currentZoomRef.current }, 300,
           );
         }
       }
     }
   }, [hasGps]);
 
-  // 自定义定位按钮：移动到当前位置
-  const handleLocate = () => {
+  // ---- Locate button ----
+  const handleLocate = useCallback(() => {
     const loc = latestLocation.current;
     if (loc) {
       shouldFollowRef.current = true;
       mapViewRef.current?.moveCamera(
-        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: currentZoomRef.current },
-        500,
+        { target: { latitude: loc.latitude, longitude: loc.longitude }, zoom: currentZoomRef.current }, 500,
       );
     }
-  };
-
-  // ======================== Mock GPS Simulation (__DEV__) ========================
-
-  const handleStartSim = () => {
-    const profileKeys = Object.keys(SIM_PROFILES);
-    const profileOptions = profileKeys.map(key => SIM_PROFILES[key].name);
-
-    // 用当前 GPS 位置或地图中心作为模拟起点
-    let startPos: StartPosition | null = null;
-    if (latestLocation.current) {
-      startPos = latestLocation.current;
-    }
-
-    Dialog.show(
-      'GPS 模拟',
-      startPos
-        ? `从当前位置开始 (${startPos.latitude.toFixed(4)}, ${startPos.longitude.toFixed(4)})`
-        : '未获取到位置，将使用默认坐标',
-      [
-        ...profileOptions.map((name, idx) => ({
-          text: name,
-          onPress: () => startSim(profileKeys[idx], startPos),
-        })),
-        { text: '取消', style: 'cancel' },
-      ],
-    );
-  };
-
-  const startSim = (profileKey: string, startPos: StartPosition | null) => {
-    setIsSimulating(true);
-
-    setHasGps(true);
-    gpsStrengthRef.current = 'strong';
-    setGpsStrength('strong');
-
-    mockLocationService.start(profileKey, startPos, (point: RawLocationPoint) => {
-      // Update latestLocation
-      latestLocation.current = { latitude: point.latitude, longitude: point.longitude };
-
-      // Move camera on first point
-      if (!hasMovedToLocation.current) {
-        hasMovedToLocation.current = true;
-        mapViewRef.current?.moveCamera(
-          { target: { latitude: point.latitude, longitude: point.longitude }, zoom: 16 },
-          500,
-        );
-      }
-
-      // Feed to recording service if recording
-      if (isRecordingRef.current) {
-        trackRecordingService.processLocation(point);
-
-        if (shouldFollowRef.current) {
-          mapViewRef.current?.moveCamera(
-            { target: { latitude: point.latitude, longitude: point.longitude }, zoom: currentZoomRef.current },
-            300,
-          );
-        }
-      } else if (!showSummaryRef.current) {
-        mapViewRef.current?.moveCamera(
-          { target: { latitude: point.latitude, longitude: point.longitude }, zoom: currentZoomRef.current },
-          300,
-        );
-      }
-    });
-  };
-
-  const handleStopSim = () => {
-    mockLocationService.stop();
-    setIsSimulating(false);
-  };
-
-  // Keep Drawer callback refs up to date
-  startSimRef.current = startSim;
-  stopSimRef.current = handleStopSim;
-
-  const handleSimButton = () => {
-    if (isSimulating) {
-      handleStopSim();
-    } else {
-      handleStartSim();
-    }
-  };
-
-  // Sync mock pause/resume with recording state
-  useEffect(() => {
-    if (!isSimulating) return;
-    if (isPaused) {
-      mockLocationService.pause();
-    } else if (isRecording) {
-      mockLocationService.resume();
-    }
-  }, [isSimulating, isPaused, isRecording]);
-
-  // Cleanup mock on unmount
-  useEffect(() => {
-    return () => {
-      if (mockLocationService.isRunning) {
-        mockLocationService.stop();
-      }
-    };
   }, []);
 
-  const selectedType = ACTIVITY_CYCLE[activityIndex];
+  // ---- Sync mock pause/resume with recording state ----
+  useEffect(() => {
+    if (!isSimulating) return;
+    if (isPaused) { backgroundLocationService.pause(); }
+    else if (isRecording) { backgroundLocationService.resume(); }
+  }, [isSimulating, isPaused, isRecording]);
 
-  // GPS strength colors — derived from theme
-  const gpsColors: Record<GpsStrength, string> = useMemo(() => ({
-    none: colors.TEXT.DISABLED,
-    weak: colors.ERROR,
-    medium: colors.WARNING,
-    strong: colors.SUCCESS,
-  }), [colors]);
-
-  // Dynamic styles — all color-dependent styles
-  const dynamicStyles = useMemo(() => StyleSheet.create({
-    container: {
-      backgroundColor: colors.BACKGROUND,
-    },
-    glowOrbTop: {
-      backgroundColor: colors.GRADIENT.BLUE,
-    },
-    glowOrbCenter: {
-      backgroundColor: colors.GRADIENT.PINK,
-    },
-    glowOrbBottom: {
-      backgroundColor: colors.GRADIENT.PURPLE,
-    },
-    headerIconButton: {
-      backgroundColor: colors.OVERLAY.LIGHT,
-      borderWidth: 1,
-      borderColor: colors.BORDER.LIGHT,
-    },
-    searchBar: {
-      backgroundColor: colors.OVERLAY.LIGHT,
-      borderWidth: 1,
-      borderColor: colors.BORDER.LIGHT,
-    },
-    searchPlaceholder: {
-      color: colors.TEXT.TERTIARY,
-    },
-    mapGpsStatusWrapper: {
-      borderWidth: 1,
-      borderColor: colors.BORDER.MEDIUM,
-    },
-    mapLocateWrapper: {
-      borderWidth: 1,
-      borderColor: colors.BORDER.MEDIUM,
-    },
-    mapSimWrapper: {
-      backgroundColor: colors.OVERLAY.GPS_SIM,
-      borderWidth: 1,
-      borderColor: colors.BORDER.MEDIUM,
-    },
-    mapSimActive: {
-      backgroundColor: colors.ERROR_OVERLAY.SIM_BG,
-      borderColor: colors.ERROR_OVERLAY.SIM_BORDER,
-    },
-    simText: {
-      color: colors.TEXT.SECONDARY,
-    },
-    simTextActive: {
-      color: colors.TEXT.PRIMARY,
-    },
-    panelWrapper: {
-      backgroundColor: colors.BACKGROUND,
-    },
-    statDivider: {
-      backgroundColor: colors.BORDER.LIGHT,
-    },
-    statLabel: {
-      color: colors.TEXT.QUATERNARY,
-    },
-    statValue: {
-      color: colors.TEXT.PRIMARY,
-    },
-    statValueDim: {
-      color: colors.TEXT.DISABLED,
-    },
-    statUnit: {
-      color: colors.TEXT.QUINARY,
-    },
-    idleBtnBg: {
-      backgroundColor: isDarkMode ? '#2a2d38' : 'rgba(0, 0, 0, 0.06)',
-      borderWidth: 1,
-      borderColor: colors.BORDER.MEDIUM,
-    },
-    resumeBtnBg: {
-      backgroundColor: colors.SUCCESS,
-      shadowColor: colors.SUCCESS,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-      shadowRadius: 8,
-    },
-    startBtnBg: {
-      backgroundColor: colors.PRIMARY,
-      shadowColor: colors.PRIMARY,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-    },
-    stopBtnBg: {
-      backgroundColor: colors.ERROR_OVERLAY.BUTTON_BG,
-      borderWidth: 1,
-      borderColor: colors.ERROR_OVERLAY.BUTTON_BORDER,
-    },
-    summaryTypeBadge: {
-      backgroundColor: colors.OVERLAY.SUMMARY,
-      borderWidth: 1,
-      borderColor: colors.BORDER.MEDIUM,
-    },
-    summaryTypeText: {
-      color: colors.TEXT.PRIMARY,
-    },
-    summaryStatsCard: {
-      backgroundColor: colors.OVERLAY.SUMMARY,
-      borderWidth: 1,
-      borderColor: colors.BORDER.MEDIUM,
-    },
-    summaryStatLabel: {
-      color: colors.TEXT.QUATERNARY,
-    },
-    summaryStatValue: {
-      color: colors.TEXT.PRIMARY,
-    },
-    summaryDiscardBtn: {
-      backgroundColor: colors.ERROR_OVERLAY.BUTTON_BG,
-      borderWidth: 1,
-      borderColor: colors.ERROR_OVERLAY.BUTTON_BORDER,
-    },
-    summaryDiscardText: {
-      color: colors.ERROR,
-    },
-    summarySaveBtn: {
-      backgroundColor: colors.PRIMARY,
-      shadowColor: colors.PRIMARY,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-      shadowRadius: 8,
-    },
-    summarySaveText: {
-      color: '#ffffff',
-    },
-    summaryShareBtn: {
-      backgroundColor: colors.OVERLAY.SUMMARY,
-      borderWidth: 1,
-      borderColor: colors.BORDER.MEDIUM,
-    },
-    shareCard: {
-      backgroundColor: colors.BACKGROUND,
-    },
-    shareCardDivider: {
-      backgroundColor: colors.BORDER.LIGHT,
-    },
-    shareCardTypeText: {
-      color: colors.TEXT.PRIMARY,
-    },
-    shareCardStatLabel: {
-      color: colors.TEXT.QUATERNARY,
-    },
-    shareCardStatValue: {
-      color: colors.TEXT.PRIMARY,
-    },
-    shareCardWatermark: {
-      color: colors.TEXT.DISABLED,
-    },
-  }), [colors]);
-
-  // 重试上传：失败后持续弹窗，直到成功或用户主动丢弃
+  // ---- Recording control handlers ----
   const retryUploadWithDialog = async () => {
     let ok = false;
     while (!ok) {
       ok = await trackRecordingService.retryUpload();
       if (!ok) {
         const action = await new Promise<'discard' | 'retry'>(resolve => {
-          Dialog.show(
-            '上传失败',
-            '网络不可用，记录已保留在本地，请稍后再试。',
-            [
-              { text: '丢弃', style: 'destructive', onPress: () => resolve('discard') },
-              { text: '重试', onPress: () => resolve('retry') },
-            ],
-          );
+          Dialog.show('上传失败', '网络不可用，记录已保留在本地，请稍后再试。', [
+            { text: '丢弃', style: 'destructive', onPress: () => resolve('discard') },
+            { text: '重试', onPress: () => resolve('retry') },
+          ]);
         });
-        if (action === 'discard') {
-          trackRecordingService.discardRecording();
-          return;
-        }
+        if (action === 'discard') { trackRecordingService.discardRecording(); return; }
       }
     }
-  };
-
-  // 循环切换运动模式
-  const cycleType = () => {
-    if (!isIdle || isStoppingRef.current || lockedActivityType.current) return;
-    setActivityIndex(prev => (prev + 1) % ACTIVITY_CYCLE.length);
   };
 
   const handleStart = async () => {
@@ -888,13 +282,9 @@ export const ActivityScreen: React.FC = () => {
     lockedActivityType.current = activityType;
     try {
       await trackRecordingService.startRecording(activityType);
-
-      // Start background location service (skip in simulation mode)
       if (!isSimulatingRef.current) {
-        try {
-          await backgroundLocationService.start(activityType);
-        } catch (bgErr: any) {
-          // Permission denied — stop recording and prompt user
+        try { await backgroundLocationService.start(activityType); }
+        catch (bgErr: any) {
           trackRecordingService.discardRecording();
           lockedActivityType.current = null;
           Alert.alert(
@@ -911,14 +301,10 @@ export const ActivityScreen: React.FC = () => {
     } catch (e: any) {
       lockedActivityType.current = null;
       if (e.message === 'UNSYNCED_RECORD') {
-        Dialog.show(
-          '未上传的记录',
-          '存在未上传的运动记录，请先处理后再开始新记录。',
-          [
-            { text: '丢弃旧记录', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
-            { text: '重试上传', onPress: () => retryUploadWithDialog() },
-          ],
-        );
+        Dialog.show('未上传的记录', '存在未上传的运动记录，请先处理后再开始新记录。', [
+          { text: '丢弃旧记录', style: 'destructive', onPress: () => trackRecordingService.discardRecording() },
+          { text: '重试上传', onPress: () => retryUploadWithDialog() },
+        ]);
       } else {
         console.error('Failed to start recording:', e);
       }
@@ -927,74 +313,54 @@ export const ActivityScreen: React.FC = () => {
 
   const handlePause = () => {
     trackRecordingService.pauseRecording();
-    if (!isSimulatingRef.current) {
-      backgroundLocationService.pause();
-    }
+    if (!isSimulatingRef.current) backgroundLocationService.pause();
   };
 
   const handleResume = () => {
     trackRecordingService.resumeRecording();
-    if (!isSimulatingRef.current) {
-      backgroundLocationService.resume();
-    }
+    if (!isSimulatingRef.current) backgroundLocationService.resume();
   };
 
-  // Long press stop (1.5s)
-  const handleStopPressIn = () => {
+  // F4: Fetch weather when recording starts and refresh every 30 min
+  useEffect(() => {
+    if (!isRecording) return;
+    const loc = latestLocation.current;
+    if (!loc) return;
+
+    const fetchWeather = async () => {
+      const currentLoc = latestLocation.current;
+      if (!currentLoc) return;
+      const weather = await weatherService.getCurrentWeather(currentLoc.latitude, currentLoc.longitude);
+      if (weather) {
+        trackRecordingService.updateWeather(weather);
+      }
+    };
+
+    fetchWeather();
+    const interval = setInterval(fetchWeather, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isRecording]);
+
+  const handleStopComplete = async () => {
     isStoppingRef.current = true;
-    longPressProgress.setValue(0);
-    Animated.timing(longPressProgress, {
-      toValue: 1,
-      duration: LONG_PRESS_DURATION,
-      useNativeDriver: false,
-    }).start();
-
-    longPressTimer.current = setTimeout(async () => {
-      // Haptic feedback — long press completed
-      Vibration.vibrate(100);
-
-      const distance = trackRecordingService.getStats().distance;
-      if (distance < MIN_RECORDING_DISTANCE) {
-        // 距离太短，丢弃记录
-        if (!isSimulatingRef.current) {
-          await backgroundLocationService.stop();
-        }
-        await trackRecordingService.discardRecording();
-        longPressProgress.setValue(0);
-        lockedActivityType.current = null;
-        Toast.show('运动距离太短，记录已丢弃');
-        // 延迟重置，防止抬手时触发开始按钮
-        setTimeout(() => {
-          isStoppingRef.current = false;
-        }, 500);
-        return;
-      }
-
-      if (!isSimulatingRef.current) {
-        await backgroundLocationService.stop();
-      }
-      await trackRecordingService.stopRecording();
+    const distance = trackRecordingService.getStats().distance;
+    if (distance < MIN_RECORDING_DISTANCE) {
+      if (!isSimulatingRef.current) await backgroundLocationService.stop();
+      await trackRecordingService.discardRecording();
       longPressProgress.setValue(0);
-      // Delay summary to let stop button fully transition back to start
-      setTimeout(() => {
-        showSummaryRef.current = true;
-        setShowSummary(true);
-      }, 400);
-    }, LONG_PRESS_DURATION);
-  };
-
-  const handleStopPressOut = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+      lockedActivityType.current = null;
+      Toast.show('运动距离太短，记录已丢弃');
+      setTimeout(() => { isStoppingRef.current = false; }, 500);
+      return;
     }
-    longPressProgress.stopAnimation();
+    if (!isSimulatingRef.current) await backgroundLocationService.stop();
+    await trackRecordingService.stopRecording();
     longPressProgress.setValue(0);
-    // Long press didn't complete — reset stopping guard
-    isStoppingRef.current = false;
+    setTimeout(() => { showSummaryRef.current = true; setShowSummary(true); }, 400);
   };
 
-  // Discard recording from summary overlay
+  const handleStopCancelled = () => { isStoppingRef.current = false; };
+
   const handleDiscardFromSummary = () => {
     stopSummaryReplay();
     showSummaryRef.current = false;
@@ -1005,7 +371,6 @@ export const ActivityScreen: React.FC = () => {
     trackRecordingService.discardRecording();
   };
 
-  // Save recording from summary overlay
   const isSavingRef = useRef(false);
   const handleSaveFromSummary = async () => {
     if (isSavingRef.current) return;
@@ -1015,58 +380,40 @@ export const ActivityScreen: React.FC = () => {
       const ok = await trackRecordingService.retryUpload();
       if (ok) {
         trackRecordingService.discardRecording();
-        showSummaryRef.current = false;
-        setShowSummary(false);
-        isStoppingRef.current = false;
-        lockedActivityType.current = null;
       } else {
         await retryUploadWithDialog();
-        showSummaryRef.current = false;
-        setShowSummary(false);
-        isStoppingRef.current = false;
-        lockedActivityType.current = null;
       }
-    } finally {
-      isSavingRef.current = false;
-    }
+      showSummaryRef.current = false;
+      setShowSummary(false);
+      isStoppingRef.current = false;
+      lockedActivityType.current = null;
+    } finally { isSavingRef.current = false; }
   };
 
-  // Share card screenshot from summary overlay
   const handleShareFromSummary = async () => {
     try {
       setShowShareCard(true);
       await new Promise<void>(r => setTimeout(() => r(), 150));
       if (!shareCardRef.current) throw new Error('Share card not rendered');
-      const uri = await captureRef(shareCardRef, {
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-      });
+      const uri = await captureRef(shareCardRef, { format: 'png', quality: 1, result: 'tmpfile' });
       setShowShareCard(false);
-      await Share.open({
-        url: uri.startsWith('file://') ? uri : `file://${uri}`,
-        type: 'image/png',
-      });
+      await Share.open({ url: uri.startsWith('file://') ? uri : `file://${uri}`, type: 'image/png' });
     } catch (e: any) {
       setShowShareCard(false);
-      if (e?.message !== 'User did not share') {
-        console.error('Share failed:', e);
-      }
+      if (e?.message !== 'User did not share') console.error('Share failed:', e);
     }
   };
 
-  // When summary overlay opens, fit main map camera to show full track
+  // ---- Summary camera + replay ----
   useEffect(() => {
     if (!showSummary || coloredSegments.length === 0) return;
     const timer = setTimeout(() => {
       const allPoints = coloredSegments.flatMap(s => s.coords);
       if (allPoints.length === 0) return;
-
       const lats = allPoints.map(p => p.latitude);
       const lons = allPoints.map(p => p.longitude);
       const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
       const centerLon = (Math.min(...lons) + Math.max(...lons)) / 2;
-
       const { width, height } = Dimensions.get('window');
       const latSpan = Math.max(...lats) - Math.min(...lats);
       const lonSpan = Math.max(...lons) - Math.min(...lons);
@@ -1076,46 +423,24 @@ export const ActivityScreen: React.FC = () => {
       const zoomByLon = Math.log2(360 / paddedLonSpan);
       const zoom = Math.min(zoomByLat, zoomByLon);
       const clampedZoom = Math.max(3, Math.min(20, Math.round(zoom)));
-
       mapViewRef.current?.moveCamera(
-        {
-          target: { latitude: centerLat, longitude: centerLon },
-          zoom: clampedZoom,
-        },
-        500,
+        { target: { latitude: centerLat, longitude: centerLon }, zoom: clampedZoom }, 500,
       );
     }, 300);
     return () => clearTimeout(timer);
   }, [showSummary, coloredSegments]);
 
-  // Auto-start replay when summary is shown and segments are ready (delayed for map camera)
   useEffect(() => {
     let delayTimer: ReturnType<typeof setTimeout> | null = null;
     if (showSummary && coloredSegments.length > 0 && replayProgress === 0) {
-      delayTimer = setTimeout(() => {
-        startSummaryReplay();
-      }, 1000);
+      delayTimer = setTimeout(() => { startSummaryReplay(); }, 1000);
     }
-    return () => {
-      if (delayTimer) clearTimeout(delayTimer);
-      stopSummaryReplay();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- start/stop are stable callbacks
+    return () => { if (delayTimer) clearTimeout(delayTimer); stopSummaryReplay(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSummary, coloredSegments]);
 
-  // 左按钮：空闲=模式选择，记录中=暂停，暂停中=继续
-  const handleLeftButton = () => {
-    if (isIdle) cycleType();
-    else if (isRecording) handlePause();
-    else if (isPaused) handleResume();
-  };
-
-  const ActiveIcon = ACTIVITY_ICONS[selectedType];
-
-  // Summary type info — computed once from locked type
+  // ---- Summary type info ----
   const summaryType = lockedActivityType.current ?? session?.activityType ?? 'RUNNING';
-  const summaryTypeMeta = ACTIVITY_TYPE_META[summaryType];
-  const SummaryIcon = summaryTypeMeta.icon;
 
   return (
     <View style={[styles.container, dynamicStyles.container]}>
@@ -1155,15 +480,11 @@ export const ActivityScreen: React.FC = () => {
 
       {/* Map Card — expands to full screen during summary */}
       <View style={[styles.mapCard, showSummary && styles.mapCardSummary]}>
-        {/* 高德地图 — 等待 SDK 初始化完成后再挂载 */}
         {mapReady && <MapView
           ref={mapViewRef}
           style={StyleSheet.absoluteFillObject}
           mapType={mapType}
-          initialCameraPosition={{
-            target: { latitude: 35.86, longitude: 104.19 },
-            zoom: 16,
-          }}
+          initialCameraPosition={{ target: { latitude: 35.86, longitude: 104.19 }, zoom: 16 }}
           minZoom={3}
           maxZoom={20}
           myLocationEnabled={locationEnabled && !isSimulating && !showSummary}
@@ -1181,7 +502,6 @@ export const ActivityScreen: React.FC = () => {
             currentZoomRef.current = e.nativeEvent.cameraPosition.zoom ?? currentZoomRef.current;
           }}
         >
-          {/* Track Polylines */}
           {displaySegments.map((seg, idx) => (
             <Polyline
               key={`segment-${idx}`}
@@ -1200,656 +520,71 @@ export const ActivityScreen: React.FC = () => {
           </View>
         )}
 
-        {/* GPS Status Indicator - 左上角 */}
-        {!showSummary && (
-        <TouchableOpacity style={[styles.mapGpsStatusWrapper, dynamicStyles.mapGpsStatusWrapper]} activeOpacity={0.7}>
-          <BlurView
-            style={StyleSheet.absoluteFillObject}
-            blurRadius={12}
-            overlayColor={colors.OVERLAY.HEAVY}
-            blurType="dark"
-            blurAmount={12}
-            pointerEvents="none"
-          />
-          <Animated.View style={{ opacity: pulseAnim }}>
-            <IconCompass size={18} color={gpsColors[gpsStrength]} />
-          </Animated.View>
-        </TouchableOpacity>
-        )}
+        <MapOverlayButtons
+          showSummary={showSummary}
+          hasGps={hasGps}
+          gpsStrength={gpsStrength}
+          pulseAnim={pulseAnim}
+          gpsColors={gpsColors}
+          isSimulating={isSimulating}
+          colors={colors}
+          onLocate={handleLocate}
+          onSimToggle={handleSimButton}
+        />
 
-        {/* Mock GPS Button - 左下角 (__DEV__ only) */}
-        {__DEV__ && !showSummary && (
-          <TouchableOpacity
-            style={[
-              styles.mapSimWrapper,
-              dynamicStyles.mapSimWrapper,
-              isSimulating && dynamicStyles.mapSimActive,
-            ]}
-            onPress={handleSimButton}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.simText, isSimulating ? dynamicStyles.simTextActive : dynamicStyles.simText]}>SIM</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Locate Button - 右下角 */}
-        {!showSummary && (
-        <TouchableOpacity
-          style={[styles.mapLocateWrapper, dynamicStyles.mapLocateWrapper, !hasGps && styles.mapLocateDisabled]}
-          onPress={handleLocate}
-          disabled={!hasGps}
-        >
-          <BlurView
-            style={StyleSheet.absoluteFillObject}
-            blurRadius={12}
-            overlayColor={colors.OVERLAY.BLUR_LIGHT}
-            blurType="dark"
-            blurAmount={12}
-            pointerEvents="none"
-          />
-          <IconGps size={18} color={hasGps ? colors.TEXT.SECONDARY : colors.TEXT.DISABLED} />
-        </TouchableOpacity>
-        )}
-
-        {/* ========== Summary Overlay ========== */}
         {showSummary && (
-          <>
-            <StatusBar barStyle="light-content" />
-            {/* Top stats overlay */}
-            <View style={[styles.summaryStatsOverlay, { paddingTop: insets.top + 16 }]}>
-              {/* Activity type badge */}
-              <View style={[styles.summaryTypeBadge, dynamicStyles.summaryTypeBadge]}>
-                <SummaryIcon size={16} color={colors.TEXT.PRIMARY} />
-                <Text style={[styles.summaryTypeText, dynamicStyles.summaryTypeText]}>{summaryTypeMeta.label}</Text>
-              </View>
-              <View style={[styles.summaryStatsCard, dynamicStyles.summaryStatsCard]}>
-                <View style={styles.summaryStatsRow}>
-                  <View style={styles.summaryStatItem}>
-                    <Text style={[styles.summaryStatLabel, dynamicStyles.summaryStatLabel]}>距离</Text>
-                    <Text style={[styles.summaryStatValue, dynamicStyles.summaryStatValue]}>{(animatedStats.distance / 1000).toFixed(2)} km</Text>
-                  </View>
-                  <View style={styles.summaryStatItem}>
-                    <Text style={[styles.summaryStatLabel, dynamicStyles.summaryStatLabel]}>时长</Text>
-                    <Text style={[styles.summaryStatValue, dynamicStyles.summaryStatValue]}>{formatDuration(animatedStats.duration)}</Text>
-                  </View>
-                  <View style={styles.summaryStatItem}>
-                    <Text style={[styles.summaryStatLabel, dynamicStyles.summaryStatLabel]}>配速</Text>
-                    <Text style={[styles.summaryStatValue, dynamicStyles.summaryStatValue]}>{formatPace(animatedStats.currentPace)}</Text>
-                  </View>
-                  <View style={styles.summaryStatItem}>
-                    <Text style={[styles.summaryStatLabel, dynamicStyles.summaryStatLabel]}>爬升</Text>
-                    <Text style={[styles.summaryStatValue, dynamicStyles.summaryStatValue]}>{Math.round(animatedStats.elevationGain)} m</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-            {/* Bottom discard / share / save buttons */}
-            <View style={[styles.summaryBottomBar, { paddingBottom: insets.bottom + 24 }]}>
-              <View style={styles.summaryButtonRow}>
-                <TouchableOpacity
-                  style={[styles.summaryDiscardBtn, dynamicStyles.summaryDiscardBtn]}
-                  onPress={handleDiscardFromSummary}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.summaryDiscardText, dynamicStyles.summaryDiscardText]}>丢弃</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.summaryShareBtn, dynamicStyles.summaryShareBtn]}
-                  onPress={handleShareFromSummary}
-                  activeOpacity={0.7}
-                >
-                  <IconShareBold size={18} color={colors.TEXT.PRIMARY} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.summarySaveBtn, dynamicStyles.summarySaveBtn]}
-                  onPress={handleSaveFromSummary}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.summarySaveText, dynamicStyles.summarySaveText]}>保存</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </>
+          <SummaryOverlay
+            paddingTop={insets.top + 16}
+            paddingBottom={insets.bottom + 24}
+            animatedStats={animatedStats}
+            activityType={summaryType as ActivityType}
+            dynamicStyles={dynamicStyles}
+            colors={colors}
+            laps={laps}
+            elevationProfile={elevationProfile}
+            weather={session?.weather}
+            onDiscard={handleDiscardFromSummary}
+            onShare={handleShareFromSummary}
+            onSave={handleSaveFromSummary}
+          />
         )}
 
-        {/* ========== Control Panel — hidden during summary ========== */}
         {!showSummary && (
-        <View style={[styles.panelWrapper, dynamicStyles.panelWrapper]}>
-          <View style={styles.panelContent}>
-
-            {/* 一行数据 */}
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={[styles.statLabel, dynamicStyles.statLabel]}>距离</Text>
-                <View style={styles.statValueRow}>
-                  <Text style={[styles.statValue, dynamicStyles.statValue, isIdle && dynamicStyles.statValueDim]}>
-                    {isIdle ? '--' : (stats.distance / 1000).toFixed(2)}
-                  </Text>
-                  <Text style={[styles.statUnit, dynamicStyles.statUnit]}>km</Text>
-                </View>
-              </View>
-
-              <View style={[styles.statDivider, dynamicStyles.statDivider]} />
-
-              <View style={styles.statItem}>
-                <Text style={[styles.statLabel, dynamicStyles.statLabel]}>时长</Text>
-                <View style={styles.statValueRow}>
-                  <Text style={[styles.statValue, dynamicStyles.statValue, isIdle && dynamicStyles.statValueDim]}>
-                    {isIdle ? '--' : formatDuration(stats.duration)}
-                  </Text>
-                  <Text style={[styles.statUnit, dynamicStyles.statUnit]}> </Text>
-                </View>
-              </View>
-
-              <View style={[styles.statDivider, dynamicStyles.statDivider]} />
-
-              <View style={styles.statItem}>
-                <Text style={[styles.statLabel, dynamicStyles.statLabel]}>配速</Text>
-                <View style={styles.statValueRow}>
-                  <Text style={[styles.statValue, dynamicStyles.statValue, isIdle && dynamicStyles.statValueDim]}>
-                    {isIdle ? '--' : formatPace(stats.currentPace)}
-                  </Text>
-                  <Text style={[styles.statUnit, dynamicStyles.statUnit]}>min/km</Text>
-                </View>
-              </View>
-
-              <View style={[styles.statDivider, dynamicStyles.statDivider]} />
-
-              <View style={styles.statItem}>
-                <Text style={[styles.statLabel, dynamicStyles.statLabel]}>海拔</Text>
-                <View style={styles.statValueRow}>
-                  <Text style={[styles.statValue, dynamicStyles.statValue, isIdle && dynamicStyles.statValueDim]}>
-                    {isIdle ? '--' : Math.round(stats.elevationGain)}
-                  </Text>
-                  <Text style={[styles.statUnit, dynamicStyles.statUnit]}>m</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* 按钮行 */}
-            <View style={styles.centerButtons}>
-              <TouchableOpacity
-                onPress={handleLeftButton}
-                activeOpacity={0.7}
-                style={[
-                  styles.actionBtn,
-                  isIdle ? dynamicStyles.idleBtnBg : null,
-                  isRecording ? dynamicStyles.startBtnBg : null,
-                  isPaused ? dynamicStyles.resumeBtnBg : null,
-                ]}
-              >
-                {isIdle ? (
-                  <ActiveIcon size={20} color={colors.TEXT.SECONDARY} />
-                ) : isRecording ? (
-                  <IconPause size={18} color="#ffffff" />
-                ) : (
-                  <IconPlay size={18} color="#ffffff" />
-                )}
-              </TouchableOpacity>
-
-              {isIdle ? (
-                <TouchableOpacity
-                  onPress={handleStart}
-                  activeOpacity={0.7}
-                  style={[styles.actionBtn, dynamicStyles.startBtnBg]}
-                >
-                  <IconPlay size={18} color="#ffffff" />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  onPressIn={handleStopPressIn}
-                  onPressOut={handleStopPressOut}
-                  activeOpacity={0.7}
-                  style={[styles.actionBtn, dynamicStyles.stopBtnBg]}
-                >
-                  <View style={styles.stopBtnInner}>
-                    <IconStop size={18} color={colors.ERROR} />
-                  </View>
-                  {/* Circular progress ring */}
-                  <View style={styles.stopProgressRingContainer} pointerEvents="none">
-                      <Svg width={44} height={44} viewBox="0 0 44 44">
-                        {/* Background ring */}
-                        <Circle
-                          cx={22}
-                          cy={22}
-                          r={20}
-                          stroke={colors.BORDER.LIGHT}
-                          strokeWidth={3}
-                          fill="none"
-                        />
-                        {/* Progress ring */}
-                        <AnimatedCircle
-                          cx={22}
-                          cy={22}
-                          r={20}
-                          transform="rotate(-90 22 22)"
-                          stroke={colors.ERROR}
-                          strokeWidth={3}
-                          fill="none"
-                          strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 20}`}
-                          strokeDashoffset={longPressProgress.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [2 * Math.PI * 20, 0],
-                          })}
-                        />
-                      </Svg>
-                  </View>
-                </TouchableOpacity>
-              )}
-            </View>
-
-          </View>
-        </View>
+          <RecordingStatsPanel
+            activityIndex={activityIndex}
+            stats={stats}
+            isIdle={isIdle}
+            isRecording={isRecording}
+            isPaused={isPaused}
+            isStopping={!!isStoppingRef.current}
+            colors={colors}
+            dynamicStyles={dynamicStyles}
+            longPressProgress={longPressProgress}
+            elevationProfile={elevationProfile}
+            onCycleType={() => {
+              if (!isIdle || isStoppingRef.current || lockedActivityType.current) return;
+              setActivityIndex(prev => (prev + 1) % ACTIVITY_CYCLE.length);
+            }}
+            onStart={handleStart}
+            onPause={handlePause}
+            onResume={handleResume}
+            onStopComplete={handleStopComplete}
+            onStopCancelled={handleStopCancelled}
+          />
         )}
       </View>
 
-      {/* ========== Offscreen Share Card ========== */}
       {showShareCard && (
-        <View ref={shareCardRef} style={[styles.shareCard, dynamicStyles.shareCard]}>
-          {/* SVG Track */}
-          <View style={styles.shareCardTrackArea}>
-            <Svg width="100%" height="100%" viewBox="0 0 200 200">
-              {shareTrackPoints.map((points, idx) =>
-                points.length >= 2 ? (
-                  <SvgPolyline
-                    key={idx}
-                    points={points.map(p => `${p.x},${p.y}`).join(' ')}
-                    fill="none"
-                    stroke={colors.PRIMARY}
-                    strokeWidth="3"
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                  />
-                ) : null
-              )}
-            </Svg>
-          </View>
-
-          {/* Divider */}
-          <View style={[styles.shareCardDivider, dynamicStyles.shareCardDivider]} />
-
-          {/* Data Area */}
-          <View style={styles.shareCardDataArea}>
-            {/* Activity type */}
-            <View style={styles.shareCardTypeRow}>
-              <SummaryIcon size={16} color={colors.TEXT.PRIMARY} />
-              <Text style={[styles.shareCardTypeText, dynamicStyles.shareCardTypeText]}>{summaryTypeMeta.label}</Text>
-            </View>
-            {/* Stats */}
-            <View style={styles.shareCardStatsRow}>
-              <View style={styles.shareCardStatItem}>
-                <Text style={[styles.shareCardStatLabel, dynamicStyles.shareCardStatLabel]}>距离</Text>
-                <Text style={[styles.shareCardStatValue, dynamicStyles.shareCardStatValue]}>{(stats.distance / 1000).toFixed(2)} km</Text>
-              </View>
-              <View style={styles.shareCardStatItem}>
-                <Text style={[styles.shareCardStatLabel, dynamicStyles.shareCardStatLabel]}>时长</Text>
-                <Text style={[styles.shareCardStatValue, dynamicStyles.shareCardStatValue]}>{formatDuration(stats.duration)}</Text>
-              </View>
-              <View style={styles.shareCardStatItem}>
-                <Text style={[styles.shareCardStatLabel, dynamicStyles.shareCardStatLabel]}>配速</Text>
-                <Text style={[styles.shareCardStatValue, dynamicStyles.shareCardStatValue]}>{formatPace(stats.currentPace)}</Text>
-              </View>
-              <View style={styles.shareCardStatItem}>
-                <Text style={[styles.shareCardStatLabel, dynamicStyles.shareCardStatLabel]}>爬升</Text>
-                <Text style={[styles.shareCardStatValue, dynamicStyles.shareCardStatValue]}>{Math.round(stats.elevationGain)} m</Text>
-              </View>
-            </View>
-            {/* Watermark */}
-            <Text style={[styles.shareCardWatermark, dynamicStyles.shareCardWatermark]}>途迹 · TrekTrace</Text>
-          </View>
-        </View>
+        <ShareCard
+          shareCardRef={shareCardRef}
+          shareTrackPoints={shareTrackPoints}
+          stats={stats}
+          activityType={summaryType as ActivityType}
+          dynamicStyles={dynamicStyles}
+          colors={colors}
+          weather={session?.weather}
+        />
       )}
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  // Glow
-  ambientGlow: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 0,
-  },
-  glowOrb: { position: 'absolute', borderRadius: 9999 },
-  glowOrbTop: {
-    top: -80, right: -40, width: 300, height: 300,
-  },
-  glowOrbCenter: {
-    top: '40%', left: '50%', transform: [{ translateX: -150 }],
-    width: 400, height: 400,
-  },
-  glowOrbBottom: {
-    bottom: -80, left: -60, width: 500, height: 500,
-  },
-  fullScreenBlur: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-  },
-
-  // Header
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    gap: 12,
-    zIndex: 20,
-  },
-  headerIconButton: {
-    width: 40, height: 40, borderRadius: 20,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  searchBar: {
-    flex: 1, height: 40,
-    borderRadius: 20,
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, gap: 12,
-  },
-  searchPlaceholder: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-  },
-
-  // Map Card
-  mapCard: {
-    flex: 1,
-    marginHorizontal: 20,
-    marginBottom: 120,
-    borderRadius: BORDER_RADIUS.G2.LG,
-    overflow: 'hidden',
-    zIndex: 10,
-  },
-
-  // GPS Status Indicator
-  mapGpsStatusWrapper: {
-    position: 'absolute', top: 16, left: 16,
-    width: 36, height: 36, borderRadius: 18,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Locate Button
-  mapLocateWrapper: {
-    position: 'absolute', bottom: PANEL_HEIGHT + 12, right: 12,
-    width: 36, height: 36, borderRadius: 18,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapLocateDisabled: {
-    opacity: 0.4,
-  },
-
-  // Mock GPS Button
-  mapSimWrapper: {
-    position: 'absolute', bottom: PANEL_HEIGHT + 12, left: 12,
-    width: 36, height: 36, borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapSimActive: {
-  },
-  simText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  simTextActive: {
-  },
-
-  // ========== Control Panel ==========
-  panelWrapper: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-  },
-  panelContent: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-
-  // 一行数据
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statDivider: {
-    width: 1,
-    height: 20,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontWeight: '600',
-    marginBottom: 1,
-  },
-  statValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  statValue: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-  },
-  statValueDim: {
-  },
-  statUnit: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    fontWeight: '400',
-    marginLeft: 2,
-  },
-
-  // 中间双按钮
-  centerButtons: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 20,
-  },
-  actionBtn: {
-    width: 44, height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // 左按钮背景
-  idleBtnBg: {
-    borderWidth: 1,
-  },
-  resumeBtnBg: {
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-  },
-
-  // 右按钮背景
-  startBtnBg: {
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-  },
-  stopBtnBg: {
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  stopBtnInner: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: '100%',
-  },
-  stopProgressRingContainer: {
-    position: 'absolute',
-    top: -1,
-    left: -1,
-    width: 44,
-    height: 44,
-  },
-
-  // ========== Summary Overlay ==========
-  mapCardSummary: {
-    marginHorizontal: 0,
-    marginBottom: 0,
-    borderRadius: 0,
-  },
-  summaryStatsOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  summaryTypeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    gap: 8,
-    borderRadius: BORDER_RADIUS.G2.XXL,
-    borderWidth: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  summaryTypeText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-  },
-  summaryStatsCard: {
-    borderRadius: BORDER_RADIUS.G2.LG,
-    borderWidth: 1,
-    padding: 16,
-  },
-  summaryStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  summaryStatItem: {
-    alignItems: 'center',
-  },
-  summaryStatLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  summaryStatValue: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-  },
-  summaryBottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 40,
-    paddingTop: 16,
-  },
-  summaryButtonRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  summaryDiscardBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  summaryDiscardText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-  },
-  summarySaveBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  summarySaveText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-  },
-  summaryShareBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-
-  // ========== Share Card ==========
-  shareCard: {
-    position: 'absolute',
-    left: 0,
-    top: -9999,
-    width: Dimensions.get('window').width,
-    height: Math.round(Dimensions.get('window').width * 1.3),
-    borderRadius: BORDER_RADIUS.G2.LG,
-    overflow: 'hidden',
-  },
-  shareCardTrackArea: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  shareCardDivider: {
-    height: 1,
-    marginHorizontal: 24,
-  },
-  shareCardDataArea: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    gap: 12,
-  },
-  shareCardTypeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  shareCardTypeText: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-  },
-  shareCardStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  shareCardStatItem: {
-    alignItems: 'center',
-  },
-  shareCardStatLabel: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  shareCardStatValue: {
-    fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-    fontWeight: '600',
-  },
-  shareCardWatermark: {
-    textAlign: 'right',
-    fontSize: TYPOGRAPHY.FONT_SIZE.XS,
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
-});

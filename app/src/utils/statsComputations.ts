@@ -12,6 +12,8 @@ import {
   eachDayOfInterval,
   differenceInCalendarDays,
   getDay,
+  subWeeks,
+  subMonths,
 } from 'date-fns';
 import type { ActivityType } from '../types';
 
@@ -99,14 +101,14 @@ export function estimateCalories(
   duration: number,
   elevationGain: number,
   type: ActivityType,
+  weightKg?: number,
 ): number {
+  const weight = weightKg ?? DEFAULT_WEIGHT_KG;
   const met = MET_VALUES[type] ?? 6;
   const hours = duration / 3600;
-  // 爬升额外消耗：每100m爬升约额外 1.5 MET·h
-  const climbBonus = (elevationGain / 100) * 1.5 * DEFAULT_WEIGHT_KG * hours > 0
-    ? (elevationGain / 100) * 0.3
-    : 0;
-  return Math.round(met * DEFAULT_WEIGHT_KG * hours + climbBonus);
+  // 爬升额外消耗：每100m爬升约额外消耗
+  const climbBonus = elevationGain > 0 ? (elevationGain / 100) * 1.5 * weight * hours : 0;
+  return Math.round(met * weight * hours + climbBonus);
 }
 
 // ==================== 核心计算函数 ====================
@@ -395,4 +397,26 @@ export function getDayActivities(
     estimatedCalories: 0,
     types: new Set(),
   };
+}
+
+/**
+ * 计算上周（基于 selectedDate 的前一周）汇总
+ */
+export function computePreviousWeekSummary(
+  selectedDate: Date,
+  activities: ActivityItem[],
+): WeekSummary {
+  const prevWeekDate = subWeeks(selectedDate, 1);
+  return computeWeekSummary(prevWeekDate, activities);
+}
+
+/**
+ * 计算上月（基于 selectedDate 的前一月）汇总
+ */
+export function computePreviousMonthSummary(
+  selectedDate: Date,
+  activities: ActivityItem[],
+): MonthSummary {
+  const prevMonthDate = subMonths(selectedDate, 1);
+  return computeMonthSummary(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, activities);
 }

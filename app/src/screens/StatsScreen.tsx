@@ -3,59 +3,37 @@
  * 周/月/年/总视图 + 时间范围选择 + 数据图表
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import { format, startOfWeek, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { TYPOGRAPHY, SPACING } from '../theme';
 import { useTheme } from '../contexts/ThemeContext';
 import { FullScreenBlur } from '../components/FullScreenBlur';
 import { ActivityDetailSheet } from '../components/ActivityDetailSheet';
 import { IconChart } from '../components/SolarIcons';
-import { activityService } from '../services/activityService';
-import {
-  computeLifetimeStats,
-  computeMonthSummary,
-  computeWeekSummary,
-  computeYearSummary,
-  groupByDay,
-} from '../utils/statsComputations';
-import type { ActivityItem, ActivityType, WeekSummary, MonthSummary, YearSummary } from '../utils/statsComputations';
-
-import { StatsTabSelector, type ViewMode } from '../components/stats/StatsTabSelector';
+import { useStatsData } from './stats/useStatsData';
+import { StatsTabSelector } from '../components/stats/StatsTabSelector';
 import { StatsTimeRange } from '../components/stats/StatsTimeRange';
 import { DataChart, niceScale } from '../components/stats/StatsChart';
-import { StatsTypeFilter, type TypeFilter } from '../components/stats/StatsTypeFilter';
+import { StatsTypeFilter } from '../components/stats/StatsTypeFilter';
 import { StatsSummary } from '../components/stats/StatsSummary';
-
-import type { ActivityResponseDTO } from '../types';
-
-function toActivityItem(dto: ActivityResponseDTO): ActivityItem {
-  return {
-    id: dto.id,
-    type: dto.type as ActivityItem['type'],
-    startTime: dto.startTime,
-    endTime: dto.endTime,
-    duration: dto.duration,
-    distance: dto.distance,
-    elevationGain: dto.elevationGain,
-  };
-}
+import { PersonalRecordsCard } from '../components/stats/PersonalRecordsCard';
+import { TrendIndicator } from '../components/stats/TrendIndicator';
 
 export const StatsScreen: React.FC = () => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-
-  const [activities, setActivities] = useState<ActivityResponseDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const hasLoaded = useRef(false);
-
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('ALL');
-  const [selectedActivity, setSelectedActivity] = useState<ActivityResponseDTO | null>(null);
+  const {
+    serverStats, loading, error, isEmpty,
+    viewMode, selectedDate, typeFilter, selectedActivity,
+    weekSummary, monthSummary, yearSummary, lifetimeStats,
+    prevWeekSummary, prevMonthSummary,
+    currentWeekStats, currentMonthStats, currentYearStats,
+    filteredDayMap, availableTypes, totalRangeLabel,
+    getHasData,
+    setViewMode, setSelectedDate, setTypeFilter, setSelectedActivity, handleCloseSheet,
+  } = useStatsData();
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
     container: {
@@ -104,107 +82,6 @@ export const StatsScreen: React.FC = () => {
     },
   }), [colors]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const load = async () => {
-        const isFirst = !hasLoaded.current;
-        try {
-          if (isFirst) setLoading(true);
-          setError(null);
-          const data = await activityService.getActivities();
-          setActivities(data);
-          hasLoaded.current = true;
-        } catch {
-          if (isFirst) setError('加载失败，请重试');
-        } finally {
-          if (isFirst) setLoading(false);
-        }
-      };
-      load();
-    }, []),
-  );
-
-  const activityItems = useMemo(() => activities.map(toActivityItem), [activities]);
-  const dayMap = useMemo(() => groupByDay(activityItems), [activityItems]);
-  const lifetimeStats = useMemo(() => computeLifetimeStats(activityItems), [activityItems]);
-
-  // ---- 按 typeFilter 过滤活动（图表数据） ----
-  const filteredItems = useMemo(() => {
-    if (typeFilter === 'ALL') return activityItems;
-    return activityItems.filter(a => a.type === typeFilter);
-  }, [activityItems, typeFilter]);
-
-  const filteredDayMap = useMemo(() => groupByDay(filteredItems), [filteredItems]);
-
-  // ---- 计算当前视图数据（基于筛选后） ----
-  const weekSummary = useMemo(() => computeWeekSummary(selectedDate, filteredItems), [selectedDate, filteredItems]);
-  const monthSummary = useMemo(() => {
-    return computeMonthSummary(selectedDate.getFullYear(), selectedDate.getMonth() + 1, filteredItems);
-  }, [selectedDate, filteredItems]);
-  const yearSummary = useMemo(() => computeYearSummary(selectedDate.getFullYear(), filteredItems), [selectedDate, filteredItems]);
-
-  // ---- 可用类型（基于未筛选的全量数据，避免筛选后消失） ----
-  const availableTypes = useMemo(() => {
-    const types = new Set<ActivityType>();
-    // 用全量 activityItems 计算当前时段有哪些类型
-    const unfilteredWeek = computeWeekSummary(selectedDate, activityItems);
-    const unfilteredMonth = computeMonthSummary(selectedDate.getFullYear(), selectedDate.getMonth() + 1, activityItems);
-    const unfilteredYear = computeYearSummary(selectedDate.getFullYear(), activityItems);
-
-    if (viewMode === 'week') {
-      unfilteredWeek.days.forEach(d => d.types.forEach(t => types.add(t)));
-    } else if (viewMode === 'month') {
-      unfilteredMonth.days.forEach(d => d.types.forEach(t => types.add(t)));
-    } else if (viewMode === 'year') {
-      unfilteredYear.months.forEach(ms => {
-        if (ms) ms.days.forEach(d => d.types.forEach(t => types.add(t)));
-      });
-    }
-    return Array.from(types);
-  }, [viewMode, selectedDate, activityItems]);
-
-  // ---- 时间范围 hasData 检测 ----
-  const hasDataForWeek = useCallback((date: Date) => {
-    const ws = startOfWeek(date, { weekStartsOn: 1 });
-    for (let i = 0; i < 7; i++) {
-      const key = format(addDays(ws, i), 'yyyy-MM-dd');
-      if (dayMap.has(key)) return true;
-    }
-    return false;
-  }, [dayMap]);
-
-  const hasDataForMonth = useCallback((date: Date) => {
-    const key = format(date, 'yyyy-MM');
-    for (const [k] of dayMap) {
-      if (k.startsWith(key)) return true;
-    }
-    return false;
-  }, [dayMap]);
-
-  const hasDataForYear = useCallback((date: Date) => {
-    const yr = date.getFullYear().toString();
-    for (const [k] of dayMap) {
-      if (k.startsWith(yr)) return true;
-    }
-    return false;
-  }, [dayMap]);
-
-  const getHasData = useCallback((date: Date) => {
-    if (viewMode === 'week') return hasDataForWeek(date);
-    if (viewMode === 'month') return hasDataForMonth(date);
-    if (viewMode === 'year') return hasDataForYear(date);
-    return false;
-  }, [viewMode, hasDataForWeek, hasDataForMonth, hasDataForYear]);
-
-  // ---- 总视图日期范围 ----
-  const totalRangeLabel = useMemo(() => {
-    if (activityItems.length === 0) return '暂无数据';
-    const sorted = [...activityItems].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-    const first = format(new Date(sorted[0].startTime), 'yyyy年M月d日');
-    const last = format(new Date(), 'yyyy年M月d日');
-    return `${first} - ${last}`;
-  }, [activityItems]);
-
   // ---- 图表数据 ----
 
   const weekXLabels = ['一', '二', '三', '四', '五', '六', '日'];
@@ -220,7 +97,6 @@ export const StatsScreen: React.FC = () => {
   const weekCalTicks = useMemo(() => niceScale(Math.max(...weekCalData, 0)).ticks, [weekCalData]);
   const weekDistTicks = useMemo(() => niceScale(Math.max(...weekDistValues, 0)).ticks, [weekDistValues]);
 
-  // 月图表：X 轴标签为均匀分布的日期（如 4/1 4/7 4/13 4/19 4/25 4/30）
   const monthXLabels = useMemo(() => {
     const daysInMonth = new Date(monthSummary.year, monthSummary.month, 0).getDate();
     const step = Math.ceil(daysInMonth / 5);
@@ -276,14 +152,6 @@ export const StatsScreen: React.FC = () => {
   const yearCalTicks = useMemo(() => niceScale(Math.max(...yearCalData, 0)).ticks, [yearCalData]);
   const yearDistTicks = useMemo(() => niceScale(Math.max(...yearDistValues, 0)).ticks, [yearDistValues]);
 
-  const handleCloseSheet = useCallback(() => setSelectedActivity(null), []);
-  const isEmpty = !loading && !error && activities.length === 0;
-
-  const handleModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-    setTypeFilter('ALL');
-  }, []);
-
   return (
     <View style={dynamicStyles.container}>
       <View style={styles.ambientGlow} pointerEvents="none">
@@ -327,7 +195,7 @@ export const StatsScreen: React.FC = () => {
       ) : (
         <View style={styles.body}>
           {/* Tab 选择器 */}
-          <StatsTabSelector mode={viewMode} onChange={handleModeChange} />
+          <StatsTabSelector mode={viewMode} onChange={setViewMode} />
 
           {/* 时间范围选择器 */}
           <StatsTimeRange
@@ -340,22 +208,22 @@ export const StatsScreen: React.FC = () => {
 
           {/* 时段统计概览（无背景纯文字） */}
           {viewMode === 'week' && <InlineSummary items={[
-            { value: fmtKm(weekSummary.totalDistance), label: '距离' },
-            { value: fmtH(weekSummary.totalDuration), label: '时长' },
-            { value: String(weekSummary.estimatedCalories), label: '消耗' },
-            { value: String(weekSummary.totalActivities), label: '次数' },
+            { value: fmtKm(currentWeekStats?.totalDistance ?? weekSummary.totalDistance), label: '距离', trend: <TrendIndicator current={weekSummary.totalDistance} previous={prevWeekSummary.totalDistance} /> },
+            { value: fmtH(currentWeekStats?.totalDuration ?? weekSummary.totalDuration), label: '时长', trend: <TrendIndicator current={weekSummary.totalDuration} previous={prevWeekSummary.totalDuration} /> },
+            { value: String(currentWeekStats?.totalCalories ?? weekSummary.estimatedCalories), label: '消耗', trend: <TrendIndicator current={weekSummary.estimatedCalories} previous={prevWeekSummary.estimatedCalories} /> },
+            { value: String(currentWeekStats?.totalActivities ?? weekSummary.totalActivities), label: '次数' },
           ]} />}
           {viewMode === 'month' && <InlineSummary items={[
-            { value: String(monthSummary.activeDays), label: '活跃天' },
-            { value: fmtKm(monthSummary.totalDistance), label: '距离' },
-            { value: fmtH(monthSummary.totalDuration), label: '时长' },
-            { value: String(monthSummary.totalActivities), label: '次数' },
+            { value: String(currentMonthStats?.activeDays ?? monthSummary.activeDays), label: '活跃天', trend: <TrendIndicator current={monthSummary.activeDays} previous={prevMonthSummary.activeDays} /> },
+            { value: fmtKm(currentMonthStats?.totalDistance ?? monthSummary.totalDistance), label: '距离', trend: <TrendIndicator current={monthSummary.totalDistance} previous={prevMonthSummary.totalDistance} /> },
+            { value: fmtH(currentMonthStats?.totalDuration ?? monthSummary.totalDuration), label: '时长', trend: <TrendIndicator current={monthSummary.totalDuration} previous={prevMonthSummary.totalDuration} /> },
+            { value: String(currentMonthStats?.totalActivities ?? monthSummary.totalActivities), label: '次数' },
           ]} />}
           {viewMode === 'year' && <InlineSummary items={[
-            { value: String(yearSummary.activeDays), label: '活跃天' },
-            { value: fmtKm(yearSummary.totalDistance), label: '距离' },
-            { value: fmtH(yearSummary.totalDuration), label: '时长' },
-            { value: String(yearSummary.estimatedCalories), label: '消耗' },
+            { value: String(currentYearStats?.activeDays ?? yearSummary.activeDays), label: '活跃天' },
+            { value: fmtKm(currentYearStats?.totalDistance ?? yearSummary.totalDistance), label: '距离' },
+            { value: fmtH(currentYearStats?.totalDuration ?? yearSummary.totalDuration), label: '时长' },
+            { value: String(currentYearStats?.totalCalories ?? yearSummary.estimatedCalories), label: '消耗' },
           ]} />}
 
           {/* 图表区域（不滚动） */}
@@ -382,7 +250,12 @@ export const StatsScreen: React.FC = () => {
             )}
 
             {viewMode === 'total' && (
-              <StatsSummary stats={lifetimeStats} />
+              <>
+                <StatsSummary stats={lifetimeStats} />
+                {serverStats?.personalRecords && Object.keys(serverStats.personalRecords).length > 0 && (
+                  <PersonalRecordsCard records={serverStats.personalRecords} />
+                )}
+              </>
             )}
           </View>
         </View>
@@ -395,10 +268,10 @@ export const StatsScreen: React.FC = () => {
 
 // ---- 工具函数 ----
 function fmtKm(m: number) { return String(Math.round(m / 100) / 10); }
-function fmtH(s: number) { return String(Math.round(s / 360) / 10); }
+function fmtH(s: number) { return String(Math.round(s / 3600) / 10); }
 
 // ---- 内部组件：无背景概览行 ----
-function InlineSummary({ items }: { items: { value: string; label: string }[] }) {
+function InlineSummary({ items }: { items: { value: string; label: string; trend?: React.ReactNode }[] }) {
   const { colors } = useTheme();
   const inlineDynamicStyles = useMemo(() => StyleSheet.create({
     val: {
@@ -423,7 +296,10 @@ function InlineSummary({ items }: { items: { value: string; label: string }[] })
         <React.Fragment key={item.label}>
           {i > 0 && <View style={inlineDynamicStyles.sep} />}
           <View style={inlineStaticStyles.cell}>
-            <Text style={inlineDynamicStyles.val}>{item.value}</Text>
+            <View style={inlineStaticStyles.valRow}>
+              <Text style={inlineDynamicStyles.val}>{item.value}</Text>
+              {item.trend}
+            </View>
             <Text style={inlineDynamicStyles.lbl}>{item.label}</Text>
           </View>
         </React.Fragment>
@@ -442,6 +318,11 @@ const inlineStaticStyles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     gap: 2,
+  },
+  valRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
 });
 
