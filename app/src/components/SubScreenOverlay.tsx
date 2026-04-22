@@ -12,6 +12,7 @@ import {
   Animated,
   Dimensions,
   StyleSheet,
+  View,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { ProfileScreen } from '../screens/ProfileScreen';
@@ -46,7 +47,6 @@ export const SubScreenOverlayRoot: React.FC = () => {
   const [visible, setVisible] = useState(false);
   const [screen, setScreen] = useState<SubScreenName | null>(null);
   const isOpenRef = useRef(false);
-  const startXRef = useRef(0);
   const translateX = useRef(new Animated.Value(SCREEN_WIDTH)).current;
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
@@ -57,14 +57,13 @@ export const SubScreenOverlayRoot: React.FC = () => {
     },
   }), [colors]);
 
-  // 左边缘右滑关闭手势（只在起始点距左边缘 25px 内触发）
+  // 左边缘右滑关闭手势：仅作用于左侧窄条，不干扰内容区滚动
   const backGesture = useRef(
     Gesture.Pan()
-      .activeOffsetX([15, 300])
-      .failOffsetY([-30, 30])
-      .onBegin((e) => { startXRef.current = e.absoluteX; })
+      .activeOffsetX([10, 300])
+      .failOffsetY([-20, 20])
       .onEnd((e) => {
-        if (startXRef.current < 25 && e.translationX > 50) {
+        if (e.translationX > 50) {
           SubScreenOverlay.close();
         }
       }),
@@ -117,17 +116,18 @@ export const SubScreenOverlayRoot: React.FC = () => {
   };
 
   return (
-    <GestureDetector gesture={backGesture}>
-      <Animated.View
-        style={[
-          dynamicStyles.overlay,
-          { transform: [{ translateX }] },
-        ]}
-        pointerEvents="auto"
-      >
-        {renderScreen()}
-      </Animated.View>
-    </GestureDetector>
+    <Animated.View
+      style={[
+        dynamicStyles.overlay,
+        { transform: [{ translateX }] },
+      ]}
+      pointerEvents="auto"
+    >
+      <GestureDetector gesture={backGesture}>
+        <View style={styles.edgeGestureArea} />
+      </GestureDetector>
+      {renderScreen()}
+    </Animated.View>
   );
 };
 
@@ -142,3 +142,14 @@ export const SubScreenOverlay = {
   _animateOpen: (_screen: SubScreenName) => {},
   _animateClose: (_cb?: () => void) => {},
 };
+
+const styles = StyleSheet.create({
+  edgeGestureArea: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 25,
+    zIndex: 10,
+  },
+});
