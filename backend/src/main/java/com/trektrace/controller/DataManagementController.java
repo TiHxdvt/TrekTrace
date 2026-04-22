@@ -2,9 +2,15 @@ package com.trektrace.controller;
 
 import com.trektrace.dto.DataSummaryResponse;
 import com.trektrace.service.ActivityService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/data")
@@ -29,7 +35,17 @@ public class DataManagementController {
     public ResponseEntity<?> exportData(
             @RequestParam(defaultValue = "json") String format,
             Authentication auth) {
-        return ResponseEntity.ok(activityService.exportData(getUserId(auth), format));
+        if (!"json".equals(format)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "目前仅支持 json 格式"));
+        }
+
+        Long userId = getUserId(auth);
+        StreamingResponseBody body = outputStream ->
+                activityService.exportDataStreaming(userId, format, outputStream);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=trektrace_export.json")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body);
     }
 
     @DeleteMapping("/activities")

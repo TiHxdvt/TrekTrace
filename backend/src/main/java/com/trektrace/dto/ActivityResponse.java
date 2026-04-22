@@ -13,4 +13,6 @@ public class ActivityResponse {
     private Double elevationGain;
     private String status;
     private String createdAt;
+    private String weatherCondition;
+    private Double temperature;
 }

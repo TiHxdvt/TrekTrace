@@ -17,9 +17,12 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final WebSocketService webSocketService;
 
-    public NotificationService(NotificationRepository notificationRepository) {
+    public NotificationService(NotificationRepository notificationRepository,
+                               WebSocketService webSocketService) {
         this.notificationRepository = notificationRepository;
+        this.webSocketService = webSocketService;
     }
 
     public List<NotificationDTO> getUserNotifications(Long userId) {
@@ -61,6 +64,12 @@ public class NotificationService {
         n.setTitle(title);
         n.setContent(content);
         n.setRelatedId(relatedId);
-        return notificationRepository.save(n);
+        Notification saved = notificationRepository.save(n);
+
+        // Push notification to user via WebSocket
+        NotificationDTO dto = new NotificationDTO(saved);
+        webSocketService.sendToUser(userId, "/queue/notifications", dto);
+
+        return saved;
     }
 }

@@ -1,6 +1,7 @@
 package com.trektrace.controller;
 
 import com.trektrace.dto.ChangePasswordRequest;
+import com.trektrace.dto.NearbyUserDTO;
 import com.trektrace.dto.ProfileResponse;
 import com.trektrace.dto.SetPasswordRequest;
 import com.trektrace.dto.UpdateProfileRequest;
@@ -10,6 +11,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/user")
@@ -35,7 +38,8 @@ public class UserProfileController {
     public ResponseEntity<ProfileResponse> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,
             Authentication auth) {
-        User user = userService.updateProfile(getUserId(auth), request.getNickname(), request.getAvatarUrl());
+        User user = userService.updateProfile(getUserId(auth), request.getNickname(), request.getAvatarUrl(),
+                request.getWeight(), request.getBio(), request.getGender(), request.getHeight());
         return ResponseEntity.ok(new ProfileResponse(user));
     }
 
@@ -49,5 +53,12 @@ public class UserProfileController {
     public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest request, Authentication auth) {
         userService.changePassword(getUserId(auth), request.getOldPassword(), request.getNewPassword());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/nearby")
+    public ResponseEntity<List<NearbyUserDTO>> getNearbyUsers(
+            @RequestParam(defaultValue = "10") double radiusKm,
+            Authentication auth) {
+        return ResponseEntity.ok(userService.getNearbyUsers(getUserId(auth), radiusKm));
     }
 }

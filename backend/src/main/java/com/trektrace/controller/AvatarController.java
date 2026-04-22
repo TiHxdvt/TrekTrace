@@ -91,7 +91,7 @@ public class AvatarController {
 
         String avatarUrl = "/api/avatars/" + filename;
         try {
-            User updated = userService.updateProfile(userId, null, avatarUrl);
+            User updated = userService.updateProfile(userId, null, avatarUrl, null, null, null, null);
             return ResponseEntity.ok(Map.of("avatarUrl", updated.getAvatarUrl()));
         } catch (Exception e) {
             // 数据库更新失败时清理已上传的文件

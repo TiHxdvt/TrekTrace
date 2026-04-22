@@ -19,6 +19,7 @@ public class ChatMessageDTO {
     private Long mediaSize;
     private Double latitude;
     private Double longitude;
+    private Integer duration;
     private Boolean isRead;
 
     public ChatMessageDTO() {}
@@ -35,6 +36,7 @@ public class ChatMessageDTO {
         this.mediaSize = message.getMediaSize();
         this.latitude = message.getLatitude();
         this.longitude = message.getLongitude();
+        this.duration = message.getDuration();
 
         if (message.getSender() != null) {
             this.senderNickname = message.getSender().getNickname();

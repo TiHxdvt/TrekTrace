@@ -49,6 +49,9 @@ public class Message {
     @Column(name = "longitude")
     private Double longitude;
 
+    @Column(name = "duration")
+    private Integer duration;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

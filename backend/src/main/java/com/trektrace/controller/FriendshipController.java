@@ -70,4 +70,23 @@ public class FriendshipController {
         friendshipService.deleteFriend(id, getUserId(auth));
         return ResponseEntity.noContent().build();
     }
+
+    // Blacklist management
+
+    @PostMapping("/{id}/block")
+    public ResponseEntity<Void> blockUser(@PathVariable Long id, Authentication auth) {
+        friendshipService.blockUser(getUserId(auth), id);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{id}/block")
+    public ResponseEntity<Void> unblockUser(@PathVariable Long id, Authentication auth) {
+        friendshipService.unblockUser(getUserId(auth), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/blocked")
+    public ResponseEntity<List<FriendDTO>> getBlockedUsers(Authentication auth) {
+        return ResponseEntity.ok(friendshipService.getBlockedUsers(getUserId(auth)));
+    }
 }

@@ -15,6 +15,10 @@ import java.time.LocalDateTime;
 @Data
 public class ConversationParticipant {
 
+    public enum ParticipantRole {
+        ADMIN, MEMBER
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -27,6 +31,16 @@ public class ConversationParticipant {
 
     @Column(name = "last_read_message_id")
     private Long lastReadMessageId;
+
+    @Column(name = "is_pinned")
+    private Boolean isPinned = false;
+
+    @Column(name = "is_muted")
+    private Boolean isMuted = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role")
+    private ParticipantRole role = ParticipantRole.MEMBER;
 
     @Column(name = "joined_at")
     private LocalDateTime joinedAt;

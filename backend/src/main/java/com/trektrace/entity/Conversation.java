@@ -25,6 +25,9 @@ public class Conversation {
     @Column(name = "name")
     private String name;
 
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

@@ -59,6 +59,12 @@ public class Activity {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "weather_condition")
+    private String weatherCondition;
+
+    @Column(name = "temperature", precision = 5, scale = 1)
+    private BigDecimal temperature;
+
     @ManyToOne
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
     private User user;

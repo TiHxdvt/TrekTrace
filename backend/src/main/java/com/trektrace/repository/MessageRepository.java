@@ -39,4 +39,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
      */
     @Query("SELECT m FROM Message m WHERE m.conversationId IN :convIds AND (:after IS NULL OR m.id > :after) ORDER BY m.id ASC")
     List<Message> findByConversationIdsAndAfter(@Param("convIds") Collection<Long> convIds, @Param("after") Long after, Pageable pageable);
+
+    List<Message> findByConversationIdAndContentContainingIgnoreCaseOrderByCreatedAtDesc(Long conversationId, String keyword, Pageable pageable);
+
+    List<Message> findByConversationIdInAndContentContainingIgnoreCaseOrderByCreatedAtDesc(Collection<Long> conversationIds, String keyword, Pageable pageable);
 }

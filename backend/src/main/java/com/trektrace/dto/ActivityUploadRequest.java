@@ -30,4 +30,7 @@ public class ActivityUploadRequest {
 
     @NotNull(message = "trackPoints is required")
     private List<TrackPointDTO> trackPoints;
+
+    private String weatherCondition;
+    private Double temperature;
 }

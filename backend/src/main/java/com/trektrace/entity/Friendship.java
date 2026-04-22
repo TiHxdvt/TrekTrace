@@ -33,6 +33,9 @@ public class Friendship {
     @Column(name = "status", nullable = false)
     private FriendshipStatus status = FriendshipStatus.PENDING;
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

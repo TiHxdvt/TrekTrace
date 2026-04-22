@@ -2,8 +2,11 @@ package com.trektrace.controller;
 
 import com.trektrace.dto.ChatMessageDTO;
 import com.trektrace.dto.ConversationDTO;
+import com.trektrace.dto.CreateGroupRequest;
 import com.trektrace.dto.SendMessageRequest;
+import com.trektrace.dto.TypingEventDTO;
 import com.trektrace.service.ChatService;
+import com.trektrace.service.WebSocketService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -36,15 +39,17 @@ public class ChatController {
             "audio/aac", "audio/mp4", "audio/mpeg", "audio/wav", "audio/x-m4a"
     );
 
-    private static final long MAX_MEDIA_SIZE = 20 * 1024 * 1024; // 20MB
+    private static final long MAX_MEDIA_SIZE = 5 * 1024 * 1024; // 5MB (must match spring.servlet.multipart.max-file-size)
 
     private final ChatService chatService;
+    private final WebSocketService webSocketService;
 
     @Value("${app.upload.dir:/app/uploads}")
     private String uploadDir;
 
-    public ChatController(ChatService chatService) {
+    public ChatController(ChatService chatService, WebSocketService webSocketService) {
         this.chatService = chatService;
+        this.webSocketService = webSocketService;
     }
 
     @GetMapping("/conversations")
@@ -80,7 +85,7 @@ public class ChatController {
         Long userId = (Long) auth.getPrincipal();
         return ResponseEntity.ok(chatService.sendMessage(userId, id, body.getContent(),
                 body.getMediaType(), body.getMediaUrl(), body.getMediaSize(),
-                body.getLatitude(), body.getLongitude()));
+                body.getLatitude(), body.getLongitude(), body.getDuration()));
     }
 
     @PostMapping("/upload")
@@ -179,11 +184,116 @@ public class ChatController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/conversations/{id}/messages/search")
+    public ResponseEntity<List<ChatMessageDTO>> searchMessages(
+            @PathVariable Long id,
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication auth) {
+        if (keyword.isBlank() || keyword.length() > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+        Long userId = (Long) auth.getPrincipal();
+        return ResponseEntity.ok(chatService.searchMessages(userId, id, keyword, page, size));
+    }
+
+    @GetMapping("/messages/search")
+    public ResponseEntity<List<ChatMessageDTO>> searchAllMessages(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication auth) {
+        if (keyword.isBlank() || keyword.length() > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+        Long userId = (Long) auth.getPrincipal();
+        return ResponseEntity.ok(chatService.searchAllMessages(userId, keyword, page, size));
+    }
+
+    @PutMapping("/conversations/{id}/pin")
+    public ResponseEntity<Void> setPinned(
+            @PathVariable Long id,
+            @Valid @RequestBody PinMuteBody body,
+            Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        chatService.setPinned(userId, id, body.getPinned());
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/conversations/{id}/mute")
+    public ResponseEntity<Void> setMuted(
+            @PathVariable Long id,
+            @Valid @RequestBody PinMuteBody body,
+            Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        chatService.setMuted(userId, id, body.getMuted());
+        return ResponseEntity.ok().build();
+    }
+
+    // ---- 群聊 API ----
+
+    @PostMapping("/conversations/group")
+    public ResponseEntity<ConversationDTO> createGroup(
+            @Valid @RequestBody CreateGroupRequest request,
+            Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        return ResponseEntity.ok(chatService.createGroupConversation(userId, request.getName(), request.getMemberIds()));
+    }
+
+    @PutMapping("/conversations/{id}/name")
+    public ResponseEntity<Void> updateGroupName(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        chatService.updateGroupName(userId, id, body.get("name"));
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/conversations/{id}/members")
+    public ResponseEntity<Void> addMembers(
+            @PathVariable Long id,
+            @RequestBody Map<String, List<Long>> body,
+            Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        chatService.addMembers(userId, id, body.get("memberIds"));
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/conversations/{id}/members/{targetUserId}")
+    public ResponseEntity<Void> removeMember(
+            @PathVariable Long id,
+            @PathVariable Long targetUserId,
+            Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        chatService.removeMember(userId, id, targetUserId);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/conversations/{id}/members")
+    public ResponseEntity<List<ConversationDTO.ParticipantDTO>> getMembers(
+            @PathVariable Long id,
+            Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        return ResponseEntity.ok(chatService.getMembers(userId, id));
+    }
+
     @MessageMapping("/chat.send")
     public ChatMessageDTO handleStompMessage(@Payload SendMessageRequest request, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         return chatService.sendMessage(userId, request.getConversationId(), request.getContent(),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
+    }
+
+    @MessageMapping("/chat.typing")
+    public void handleTypingEvent(@Payload TypingEventDTO event, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        event.setUserId(userId);
+        webSocketService.sendToConversationExclude(
+                event.getConversationId(), userId,
+                "/queue/typing", event
+        );
     }
 
     private String guessExtension(String contentType) {
@@ -208,11 +318,18 @@ public class ChatController {
         private Long mediaSize;
         private Double latitude;
         private Double longitude;
+        private Integer duration;
     }
 
     @Data
     public static class MarkAsReadBody {
         @NotNull(message = "消息ID不能为空")
         private Long messageId;
+    }
+
+    @Data
+    public static class PinMuteBody {
+        private Boolean pinned;
+        private Boolean muted;
     }
 }
