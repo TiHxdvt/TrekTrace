@@ -1,18 +1,29 @@
 package com.trektrace.service;
 
+import com.trektrace.dto.NearbyUserDTO;
+import com.trektrace.entity.Activity;
+import com.trektrace.entity.Friendship;
 import com.trektrace.entity.User;
+import com.trektrace.entity.VerificationCode;
+import com.trektrace.repository.ActivityRepository;
+import com.trektrace.repository.FriendshipRepository;
 import com.trektrace.repository.UserRepository;
+import com.trektrace.repository.VerificationCodeRepository;
 import com.trektrace.util.JwtUtil;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -40,6 +51,10 @@ public class UserService {
     /** 允许中文、字母、数字、下划线、短横线、点 */
     private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[\\u4e00-\\u9fa5a-zA-Z0-9_.\\-]+$");
 
+    /** 密码强度正则：至少6位，必须包含字母和数字 */
+    private static final Pattern PASSWORD_STRENGTH_PATTERN =
+            Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d@$!%*#?&]{6,72}$");
+
     /** 昵称最大字符长度（中英文均计为1） */
     private static final int NICKNAME_MAX_LENGTH = 14;
 
@@ -53,12 +68,24 @@ public class UserService {
     }
 
     private final UserRepository userRepository;
+    private final VerificationCodeRepository verificationCodeRepository;
     private final JwtUtil jwtUtil;
+    private final TokenBlacklistService tokenBlacklistService;
+    private final FriendshipRepository friendshipRepository;
+    private final ActivityRepository activityRepository;
     private static final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public UserService(UserRepository userRepository, JwtUtil jwtUtil) {
+    private static final double EARTH_RADIUS_KM = 6371.0;
+
+    public UserService(UserRepository userRepository, VerificationCodeRepository verificationCodeRepository,
+                       JwtUtil jwtUtil, TokenBlacklistService tokenBlacklistService,
+                       FriendshipRepository friendshipRepository, ActivityRepository activityRepository) {
         this.userRepository = userRepository;
+        this.verificationCodeRepository = verificationCodeRepository;
         this.jwtUtil = jwtUtil;
+        this.tokenBlacklistService = tokenBlacklistService;
+        this.friendshipRepository = friendshipRepository;
+        this.activityRepository = activityRepository;
     }
 
     public User createOrGetUser(String phone) {
@@ -78,7 +105,12 @@ public class UserService {
     }
 
     public String generateToken(Long userId) {
-        return jwtUtil.generateToken(userId);
+        User user = getUserById(userId);
+        return jwtUtil.generateAccessToken(userId, user.getPasswordVersion() != null ? user.getPasswordVersion() : 1);
+    }
+
+    public String generateRefreshToken(Long userId) {
+        return jwtUtil.generateRefreshToken(userId);
     }
 
     public User getUserById(Long userId) {
@@ -95,7 +127,8 @@ public class UserService {
         return w;
     }
 
-    public User updateProfile(Long userId, String nickname, String avatarUrl) {
+    public User updateProfile(Long userId, String nickname, String avatarUrl, java.math.BigDecimal weight,
+                               String bio, String gender, java.math.BigDecimal height) {
         User user = getUserById(userId);
         if (nickname != null) {
             // 昵称长度校验（中文算2，英文/符号算1，上限14=7个中文）
@@ -134,6 +167,18 @@ public class UserService {
         if (avatarUrl != null) {
             user.setAvatarUrl(avatarUrl);
         }
+        if (weight != null) {
+            user.setWeight(weight);
+        }
+        if (bio != null) {
+            user.setBio(bio);
+        }
+        if (gender != null) {
+            user.setGender(gender);
+        }
+        if (height != null) {
+            user.setHeight(height);
+        }
         return userRepository.save(user);
     }
 
@@ -169,6 +214,7 @@ public class UserService {
         if (user.getPassword() != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码已设置，请使用修改密码功能");
         }
+        validatePasswordStrength(rawPassword);
         user.setPassword(passwordEncoder.encode(rawPassword));
         userRepository.save(user);
     }
@@ -181,8 +227,63 @@ public class UserService {
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "当前密码错误");
         }
+        validatePasswordStrength(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordVersion((user.getPasswordVersion() != null ? user.getPasswordVersion() : 1) + 1);
         userRepository.save(user);
+    }
+
+    public void resetPassword(String phone, String code, String newPassword) {
+        Optional<VerificationCode> vcOpt = verificationCodeRepository
+                .findTopByPhoneAndCodeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
+                        phone, code, LocalDateTime.now());
+
+        if (vcOpt.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码错误或已过期");
+        }
+
+        VerificationCode vc = vcOpt.get();
+        vc.setUsed(true);
+        verificationCodeRepository.save(vc);
+
+        validatePasswordStrength(newPassword);
+
+        User user = userRepository.findByPhone(phone)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户不存在"));
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordVersion((user.getPasswordVersion() != null ? user.getPasswordVersion() : 1) + 1);
+        userRepository.save(user);
+
+        // Blacklist all refresh tokens for this user
+        tokenBlacklistService.blacklistAllUserTokens(user.getId());
+    }
+
+    public void bindEmail(Long userId, String email) {
+        User user = getUserById(userId);
+        // 检查邮箱是否已被其他用户绑定
+        userRepository.findByEmail(email).ifPresent(existing -> {
+            if (!existing.getId().equals(userId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "该邮箱已被其他用户绑定");
+            }
+        });
+        user.setEmail(email);
+        user.setEmailVerified(false);
+        userRepository.save(user);
+    }
+
+    public void verifyEmail(Long userId, String email) {
+        User user = getUserById(userId);
+        if (email.equals(user.getEmail())) {
+            user.setEmailVerified(true);
+            userRepository.save(user);
+        }
+    }
+
+    private void validatePasswordStrength(String password) {
+        if (password == null || !PASSWORD_STRENGTH_PATTERN.matcher(password).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码需6-72位，且包含字母和数字");
+        }
     }
 
     public User updateVisibility(Long userId, String visibility) {
@@ -193,5 +294,85 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "无效的可见性设置");
         }
         return userRepository.save(user);
+    }
+
+    /** Get nearby users within radiusKm */
+    public List<NearbyUserDTO> getNearbyUsers(Long userId, double radiusKm) {
+        User currentUser = getUserById(userId);
+        if (currentUser.getLastLatitude() == null || currentUser.getLastLongitude() == null) {
+            return Collections.emptyList();
+        }
+
+        double lat = currentUser.getLastLatitude().doubleValue();
+        double lon = currentUser.getLastLongitude().doubleValue();
+
+        // Calculate bounding box
+        double latDelta = Math.toDegrees(radiusKm / EARTH_RADIUS_KM);
+        double lonDelta = Math.toDegrees(radiusKm / (EARTH_RADIUS_KM * Math.cos(Math.toRadians(lat))));
+
+        BigDecimal minLat = BigDecimal.valueOf(lat - latDelta);
+        BigDecimal maxLat = BigDecimal.valueOf(lat + latDelta);
+        BigDecimal minLon = BigDecimal.valueOf(lon - lonDelta);
+        BigDecimal maxLon = BigDecimal.valueOf(lon + lonDelta);
+
+        // Only show PUBLIC and FRIENDS visibility users, with location in last 7 days
+        LocalDateTime recentCutoff = LocalDateTime.now().minusDays(7);
+        List<User.DataVisibility> visibilities = List.of(
+                User.DataVisibility.PUBLIC, User.DataVisibility.FRIENDS);
+
+        List<User> candidates = userRepository.findNearbyUsers(
+                minLat, maxLat, minLon, maxLon, recentCutoff, userId, visibilities);
+
+        // Filter out blocked users
+        Set<Long> blockedIds = friendshipRepository.findBlockedByUser(userId).stream()
+                .flatMap(f -> java.util.stream.Stream.of(f.getRequesterId(), f.getAddresseeId()))
+                .filter(id -> !id.equals(userId))
+                .collect(Collectors.toSet());
+        candidates = candidates.stream()
+                .filter(u -> !blockedIds.contains(u.getId()))
+                .collect(Collectors.toList());
+
+        // Get latest activity for each nearby user
+        List<Long> candidateIds = candidates.stream().map(User::getId).collect(Collectors.toList());
+        Map<Long, Activity.ActivityType> lastActivityMap = new HashMap<>();
+        if (!candidateIds.isEmpty()) {
+            List<Activity> latestActivities = activityRepository.findLatestByUserIds(
+                    candidateIds, PageRequest.of(0, 1000, Sort.by(Sort.Direction.DESC, "startTime")));
+            for (Activity a : latestActivities) {
+                lastActivityMap.putIfAbsent(a.getUserId(), a.getType());
+            }
+        }
+
+        // Calculate precise distance and sort
+        List<NearbyUserDTO> result = new ArrayList<>();
+        for (User u : candidates) {
+            double distance = haversineKm(lat, lon,
+                    u.getLastLatitude().doubleValue(), u.getLastLongitude().doubleValue());
+            if (distance <= radiusKm) {
+                NearbyUserDTO dto = new NearbyUserDTO();
+                dto.setUserId(u.getId());
+                dto.setAccount(u.getAccount());
+                dto.setNickname(u.getNickname());
+                dto.setAvatarUrl(u.getAvatarUrl());
+                dto.setDistanceKm(Math.round(distance * 10.0) / 10.0);
+                Activity.ActivityType lastType = lastActivityMap.get(u.getId());
+                dto.setLastActivityType(lastType != null ? lastType.name() : null);
+                dto.setLastLocationAt(u.getLastLocationAt() != null ? u.getLastLocationAt().toString() : null);
+                result.add(dto);
+            }
+        }
+
+        result.sort(Comparator.comparingDouble(NearbyUserDTO::getDistanceKm));
+        return result;
+    }
+
+    private static double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return EARTH_RADIUS_KM * c;
     }
 }
