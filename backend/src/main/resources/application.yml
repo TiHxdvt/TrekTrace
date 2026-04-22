@@ -18,6 +18,17 @@ spring:
       enabled: true
       max-file-size: 5MB
       max-request-size: 5MB
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 server:
   port: 8080
@@ -28,6 +39,7 @@ cors:
 jwt:
   secret: ${JWT_SECRET:}
   expiration: 604800000  # 7 days in milliseconds
+  refresh-expiration: 2592000000  # 30 days in milliseconds
 
 sms:
   provider: ${SMS_PROVIDER:mock}  # mock / aliyun / tencent
@@ -40,6 +52,16 @@ sms:
 app:
   upload:
     dir: ${UPLOAD_DIR:./uploads}
+
+mail:
+  provider: ${MAIL_PROVIDER:mock}
+  base-url: ${MAIL_BASE_URL:http://localhost:8080}
+  smtp:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    from: ${SMTP_FROM:noreply@trektrace.com}
 
 springdoc:
   api-docs:
@@ -63,10 +85,26 @@ spring:
         format_sql: true
   flyway:
     enabled: false
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:465}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
 springdoc:
   api-docs:
     enabled: true
   swagger-ui:
     enabled: true
 jwt:
-  secret: ${JWT_SECRET:dev-only-secret-key-do-not-use-in-production-32ch}
+  secret: ${JWT_SECRET:dev-only-secret-key-do-not-use-in-production-!!}
+  refresh-expiration: 2592000000
+mail:
+  provider: smtp
+  base-url: ${MAIL_BASE_URL:http://localhost:8080}
+  from: ${SMTP_FROM:noreply@trektrace.com}
