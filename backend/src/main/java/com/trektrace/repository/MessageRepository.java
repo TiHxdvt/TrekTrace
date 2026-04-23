@@ -43,4 +43,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     List<Message> findByConversationIdAndContentContainingIgnoreCaseOrderByCreatedAtDesc(Long conversationId, String keyword, Pageable pageable);
 
     List<Message> findByConversationIdInAndContentContainingIgnoreCaseOrderByCreatedAtDesc(Collection<Long> conversationIds, String keyword, Pageable pageable);
+
+    @Query("SELECT m.mediaUrl FROM Message m WHERE m.conversationId IN :convIds AND m.mediaUrl IS NOT NULL")
+    List<String> findMediaUrlsByConversationIdIn(@Param("convIds") Collection<Long> convIds);
 }

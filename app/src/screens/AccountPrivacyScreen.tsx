@@ -19,9 +19,11 @@ import { accountService } from '../services/accountService';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
 import { storageService } from '../services/storageService';
+import { chatService } from '../services/chatService';
+import * as chatDB from '../services/chatDatabaseService';
 import { Dialog } from '../components/Dialog';
 import { Toast } from '../components/Toast';
-import { IconAltArrowRight } from '../components/SolarIcons';
+import { SectionItem } from '../components/SectionItem';
 
 type NavProp = { goBack: () => void };
 
@@ -629,6 +631,29 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
     );
   };
 
+  const handleDeleteAllChat = () => {
+    Dialog.show(
+      '删除全部聊天记录',
+      '此操作将同时删除服务器和本地的所有对话及聊天消息，且不可恢复。确定继续吗？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '确定删除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await chatService.deleteAllChatData();
+              chatDB.clearAllChatData();
+              Toast.show('所有聊天记录已删除');
+            } catch {
+              Toast.show('删除失败');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const notImplemented = () => Toast.show('功能开发中');
 
   const maskedPhone = phone.length >= 7 ? phone.slice(0, 3) + '****' + phone.slice(-4) : '未绑定';
@@ -692,6 +717,8 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
         {/* 危险操作 */}
         <Text style={[dynamicStyles.sectionTitle, dynamicStyles.dangerSectionTitle]}>危险操作</Text>
         <View style={dynamicStyles.card}>
+          <SectionItem title="删除全部聊天记录" danger onPress={handleDeleteAllChat} />
+          <View style={dynamicStyles.divider} />
           <SectionItem title="注销账号" danger onPress={handleDeleteAccount} />
         </View>
       </ScrollView>
@@ -705,52 +732,8 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
   );
 };
 
-// --- 通用菜单项 ---
-const SectionItem: React.FC<{
-  title: string;
-  value?: string;
-  danger?: boolean;
-  onPress: () => void;
-}> = ({ title, value, danger, onPress }) => {
-  const { colors } = useTheme();
-
-  const itemStyles = useMemo(() => StyleSheet.create({
-    itemTitle: {
-      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-      color: colors.TEXT.SECONDARY,
-    },
-    itemValue: {
-      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-      color: colors.TEXT.QUATERNARY,
-    },
-    dangerText: {
-      color: colors.ERROR,
-    },
-  }), [colors]);
-
-  return (
-    <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.7}>
-      <Text style={[itemStyles.itemTitle, danger && itemStyles.dangerText]}>{title}</Text>
-      <View style={styles.itemRight}>
-        {value ? <Text style={[itemStyles.itemValue, danger && itemStyles.dangerText]}>{value}</Text> : null}
-        <IconAltArrowRight size={18} color={danger ? colors.ERROR : colors.TEXT.QUINARY} />
-      </View>
-    </TouchableOpacity>
-  );
-};
 
 const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },
-  item: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: SPACING.LG,
-  },
-  itemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.XS,
-  },
 });

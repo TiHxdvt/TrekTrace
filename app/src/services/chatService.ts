@@ -45,15 +45,20 @@ export const chatService = {
   },
 
   async uploadMedia(fileUri: string, mimeType?: string): Promise<MediaUploadResult> {
+    // 根据文件后缀推断 MIME type，避免硬编码导致后端拒绝
+    const ext = fileUri.split('.').pop()?.toLowerCase();
+    const type = mimeType
+      || (ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg');
     const formData = new FormData();
     // @ts-ignore React Native FormData supports uri
     formData.append('file', {
       uri: fileUri,
-      type: mimeType || 'image/jpeg',
-      name: 'upload',
+      type,
+      name: `upload.${ext || 'jpg'}`,
     });
     const res = await api.post('/chat/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000,
     });
     return res.data;
   },
@@ -90,6 +95,11 @@ export const chatService = {
   /** 删除单条消息（只能删自己的） */
   async deleteMessage(messageId: number): Promise<void> {
     await api.delete(`/chat/messages/${messageId}`);
+  },
+
+  /** 删除所有聊天数据（会话+消息） */
+  async deleteAllChatData(): Promise<void> {
+    await api.delete('/data/chat');
   },
 
   /** 在指定会话中搜索消息 */

@@ -105,12 +105,62 @@ export function upsertConversations(convs: Conversation[]): void {
   }
 }
 
+/** 确保会话存在于本地 DB（不存在则插入，用于从好友页直接打开聊天的场景） */
+export function ensureConversation(params: {
+  conversationId: number;
+  friendUserId: number;
+  friendNickname?: string;
+  friendAvatarUrl?: string;
+  conversationType?: string;
+  conversationName?: string;
+}): void {
+  const db = getDatabase();
+  const existing = db.executeSync(
+    `SELECT 1 FROM conversations WHERE id = ?`,
+    [params.conversationId],
+  );
+  if (existing.rows.length > 0) return;
+
+  const now = new Date().toISOString();
+  db.executeSync(
+    `INSERT INTO conversations
+      (id, type, name, other_user_id, other_user_nickname, other_user_avatar_url,
+       last_message_content, last_message_created_at, unread_count, updated_at, is_pinned, is_muted)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, ?, 0, 0)`,
+    [
+      params.conversationId,
+      params.conversationType === 'GROUP' ? 'GROUP' : 'DIRECT',
+      params.conversationName ?? null,
+      params.friendUserId,
+      params.friendNickname ?? null,
+      params.friendAvatarUrl ?? null,
+      now,
+    ],
+  );
+}
+
 /** 删除本地会话 */
 export function deleteConversationLocal(convId: number): void {
   const db = getDatabase();
   db.executeSync(`DELETE FROM messages WHERE conversation_id = ?`, [convId]);
   db.executeSync(`DELETE FROM pending_messages WHERE conversation_id = ?`, [convId]);
   db.executeSync(`DELETE FROM conversations WHERE id = ?`, [convId]);
+}
+
+/** 清空所有本地聊天数据（会话、消息、待发送队列、同步位点） */
+export function clearAllChatData(): void {
+  const db = getDatabase();
+  try {
+    db.executeSync('BEGIN TRANSACTION');
+    db.executeSync('DELETE FROM messages');
+    db.executeSync('DELETE FROM pending_messages');
+    db.executeSync('DELETE FROM conversations');
+    db.executeSync("DELETE FROM sync_metadata WHERE key LIKE 'last_sync_%'");
+    db.executeSync('COMMIT');
+  } catch (e) {
+    db.executeSync('ROLLBACK');
+    throw e;
+  }
 }
 
 /** 更新会话未读数 */
@@ -208,6 +258,32 @@ export function getAllMessages(convId: number): ChatMessage[] {
 /** 插入消息（来自服务端同步或 WebSocket 推送） */
 export function insertMessage(msg: ChatMessage): void {
   const db = getDatabase();
+
+  // 先尝试认领本地 sending 记录（避免 sendLocalMessage 与 WebSocket/sync 的竞态）
+  // 场景：sendLocalMessage 先用 id=NULL 插入，WebSocket 回调先到达并调用 insertMessage
+  // 如果不认领，会产生两条记录（自增 id + serverId），导致消息重复或排序错乱
+  // 加 30 秒时间窗口，防止快速连发相同内容消息时认领错记录
+  const claimed = db.executeSync(
+    `UPDATE messages SET
+       id = ?, status = 'sent', created_at = ?, server_created_at = ?,
+       media_url = ?, media_type = ?, media_size = ?,
+       latitude = ?, longitude = ?, duration = ?
+     WHERE rowid = (
+       SELECT rowid FROM messages
+       WHERE conversation_id = ? AND sender_id = ? AND type = ? AND content = ? AND status = 'sending'
+         AND created_at > datetime('now', '-30 seconds')
+       LIMIT 1
+     )`,
+    [
+      msg.id, msg.createdAt, msg.createdAt,
+      msg.mediaUrl ?? null, msg.mediaType ?? null, msg.mediaSize ?? null,
+      msg.latitude ?? null, msg.longitude ?? null, msg.duration ?? null,
+      msg.conversationId, msg.senderId, msg.type, msg.content,
+    ],
+  );
+  if (claimed.rowsAffected > 0) return;
+
+  // 没有可认领的 sending 记录，直接插入
   db.executeSync(
     `INSERT OR IGNORE INTO messages
       (id, local_id, conversation_id, sender_id, content, type, status, created_at, server_created_at, is_deleted,
@@ -265,12 +341,12 @@ export function insertSendingMessage(
 }
 
 /** 更新消息状态（sending → sent / failed） */
-export function updateMessageStatus(localId: string, status: LocalMessageStatus, serverId?: number): void {
+export function updateMessageStatus(localId: string, status: LocalMessageStatus, serverId?: number, serverCreatedAt?: string): void {
   const db = getDatabase();
   if (serverId && status === 'sent') {
     db.executeSync(
-      `UPDATE messages SET status = ?, id = ? WHERE local_id = ?`,
-      [status, serverId, localId],
+      `UPDATE messages SET status = ?, id = ?, created_at = ?, server_created_at = ? WHERE local_id = ?`,
+      [status, serverId, serverCreatedAt ?? new Date().toISOString(), serverCreatedAt ?? null, localId],
     );
   } else {
     db.executeSync(

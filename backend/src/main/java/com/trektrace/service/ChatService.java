@@ -338,6 +338,28 @@ public class ChatService {
     }
 
     /**
+     * 删除用户参与的所有会话及其消息
+     */
+    @Transactional
+    public void deleteAllChatData(Long userId) {
+        List<Conversation> conversations = conversationRepository.findByUserId(userId);
+        if (conversations.isEmpty()) return;
+
+        List<Long> convIds = conversations.stream().map(Conversation::getId).collect(Collectors.toList());
+
+        // Collect and delete media files (直接查询 URL，避免加载完整 Message 实体)
+        List<String> mediaUrls = messageRepository.findMediaUrlsByConversationIdIn(convIds);
+        deleteMediaFiles(mediaUrls);
+
+        // Delete messages, participants, conversations
+        for (Long convId : convIds) {
+            messageRepository.deleteByConversationId(convId);
+            participantRepository.deleteByConversationId(convId);
+        }
+        conversationRepository.deleteAllById(convIds);
+    }
+
+    /**
      * 删除单条消息（仅发送者可操作）
      */
     @Transactional
