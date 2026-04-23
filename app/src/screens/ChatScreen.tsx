@@ -16,6 +16,7 @@ import {
   StyleSheet,
   Keyboard,
   Platform,
+  PermissionsAndroid,
   ActivityIndicator,
   InteractionManager,
   type KeyboardEvent,
@@ -34,6 +35,8 @@ import { ChatMessage, User } from '../types';
 import { IconAltArrowLeft, IconSmileCircle, IconAddCircle, IconMagnifer } from '../components/SolarIcons';
 import { ChatTimeItem } from '../components/chat/ChatTimeItem';
 import { ChatMessageItem } from '../components/chat/ChatMessageItem';
+import { ChatImageViewer } from '../components/chat/ChatImageViewer';
+import ImageResizer from '@bam.tech/react-native-image-resizer';
 import { ChatTypingItem } from '../components/chat/ChatTypingItem';
 import { ChatAttachmentPanel } from '../components/chat/ChatAttachmentPanel';
 import {
@@ -41,6 +44,7 @@ import {
   ChatListItem,
   MessageStatus,
 } from '../components/chat/chatDataTransform';
+import { resolveMediaUrl } from '../components/chat/ChatImageMessage';
 
 type NavProp = { goBack: () => void };
 
@@ -75,6 +79,9 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   const [showEmoji, setShowEmoji] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerUris, setViewerUris] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<ChatMessage[]>([]);
   const [searching, setSearching] = useState(false);
@@ -86,6 +93,8 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 已通过 API 发送成功的消息 serverId 集合，用于 WebSocket 去重（避免重复插入） */
+  const sentServerIds = useRef<Set<number>>(new Set());
   const pageSize = 50;
 
   const dynamicStyles = useMemo(
@@ -172,6 +181,16 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         const dbMessages = chatDB.getMessages(conversationId, pageSize, currentOffset);
 
         if (currentOffset === 0) {
+          // 确保会话存在于本地 conversations 表（从好友页直接打开时可能缺失）
+          chatDB.ensureConversation({
+            conversationId,
+            friendUserId,
+            friendNickname,
+            friendAvatarUrl,
+            conversationType,
+            conversationName,
+          });
+
           setMessages(dbMessages);
           // 构建 statusMap：从 DB 中读取的消息默认 sent
           const sent = new Map<number, MessageStatus>();
@@ -211,10 +230,9 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   useEffect(() => {
     const handle = InteractionManager.runAfterInteractions(() => {
       loadMessages(0);
-      // 后台同步该会话消息
-      syncConversationMessages(conversationId).then(() => {
-        // 同步完成后重新加载以合并新消息
-        loadMessages(0);
+      // 后台同步该会话消息，仅在有新消息时才重新加载
+      syncConversationMessages(conversationId).then(hasNew => {
+        if (hasNew) loadMessages(0);
       });
     });
     return () => handle.cancel();
@@ -244,6 +262,11 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       }
 
       setMessages(prev => {
+        // 自己刚通过 API 发送的消息：乐观消息已在列表中，跳过
+        // 注意：不能 delete，因为 WebSocket 有两个订阅会触发两次，第二次也需要跳过
+        if (sentServerIds.current.has(msg.id)) {
+          return prev;
+        }
         // 如果已存在同 id 的消息，检查是否为更新（如撤回）
         const existingIdx = prev.findIndex(m => m.id === msg.id);
         if (existingIdx !== -1) {
@@ -333,18 +356,30 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
     }
   }, [sendTypingEvent]);
 
-  // ---- listData 计算 ----
+  // ---- listData 计算（倒序，最新消息在 index 0，配合 inverted FlatList） ----
   const listData = useMemo(
-    () => transformMessagesToList(messages, statusMap),
+    () => transformMessagesToList(messages, statusMap).reverse(),
     [messages, statusMap],
   );
 
-  // ---- 滚动到底部 ----
-  useEffect(() => {
-    if (listData.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [listData.length]);
+  // ---- 所有图片数据（按消息时间排序，msgId 消歧重复 URL） ----
+  const { imageUris, imageMsgIds } = useMemo(() => {
+    const items = messages
+      .filter(m => m.type === 'IMAGE' && m.mediaUrl)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return {
+      imageUris: items.map(m => resolveMediaUrl(m.mediaUrl!)),
+      imageMsgIds: items.map(m => m.id),
+    };
+  }, [messages]);
+
+  // ---- 点击图片打开画廊（用 msgId 定位，不受重复 URL 影响） ----
+  const handleImagePress = useCallback((msgId: number, imageUri: string) => {
+    const idx = imageMsgIds.indexOf(msgId);
+    setViewerUris(imageUris);
+    setViewerIndex(idx >= 0 ? idx : 0);
+    setViewerVisible(true);
+  }, [imageUris, imageMsgIds]);
 
   // ---- 乐观更新辅助函数 ----
   const replaceOptimistic = useCallback(
@@ -354,7 +389,14 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         if (hasServerMsg) {
           return prev.filter(m => m.id !== optimisticId);
         }
-        return prev.map(m => (m.id === optimisticId ? serverMsg : m));
+        return prev.map(m => {
+          if (m.id !== optimisticId) return m;
+          // 保留 localKey 和图片本地 URI + 尺寸，避免 FlatList 重建组件
+          if (m.mediaUrl) {
+            return { ...serverMsg, localKey: m.localKey, mediaUrl: m.mediaUrl, mediaWidth: m.mediaWidth, mediaHeight: m.mediaHeight };
+          }
+          return { ...serverMsg, localKey: m.localKey };
+        });
       });
       setStatusMap(prev => {
         const next = new Map(prev);
@@ -387,6 +429,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
     // 乐观更新：立即插入本地消息到 UI
     const optimisticMsg: ChatMessage = {
       id: -Date.now(),
+      localKey: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       conversationId,
       senderId: myUserId,
       content: text,
@@ -409,43 +452,69 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
   }, [inputText, conversationId, replaceOptimistic, markOptimisticFailed]);
 
   // ---- 发送图片消息 ----
-  const handleSendImage = useCallback(async (imageUri: string, fileSize?: number) => {
+  // 乐观渲染：用本地 file:// URI 立即展示（本地文件秒渲染），不做 replaceOptimistic
+  const handleSendImage = useCallback(async (imageUri: string, fileSize?: number, imgWidth?: number, imgHeight?: number) => {
     setShowAttachment(false);
     const myUserId = await getCurrentUserId();
     const now = new Date().toISOString();
 
-    // 乐观更新
+    // 压缩图片：限制最大 1920px，JPEG 质量 0.7，确保不超过服务端 5MB 限制
+    let uploadUri = imageUri;
+    try {
+      const resized = await ImageResizer.createResizedImage(
+        imageUri, 1920, 1920, 'JPEG', 70, 0, undefined,
+      );
+      if (resized.uri) uploadUri = resized.uri;
+    } catch {}
+
+    const optimisticId = -Date.now();
     const optimisticMsg: ChatMessage = {
-      id: -Date.now(),
+      id: optimisticId,
+      localKey: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       conversationId,
       senderId: myUserId,
       content: '[图片]',
       type: 'IMAGE',
       mediaType: 'IMAGE',
-      mediaUrl: imageUri, // 本地 URI 先展示
+      mediaUrl: imageUri,
       mediaSize: fileSize,
+      mediaWidth: imgWidth,
+      mediaHeight: imgHeight,
       createdAt: now,
     };
 
     setMessages(prev => [...prev, optimisticMsg]);
-    setStatusMap(prev => new Map(prev).set(optimisticMsg.id, 'sending'));
+    setStatusMap(prev => new Map(prev).set(optimisticId, 'sending'));
 
     try {
-      // 上传文件
-      const uploadResult = await chatService.uploadMedia(imageUri, 'image/jpeg');
-      // 发送消息
+      const uploadResult = await chatService.uploadMedia(uploadUri, undefined);
       const serverMsg = await chatService.sendMessage(conversationId, '[图片]', {
         mediaType: 'IMAGE',
         mediaUrl: uploadResult.url,
         mediaSize: fileSize,
       });
 
-      replaceOptimistic(optimisticMsg.id, serverMsg);
+      // 写入 DB（下次打开聊天时从 DB 加载服务器 URL）
+      try {
+        if (!chatDB.messageExists(serverMsg.id)) {
+          chatDB.insertMessage(serverMsg);
+        }
+        chatDB.updateConversationLastMessage(conversationId, '[图片]', serverMsg.createdAt);
+      } catch {}
+
+      // 标记已发送 + 记录 serverId，防止 WebSocket 重复插入
+      sentServerIds.current.add(serverMsg.id);
+      setStatusMap(prev => {
+        const next = new Map(prev);
+        next.delete(optimisticId);
+        next.set(optimisticId, 'sent');
+        return next;
+      });
     } catch {
-      markOptimisticFailed(optimisticMsg.id);
+      setStatusMap(prev => new Map(prev).set(optimisticId, 'failed'));
       Toast.show('图片发送失败');
     }
-  }, [conversationId, replaceOptimistic, markOptimisticFailed]);
+  }, [conversationId]);
 
   // ---- 发送语音消息 ----
   const handleSendAudio = useCallback(async (audioUri: string, duration: number) => {
@@ -454,6 +523,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
 
     const optimisticMsg: ChatMessage = {
       id: -Date.now(),
+      localKey: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       conversationId,
       senderId: myUserId,
       content: '[语音]',
@@ -497,6 +567,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
 
           const optimisticMsg: ChatMessage = {
             id: -Date.now(),
+            localKey: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             conversationId,
             senderId: myUserId,
             content: '位置分享',
@@ -596,13 +667,31 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
 
   // ---- 附件面板操作 ----
   const handleCamera = useCallback(async () => {
+    // Android 需要手动请求相机权限
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: '相机权限',
+          message: '需要相机权限来拍摄照片',
+          buttonNeutral: '稍后再问',
+          buttonNegative: '拒绝',
+          buttonPositive: '允许',
+        },
+      );
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        Toast.show('需要相机权限才能拍照');
+        return;
+      }
+    }
+
     try {
       const { launchCamera } = await import('react-native-image-picker');
       launchCamera({ mediaType: 'photo', quality: 0.8 }, (response) => {
         if (response.assets && response.assets.length > 0) {
           const asset = response.assets[0];
           if (asset.uri) {
-            handleSendImage(asset.uri, asset.fileSize);
+            handleSendImage(asset.uri, asset.fileSize, asset.width, asset.height);
           }
         }
       });
@@ -618,7 +707,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         if (response.assets && response.assets.length > 0) {
           const asset = response.assets[0];
           if (asset.uri) {
-            handleSendImage(asset.uri, asset.fileSize);
+            handleSendImage(asset.uri, asset.fileSize, asset.width, asset.height);
           }
         }
       });
@@ -713,16 +802,19 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
             : undefined}
           mediaUrl={message.mediaUrl}
           mediaSize={message.mediaSize}
+          mediaWidth={message.mediaWidth}
+          mediaHeight={message.mediaHeight}
           latitude={message.latitude}
           longitude={message.longitude}
           duration={message.duration}
           createdAt={message.createdAt}
           senderNickname={message.senderNickname}
           isGroupChat={isGroupChat}
+          onImagePress={(uri: string) => handleImagePress(message.id, uri)}
         />
       );
     },
-    [friendUserId, myAvatarUrl, friendAvatarUrl, handleRetry, handleDelete, handleRecall],
+    [friendUserId, myAvatarUrl, friendAvatarUrl, handleRetry, handleDelete, handleRecall, handleImagePress],
   );
 
   const keyExtractor = useCallback((item: ChatListItem) => item.id, []);
@@ -790,6 +882,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
       <FlatList
         ref={flatListRef}
         data={listData}
+        inverted={true}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         contentContainerStyle={styles.messageList}
@@ -797,7 +890,7 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        ListFooterComponent={
+        ListHeaderComponent={
           loadingMore ? (
             <View style={styles.loadingMoreWrap}>
               <ActivityIndicator size="small" color={colors.TEXT.TERTIARY} />
@@ -938,6 +1031,14 @@ export const ChatScreen: React.FC<{ navigation: NavProp; route: { params: ChatSc
           </View>
         </View>
       )}
+
+      {/* 全屏图片画廊 */}
+      <ChatImageViewer
+        visible={viewerVisible}
+        imageUris={viewerUris}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
+      />
     </>
   );
 

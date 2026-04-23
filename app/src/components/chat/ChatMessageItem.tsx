@@ -52,11 +52,7 @@ const MessageStatusIcon: React.FC<{ status?: MessageStatus; onRetry?: () => void
         </TouchableOpacity>
       );
     case 'sent':
-      return (
-        <View style={styles.statusWrap}>
-          <IconCheckRead size={16} color="#4CAF50" />
-        </View>
-      );
+      return <View style={styles.statusWrap} />;
     case 'read':
       return (
         <View style={styles.statusWrap}>
@@ -185,12 +181,15 @@ interface ChatMessageItemProps {
   mediaType?: string;
   mediaUrl?: string;
   mediaSize?: number;
+  mediaWidth?: number;
+  mediaHeight?: number;
   latitude?: number;
   longitude?: number;
   duration?: number;
   createdAt?: string;
   senderNickname?: string;
   isGroupChat?: boolean;
+  onImagePress?: (uri: string) => void;
 }
 
 export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
@@ -205,12 +204,15 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   mediaType,
   mediaUrl,
   mediaSize,
+  mediaWidth,
+  mediaHeight,
   latitude,
   longitude,
   duration,
   createdAt,
   senderNickname,
   isGroupChat,
+  onImagePress,
 }) => {
   const { colors } = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -289,7 +291,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     switch (mediaType) {
       case 'IMAGE':
         return mediaUrl ? (
-          <ChatImageMessage mediaUrl={mediaUrl} isMine={isMine} status={status} />
+          <ChatImageMessage mediaUrl={mediaUrl} isMine={isMine} status={status} initialWidth={mediaWidth} initialHeight={mediaHeight} onImagePress={onImagePress} />
         ) : null;
       case 'AUDIO':
         return mediaUrl ? (
@@ -406,13 +408,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bubble: {
-    maxWidth: '65%',
+    maxWidth: SCREEN_WIDTH * 0.72,
     borderRadius: BORDER_RADIUS.LG,
     paddingHorizontal: SPACING.MD,
     paddingVertical: SPACING.SM,
   },
   bubbleWrapper: {
-    maxWidth: '65%',
     gap: 2,
   },
   senderNickname: {
