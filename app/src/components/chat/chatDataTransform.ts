@@ -43,7 +43,7 @@ export function transformMessagesToList(
 
     result.push({
       kind: 'message',
-      id: `msg-${msg.id}`,
+      id: `msg-${msg.localKey || msg.id}`,
       message: msg,
       status: statusMap?.get(msg.id) ?? 'sent',
     });

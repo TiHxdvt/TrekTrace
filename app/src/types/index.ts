@@ -254,6 +254,8 @@ export interface Conversation {
 
 export interface ChatMessage {
   id: number;
+  /** 稳定 key，乐观更新替换服务器消息时不变，避免 FlatList 组件重建 */
+  localKey?: string;
   conversationId: number;
   senderId: number;
   senderNickname?: string;
@@ -264,6 +266,8 @@ export interface ChatMessage {
   mediaUrl?: string;
   mediaType?: string;
   mediaSize?: number;
+  mediaWidth?: number;
+  mediaHeight?: number;
   latitude?: number;
   longitude?: number;
   duration?: number;

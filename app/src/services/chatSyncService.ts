@@ -68,8 +68,9 @@ export async function syncConversations(): Promise<void> {
 /**
  * 增量同步消息
  * 拉取上次同步之后的所有新消息 → 写入本地 DB
+ * @returns 同步到的新消息数量
  */
-export async function syncMessages(): Promise<void> {
+export async function syncMessages(): Promise<number> {
   const lastSyncId = getSyncMeta(META_LAST_SYNC_MESSAGE_ID);
   const afterMessageId = lastSyncId ? parseInt(lastSyncId, 10) : undefined;
 
@@ -85,15 +86,18 @@ export async function syncMessages(): Promise<void> {
 
     console.log('[Sync] Synced', messages.length, 'messages, lastId:', maxId);
   }
+
+  return messages.length;
 }
 
 /**
  * 同步某会话的新消息
  * 打开聊天页时调用，确保该会话数据最新
+ * @returns 是否有新消息同步到本地
  */
-export async function syncConversationMessages(_convId: number): Promise<void> {
-  // 先做一次全局增量同步（简化逻辑，避免按会话单独维护位点）
-  await syncMessages();
+export async function syncConversationMessages(_convId: number): Promise<boolean> {
+  const count = await syncMessages();
+  return count > 0;
 }
 
 /**
@@ -120,7 +124,7 @@ export async function flushPendingMessages(): Promise<void> {
       const result = await chatService.sendMessage(msg.conversationId, msg.content);
 
       // 发送成功：更新本地消息状态，删除 pending 记录
-      updateMessageStatus(msg.localId, 'sent', result.id);
+      updateMessageStatus(msg.localId, 'sent', result.id, result.createdAt);
       removePendingMessage(msg.localId);
 
       // 更新同步位点
@@ -171,7 +175,7 @@ export async function sendLocalMessage(
     const result = await chatService.sendMessage(conversationId, content);
 
     // 4a. 成功
-    updateMessageStatus(localId, 'sent', result.id);
+    updateMessageStatus(localId, 'sent', result.id, result.createdAt);
     removePendingMessage(localId);
 
     // 更新同步位点
