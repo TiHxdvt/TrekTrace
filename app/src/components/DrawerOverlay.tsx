@@ -20,11 +20,16 @@ import {
   Easing,
   Dimensions,
   InteractionManager,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { storageService } from '../services/storageService';
+import { userService } from '../services/userService';
 import { Dialog } from '../components/Dialog';
+import { Toast } from '../components/Toast';
 import { Avatar } from '../components/Avatar';
 import { SubScreenOverlay, SubScreenName } from '../components/SubScreenOverlay';
 import {
@@ -43,6 +48,13 @@ import {
 import { useTheme, ThemeMode } from '../contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const IMAGE_PICKER_OPTIONS = {
+  mediaType: 'photo' as const,
+  quality: 0.7 as const,
+  maxWidth: 512,
+  maxHeight: 512,
+};
 
 // ─── 三段式主题选择器 ───
 
@@ -223,6 +235,7 @@ const DrawerContent: React.FC = () => {
   const avatarUrl = userData?.avatar ?? null;
   const { themeMode, setThemeMode, colors } = useTheme();
   const [themeSelectorExpanded, setThemeSelectorExpanded] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const insets = useSafeAreaInsets();
 
   const expandThemeSelector = useCallback(() => {
@@ -232,6 +245,64 @@ const DrawerContent: React.FC = () => {
   const collapseThemeSelector = useCallback(() => {
     setThemeSelectorExpanded(false);
   }, []);
+
+  const handleAvatarPress = () => {
+    Dialog.show('更换头像', '请选择头像来源', [
+      { text: '取消', style: 'cancel' },
+      { text: '拍照', onPress: () => handlePickImage('camera') },
+      { text: '从相册选择', onPress: () => handlePickImage('library') },
+    ]);
+  };
+
+  const handlePickImage = async (source: 'camera' | 'library') => {
+    if (source === 'camera' && Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: '相机权限',
+          message: '需要相机权限来拍摄头像照片',
+          buttonNeutral: '稍后再问',
+          buttonNegative: '拒绝',
+          buttonPositive: '允许',
+        },
+      );
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        Toast.show('需要相机权限才能拍照');
+        return;
+      }
+    }
+
+    const result = source === 'camera'
+      ? await launchCamera(IMAGE_PICKER_OPTIONS)
+      : await launchImageLibrary(IMAGE_PICKER_OPTIONS);
+
+    if (result.didCancel || result.errorCode) {
+      if (result.errorCode) {
+        Toast.show(`选择图片失败: ${result.errorMessage || result.errorCode}`);
+      }
+      return;
+    }
+
+    const asset = result.assets?.[0];
+    if (!asset?.uri || !asset?.type) return;
+
+    setUploading(true);
+    try {
+      const newUrl = await userService.uploadAvatar(asset.uri, asset.type);
+      if (_pendingUserData) {
+        _pendingUserData.avatar = newUrl;
+      }
+      const user = await storageService.getUser();
+      if (user) {
+        await storageService.saveUser({ ...user, avatarUrl: newUrl });
+      }
+      Toast.show('头像已更新');
+    } catch {
+      Toast.show('头像上传失败');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
     drawer: {
@@ -284,7 +355,7 @@ const DrawerContent: React.FC = () => {
       {/* 头部 */}
       <View style={styles.header}>
         <View style={styles.userArea}>
-          <Avatar uri={avatarUrl} size={64} />
+          <Avatar uri={avatarUrl} size={64} onPress={handleAvatarPress} loading={uploading} />
           <View style={styles.userInfo}>
             <Text style={dynamicStyles.userName}>{userName}</Text>
             {userAccount ? (

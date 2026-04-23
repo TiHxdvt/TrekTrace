@@ -11,10 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Platform,
-  PermissionsAndroid,
 } from 'react-native';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { useTheme } from '../contexts/ThemeContext';
 import { FeatureHeader } from '../components/FeatureScreenOverlay';
@@ -22,32 +19,14 @@ import { FeatureScreenLayout } from '../components/FeatureScreenLayout';
 import { userService, ProfileData } from '../services/userService';
 import { storageService } from '../services/storageService';
 import { Toast } from '../components/Toast';
-import { Dialog } from '../components/Dialog';
-import { Avatar } from '../components/Avatar';
-
-import { IconAltArrowRight } from '../components/SolarIcons';
+import { SectionItem } from '../components/SectionItem';
 import { SubScreenOverlay } from '../components/SubScreenOverlay';
 
 type NavProp = { goBack: () => void };
 
-const IMAGE_PICKER_OPTIONS = {
-  mediaType: 'photo' as const,
-  quality: 0.7 as const,
-  maxWidth: 512,
-  maxHeight: 512,
-};
-
 const NICKNAME_MAX_LENGTH = 14;
 const NICKNAME_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-/** 计算昵称显示宽度（中文算2，其他算1） */
-function nicknameWidth(s: string): number {
-  let w = 0;
-  for (let i = 0; i < s.length; i++) {
-    w += s.charCodeAt(i) > 0x7F ? 2 : 1;
-  }
-  return w;
-}
+const BIO_MAX_LENGTH = 200;
 
 /** 截断字符串使其显示宽度不超过 max */
 function truncateToWidth(s: string, max: number): string {
@@ -78,33 +57,32 @@ function getCooldownDesc(updatedAt: string | null | undefined): string | null {
   return `昵称修改冷却中，还需${minutes}分钟`;
 }
 
-export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation }) => {
-  const { colors } = useTheme();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [nickname, setNickname] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [weight, setWeight] = useState('');
-  const [bio, setBio] = useState('');
-  const [gender, setGender] = useState<string | null>(null);
-  const [heightVal, setHeightVal] = useState('');
-
-  const dynamicStyles = useMemo(() => StyleSheet.create({
-    sectionTitle: {
-      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
-      fontWeight: '500',
-      color: colors.TEXT.QUATERNARY,
-      marginBottom: SPACING.MD,
-      marginTop: SPACING.SM,
+// --- Modal 样式工厂 ---
+function modalStyles(colors: any) {
+  return StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: SPACING.XXL,
     },
     card: {
-      backgroundColor: colors.OVERLAY.LIGHT,
+      backgroundColor: colors.BACKGROUND,
       borderWidth: 1,
       borderColor: colors.BORDER.LIGHT,
-      borderRadius: BORDER_RADIUS.LG,
-      paddingHorizontal: SPACING.LG,
+      borderRadius: BORDER_RADIUS.XL,
+      padding: SPACING.XXL,
+      width: '100%',
+      maxWidth: 380,
+      gap: SPACING.MD,
+    },
+    title: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.LG,
+      fontWeight: '600',
+      color: colors.TEXT.PRIMARY,
+      textAlign: 'center',
+      marginBottom: SPACING.SM,
     },
     input: {
       backgroundColor: colors.OVERLAY.MEDIUM,
@@ -116,33 +94,378 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
       fontSize: TYPOGRAPHY.FONT_SIZE.MD,
       color: colors.TEXT.PRIMARY,
     },
-    cooldownText: {
-      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-      color: colors.WARNING,
+    hint: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XS,
+      color: colors.TEXT.QUATERNARY,
+      marginTop: -SPACING.XS,
     },
-    itemTitle: {
+    btnRow: {
+      flexDirection: 'row',
+      gap: SPACING.MD,
+      marginTop: SPACING.SM,
+    },
+    btn: {
+      flex: 1,
+      paddingVertical: SPACING.MD,
+      borderRadius: BORDER_RADIUS.MD,
+      alignItems: 'center',
+    },
+    btnCancel: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+    },
+    btnCancelText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      color: colors.TEXT.TERTIARY,
+    },
+    btnConfirm: {
+      backgroundColor: colors.PRIMARY,
+    },
+    btnConfirmText: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
+    btnDisabled: { opacity: 0.5 },
+    option: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: SPACING.MD,
+      paddingHorizontal: SPACING.MD,
+      borderRadius: BORDER_RADIUS.MD,
+    },
+    optionSelected: {
+      backgroundColor: colors.OVERLAY.MEDIUM,
+    },
+    optionText: {
       fontSize: TYPOGRAPHY.FONT_SIZE.MD,
       color: colors.TEXT.SECONDARY,
     },
-    itemValue: {
-      fontSize: TYPOGRAPHY.FONT_SIZE.SM,
+    optionTextSelected: {
+      color: colors.PRIMARY,
+      fontWeight: '500',
+    },
+    charCount: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.XS,
       color: colors.TEXT.QUATERNARY,
+      textAlign: 'right',
+    },
+  });
+}
+
+// --- 昵称编辑弹框 ---
+const EditNicknameModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  initialValue: string;
+  cooldownDesc: string | null;
+  onSuccess: () => void;
+}> = ({ visible, onClose, initialValue, cooldownDesc, onSuccess }) => {
+  const { colors } = useTheme();
+  const [value, setValue] = useState(initialValue);
+  const [loading, setLoading] = useState(false);
+  const ms = useMemo(() => modalStyles(colors), [colors]);
+
+  useEffect(() => {
+    if (visible) setValue(initialValue);
+  }, [visible, initialValue]);
+
+  if (!visible) return null;
+
+  const handleSubmit = async () => {
+    const trimmed = value.trim();
+    if (!trimmed) { Toast.show('昵称不能为空'); return; }
+    setLoading(true);
+    try {
+      const updated = await userService.updateProfile({ nickname: trimmed });
+      const user = await storageService.getUser();
+      if (user) {
+        await storageService.saveUser({ ...user, nickname: updated.nickname });
+      }
+      Toast.show('昵称已更新');
+      onSuccess();
+      onClose();
+    } catch (e: any) {
+      Toast.show(e?.response?.data?.error || '修改失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={ms.overlay}>
+      <View style={ms.card}>
+        <Text style={ms.title}>修改昵称</Text>
+        {cooldownDesc && <Text style={[ms.hint, { color: colors.WARNING }]}>{cooldownDesc}</Text>}
+        <TextInput
+          style={ms.input}
+          value={value}
+          onChangeText={(text) => setValue(truncateToWidth(text, NICKNAME_MAX_LENGTH))}
+          placeholder="输入昵称"
+          placeholderTextColor={colors.TEXT.PLACEHOLDER}
+          editable={!cooldownDesc}
+        />
+        <View style={ms.btnRow}>
+          <TouchableOpacity style={[ms.btn, ms.btnCancel]} onPress={onClose}><Text style={ms.btnCancelText}>取消</Text></TouchableOpacity>
+          <TouchableOpacity style={[ms.btn, ms.btnConfirm, (loading || !!cooldownDesc) && ms.btnDisabled]} onPress={handleSubmit} disabled={loading || !!cooldownDesc}><Text style={ms.btnConfirmText}>{loading ? '保存中...' : '确认'}</Text></TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// --- 签名编辑弹框 ---
+const EditBioModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  initialValue: string;
+  onSuccess: () => void;
+}> = ({ visible, onClose, initialValue, onSuccess }) => {
+  const { colors } = useTheme();
+  const [value, setValue] = useState(initialValue);
+  const [loading, setLoading] = useState(false);
+  const ms = useMemo(() => modalStyles(colors), [colors]);
+
+  useEffect(() => {
+    if (visible) setValue(initialValue);
+  }, [visible, initialValue]);
+
+  if (!visible) return null;
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      await userService.updateProfile({ bio: value || undefined });
+      Toast.show('签名已更新');
+      onSuccess();
+      onClose();
+    } catch (e: any) {
+      Toast.show(e?.response?.data?.error || '修改失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={ms.overlay}>
+      <View style={ms.card}>
+        <Text style={ms.title}>修改签名</Text>
+        <TextInput
+          style={[ms.input, { minHeight: 80, textAlignVertical: 'top' }]}
+          value={value}
+          onChangeText={(text) => setValue(text.slice(0, BIO_MAX_LENGTH))}
+          placeholder="写点什么介绍一下自己吧..."
+          placeholderTextColor={colors.TEXT.PLACEHOLDER}
+          multiline
+          maxLength={BIO_MAX_LENGTH}
+        />
+        <Text style={ms.charCount}>{value.length}/{BIO_MAX_LENGTH}</Text>
+        <View style={ms.btnRow}>
+          <TouchableOpacity style={[ms.btn, ms.btnCancel]} onPress={onClose}><Text style={ms.btnCancelText}>取消</Text></TouchableOpacity>
+          <TouchableOpacity style={[ms.btn, ms.btnConfirm, loading && ms.btnDisabled]} onPress={handleSubmit} disabled={loading}><Text style={ms.btnConfirmText}>{loading ? '保存中...' : '确认'}</Text></TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// --- 性别选择弹框 ---
+const EditGenderModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  current: string | null;
+  onSuccess: () => void;
+}> = ({ visible, onClose, current, onSuccess }) => {
+  const { colors } = useTheme();
+  const ms = useMemo(() => modalStyles(colors), [colors]);
+
+  if (!visible) return null;
+
+  const options = [
+    { value: 'MALE', label: '男' },
+    { value: 'FEMALE', label: '女' },
+    { value: 'OTHER', label: '其他' },
+  ];
+
+  const handleSelect = async (v: string) => {
+    try {
+      await userService.updateProfile({ gender: v });
+      Toast.show('性别已更新');
+      onSuccess();
+      onClose();
+    } catch (e: any) {
+      Toast.show(e?.response?.data?.error || '修改失败');
+    }
+  };
+
+  return (
+    <View style={ms.overlay}>
+      <View style={ms.card}>
+        <Text style={ms.title}>选择性别</Text>
+        {options.map(opt => (
+          <TouchableOpacity
+            key={opt.value}
+            style={[ms.option, current === opt.value && ms.optionSelected]}
+            onPress={() => handleSelect(opt.value)}
+            activeOpacity={0.7}
+          >
+            <Text style={[ms.optionText, current === opt.value && ms.optionTextSelected]}>{opt.label}</Text>
+            {current === opt.value && <Text style={{ color: colors.PRIMARY, fontSize: 18 }}>✓</Text>}
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity style={{ paddingVertical: SPACING.MD, alignItems: 'center' }} onPress={onClose}>
+          <Text style={{ color: colors.TEXT.TERTIARY, fontSize: TYPOGRAPHY.FONT_SIZE.MD }}>取消</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+// --- 身高编辑弹框 ---
+const EditHeightModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  initialValue: string;
+  onSuccess: () => void;
+}> = ({ visible, onClose, initialValue, onSuccess }) => {
+  const { colors } = useTheme();
+  const [value, setValue] = useState(initialValue);
+  const [loading, setLoading] = useState(false);
+  const ms = useMemo(() => modalStyles(colors), [colors]);
+
+  useEffect(() => {
+    if (visible) setValue(initialValue);
+  }, [visible, initialValue]);
+
+  if (!visible) return null;
+
+  const handleSubmit = async () => {
+    const num = value ? parseFloat(value) : undefined;
+    if (num !== undefined && (isNaN(num) || num < 50 || num > 300)) {
+      Toast.show('身高范围：50-300cm');
+      return;
+    }
+    setLoading(true);
+    try {
+      await userService.updateProfile({ height: num });
+      Toast.show('身高已更新');
+      onSuccess();
+      onClose();
+    } catch (e: any) {
+      Toast.show(e?.response?.data?.error || '修改失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={ms.overlay}>
+      <View style={ms.card}>
+        <Text style={ms.title}>修改身高</Text>
+        <TextInput
+          style={ms.input}
+          value={value}
+          onChangeText={setValue}
+          placeholder="输入身高（50-300cm）"
+          placeholderTextColor={colors.TEXT.PLACEHOLDER}
+          keyboardType="decimal-pad"
+        />
+        <View style={ms.btnRow}>
+          <TouchableOpacity style={[ms.btn, ms.btnCancel]} onPress={onClose}><Text style={ms.btnCancelText}>取消</Text></TouchableOpacity>
+          <TouchableOpacity style={[ms.btn, ms.btnConfirm, loading && ms.btnDisabled]} onPress={handleSubmit} disabled={loading}><Text style={ms.btnConfirmText}>{loading ? '保存中...' : '确认'}</Text></TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// --- 体重编辑弹框 ---
+const EditWeightModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  initialValue: string;
+  onSuccess: () => void;
+}> = ({ visible, onClose, initialValue, onSuccess }) => {
+  const { colors } = useTheme();
+  const [value, setValue] = useState(initialValue);
+  const [loading, setLoading] = useState(false);
+  const ms = useMemo(() => modalStyles(colors), [colors]);
+
+  useEffect(() => {
+    if (visible) setValue(initialValue);
+  }, [visible, initialValue]);
+
+  if (!visible) return null;
+
+  const handleSubmit = async () => {
+    const num = value ? parseFloat(value) : undefined;
+    if (num !== undefined && (isNaN(num) || num < 20 || num > 300)) {
+      Toast.show('体重范围：20-300kg');
+      return;
+    }
+    setLoading(true);
+    try {
+      await userService.updateProfile({ weight: num });
+      Toast.show('体重已更新');
+      onSuccess();
+      onClose();
+    } catch (e: any) {
+      Toast.show(e?.response?.data?.error || '修改失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={ms.overlay}>
+      <View style={ms.card}>
+        <Text style={ms.title}>修改体重</Text>
+        <TextInput
+          style={ms.input}
+          value={value}
+          onChangeText={setValue}
+          placeholder="输入体重（20-300kg）"
+          placeholderTextColor={colors.TEXT.PLACEHOLDER}
+          keyboardType="decimal-pad"
+        />
+        <View style={ms.btnRow}>
+          <TouchableOpacity style={[ms.btn, ms.btnCancel]} onPress={onClose}><Text style={ms.btnCancelText}>取消</Text></TouchableOpacity>
+          <TouchableOpacity style={[ms.btn, ms.btnConfirm, loading && ms.btnDisabled]} onPress={handleSubmit} disabled={loading}><Text style={ms.btnConfirmText}>{loading ? '保存中...' : '确认'}</Text></TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// --- 主页面 ---
+export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showEditNickname, setShowEditNickname] = useState(false);
+  const [showEditBio, setShowEditBio] = useState(false);
+  const [showEditGender, setShowEditGender] = useState(false);
+  const [showEditHeight, setShowEditHeight] = useState(false);
+  const [showEditWeight, setShowEditWeight] = useState(false);
+
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    sectionTitle: {
+      fontSize: TYPOGRAPHY.FONT_SIZE.BASE,
+      fontWeight: '500',
+      color: colors.TEXT.QUATERNARY,
+      marginBottom: SPACING.MD,
+      marginTop: SPACING.XXL,
+    },
+    card: {
+      backgroundColor: colors.OVERLAY.LIGHT,
+      borderWidth: 1,
+      borderColor: colors.BORDER.LIGHT,
+      borderRadius: BORDER_RADIUS.LG,
+      paddingHorizontal: SPACING.LG,
     },
     divider: {
       height: 1,
       backgroundColor: colors.BORDER.LIGHT,
-    },
-    saveBtn: {
-      backgroundColor: colors.PRIMARY,
-      borderRadius: BORDER_RADIUS.LG,
-      paddingVertical: SPACING.LG,
-      alignItems: 'center',
-      marginTop: SPACING.XXL,
-    },
-    saveBtnText: {
-      fontSize: TYPOGRAPHY.FONT_SIZE.MD,
-      fontWeight: '600',
-      color: '#ffffff',
     },
   }), [colors]);
 
@@ -150,12 +473,6 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
     try {
       const data = await userService.getProfile();
       setProfile(data);
-      setNickname(data.nickname || '');
-      setAvatarUrl(data.avatarUrl || '');
-      setWeight(data.weight != null ? String(data.weight) : '');
-      setBio(data.bio || '');
-      setGender(data.gender || null);
-      setHeightVal(data.height != null ? String(data.height) : '');
     } catch {
       Toast.show('加载个人信息失败');
     } finally {
@@ -167,110 +484,11 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
     loadProfile();
   }, [loadProfile]);
 
-  const handleAvatarPress = () => {
-    Dialog.show('更换头像', '请选择头像来源', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '拍照',
-        onPress: () => handlePickImage('camera'),
-      },
-      {
-        text: '从相册选择',
-        onPress: () => handlePickImage('library'),
-      },
-    ]);
-  };
-
-  const handlePickImage = async (source: 'camera' | 'library') => {
-    // Android 相机需要运行时权限
-    if (source === 'camera' && Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.CAMERA,
-        {
-          title: '相机权限',
-          message: '需要相机权限来拍摄头像照片',
-          buttonNeutral: '稍后再问',
-          buttonNegative: '拒绝',
-          buttonPositive: '允许',
-        },
-      );
-      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Toast.show('需要相机权限才能拍照');
-        return;
-      }
-    }
-
-    const result = source === 'camera'
-      ? await launchCamera(IMAGE_PICKER_OPTIONS)
-      : await launchImageLibrary(IMAGE_PICKER_OPTIONS);
-
-    if (result.didCancel || result.errorCode) {
-      if (result.errorCode) {
-        Toast.show(`选择图片失败: ${result.errorMessage || result.errorCode}`);
-      }
-      return;
-    }
-
-    const asset = result.assets?.[0];
-    if (!asset?.uri || !asset?.type) return;
-
-    setUploading(true);
-    try {
-      const newUrl = await userService.uploadAvatar(asset.uri, asset.type);
-      setAvatarUrl(newUrl);
-      if (profile) {
-        setProfile({ ...profile, avatarUrl: newUrl });
-      }
-      const user = await storageService.getUser();
-      if (user) {
-        await storageService.saveUser({ ...user, avatarUrl: newUrl });
-      }
-      Toast.show('头像已更新');
-    } catch {
-      Toast.show('头像上传失败');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const weightNum = weight ? parseFloat(weight) : undefined;
-      const heightNum = heightVal ? parseFloat(heightVal) : undefined;
-      if (weightNum !== undefined && (weightNum < 20 || weightNum > 300)) {
-        Toast.show('体重范围：20-300kg');
-        setSaving(false);
-        return;
-      }
-      if (heightNum !== undefined && (heightNum < 50 || heightNum > 300)) {
-        Toast.show('身高范围：50-300cm');
-        setSaving(false);
-        return;
-      }
-      const updated = await userService.updateProfile({
-        nickname: nickname || undefined,
-        weight: weightNum && !isNaN(weightNum) ? weightNum : undefined,
-        bio: bio || undefined,
-        gender: gender || undefined,
-        height: heightNum && !isNaN(heightNum) ? heightNum : undefined,
-      });
-      setProfile(updated);
-      // Update local storage
-      const user = await storageService.getUser();
-      if (user) {
-        await storageService.saveUser({ ...user, nickname: updated.nickname, avatarUrl: updated.avatarUrl });
-      }
-      Toast.show('保存成功');
-    } catch (e: any) {
-      const msg = e?.response?.data?.error || e?.response?.data?.message || '保存失败';
-      Toast.show(msg);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const cooldownDesc = useMemo(() => getCooldownDesc(profile?.nicknameUpdatedAt), [profile?.nicknameUpdatedAt]);
+
+  const genderLabel = profile?.gender === 'MALE' ? '男'
+    : profile?.gender === 'FEMALE' ? '女'
+    : profile?.gender === 'OTHER' ? '其他' : '未设置';
 
   if (loading) {
     return (
@@ -287,164 +505,95 @@ export const ProfileScreen: React.FC<{ navigation: NavProp }> = ({ navigation })
     <FeatureScreenLayout>
       <FeatureHeader title="个人信息" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Avatar */}
-        <View style={styles.avatarSection}>
-          <Avatar uri={avatarUrl} size={96} onPress={handleAvatarPress} loading={uploading} />
-        </View>
-
         {/* 基本信息 */}
         <Text style={dynamicStyles.sectionTitle}>基本信息</Text>
         <View style={dynamicStyles.card}>
-          {/* 昵称（可编辑） */}
-          <View style={styles.editSection}>
-            <View style={styles.editLabelRow}>
-              <Text style={dynamicStyles.itemTitle}>昵称</Text>
-              {cooldownDesc && <Text style={dynamicStyles.cooldownText}>{cooldownDesc}</Text>}
-            </View>
-            <TextInput
-              style={dynamicStyles.input}
-              value={nickname}
-              onChangeText={(text) => setNickname(truncateToWidth(text, NICKNAME_MAX_LENGTH))}
-              placeholder="中文、字母、数字、下划线，最长7个中文"
-              placeholderTextColor={colors.TEXT.PLACEHOLDER}
-              editable={!cooldownDesc}
-            />
-          </View>
-
+          <SectionItem
+            title="昵称"
+            value={profile?.nickname || '未设置'}
+            onPress={() => setShowEditNickname(true)}
+          />
           <View style={dynamicStyles.divider} />
-
-          {/* 账号 */}
-          <View style={styles.item}>
-            <Text style={dynamicStyles.itemTitle}>途迹账号</Text>
-            <Text style={dynamicStyles.itemValue}>{profile?.account != null ? profile.account : '-'}</Text>
-          </View>
-
-          <View style={dynamicStyles.divider} />
-
-          {/* 手机号 */}
-          <View style={styles.item}>
-            <Text style={dynamicStyles.itemTitle}>手机号</Text>
-            <Text style={dynamicStyles.itemValue}>{profile?.phone || '-'}</Text>
-          </View>
-
-          <View style={dynamicStyles.divider} />
-
-          {/* 注册时间 */}
-          <View style={styles.item}>
-            <Text style={dynamicStyles.itemTitle}>注册时间</Text>
-            <Text style={dynamicStyles.itemValue}>
-              {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('zh-CN') : '-'}
-            </Text>
-          </View>
-        </View>
-
-        {/* 个人简介 */}
-        <Text style={dynamicStyles.sectionTitle}>个人简介</Text>
-        <View style={dynamicStyles.card}>
-          <View style={styles.editSection}>
-            <TextInput
-              style={[dynamicStyles.input, { minHeight: 80, textAlignVertical: 'top' }]}
-              value={bio}
-              onChangeText={(text) => setBio(text.slice(0, 200))}
-              placeholder="写点什么介绍一下自己吧..."
-              placeholderTextColor={colors.TEXT.PLACEHOLDER}
-              multiline
-              maxLength={200}
-            />
-            <Text style={dynamicStyles.itemValue}>{bio.length}/200</Text>
-          </View>
+          <SectionItem
+            title="签名"
+            value={profile?.bio ? (profile.bio.length > 20 ? profile.bio.slice(0, 20) + '...' : profile.bio) : '未设置'}
+            onPress={() => setShowEditBio(true)}
+          />
         </View>
 
         {/* 身体数据 */}
         <Text style={dynamicStyles.sectionTitle}>身体数据</Text>
         <View style={dynamicStyles.card}>
-          {/* 性别 */}
-          <View style={styles.editSection}>
-            <Text style={[dynamicStyles.itemTitle, { marginBottom: SPACING.SM }]}>性别</Text>
-            <View style={styles.genderRow}>
-              {[
-                { key: 'MALE', label: '男' },
-                { key: 'FEMALE', label: '女' },
-                { key: 'OTHER', label: '其他' },
-              ].map((opt) => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[
-                    styles.genderBtn,
-                    {
-                      backgroundColor: gender === opt.key ? colors.PRIMARY : colors.OVERLAY.MEDIUM,
-                      borderColor: gender === opt.key ? colors.PRIMARY : colors.BORDER.MEDIUM,
-                    },
-                  ]}
-                  onPress={() => setGender(gender === opt.key ? null : opt.key)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{
-                    fontSize: TYPOGRAPHY.FONT_SIZE.SM,
-                    color: gender === opt.key ? '#ffffff' : colors.TEXT.SECONDARY,
-                  }}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
+          <SectionItem
+            title="性别"
+            value={genderLabel}
+            onPress={() => setShowEditGender(true)}
+          />
           <View style={dynamicStyles.divider} />
-
-          <View style={styles.editSection}>
-            <View style={styles.editLabelRow}>
-              <Text style={dynamicStyles.itemTitle}>身高</Text>
-              <Text style={dynamicStyles.itemValue}>cm</Text>
-            </View>
-            <TextInput
-              style={dynamicStyles.input}
-              value={heightVal}
-              onChangeText={setHeightVal}
-              placeholder="输入身高（50-300cm）"
-              placeholderTextColor={colors.TEXT.PLACEHOLDER}
-              keyboardType="decimal-pad"
-            />
-          </View>
-
+          <SectionItem
+            title="身高"
+            value={profile?.height != null ? `${profile.height}cm` : '未设置'}
+            onPress={() => setShowEditHeight(true)}
+          />
           <View style={dynamicStyles.divider} />
-
-          <View style={styles.editSection}>
-            <View style={styles.editLabelRow}>
-              <Text style={dynamicStyles.itemTitle}>体重</Text>
-              <Text style={dynamicStyles.itemValue}>kg</Text>
-            </View>
-            <TextInput
-              style={dynamicStyles.input}
-              value={weight}
-              onChangeText={setWeight}
-              placeholder="输入体重（20-300kg）"
-              placeholderTextColor={colors.TEXT.PLACEHOLDER}
-              keyboardType="decimal-pad"
-            />
-          </View>
+          <SectionItem
+            title="体重"
+            value={profile?.weight != null ? `${profile.weight}kg` : '未设置'}
+            onPress={() => setShowEditWeight(true)}
+          />
         </View>
 
-        {/* 隐私设置 */}
-        <TouchableOpacity
-          style={[dynamicStyles.card, styles.item]}
-          onPress={() => SubScreenOverlay.close(() => SubScreenOverlay.open('AccountPrivacy'))}
-          activeOpacity={0.7}
-        >
-          <Text style={dynamicStyles.itemTitle}>隐私设置</Text>
-          <IconAltArrowRight size={18} color={colors.TEXT.QUINARY} />
-        </TouchableOpacity>
-
-        {/* Save button */}
-        <TouchableOpacity
-          style={[dynamicStyles.saveBtn, saving && styles.saveBtnDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-          activeOpacity={0.7}
-        >
-          <Text style={dynamicStyles.saveBtnText}>{saving ? '保存中...' : '保存'}</Text>
-        </TouchableOpacity>
+        {/* 账号安全 */}
+        <Text style={dynamicStyles.sectionTitle}>账号安全</Text>
+        <View style={dynamicStyles.card}>
+          <SectionItem
+            title="账号安全"
+            onPress={() => SubScreenOverlay.close(() => SubScreenOverlay.open('AccountPrivacy'))}
+          />
+        </View>
       </ScrollView>
+
+      {showEditNickname && (
+        <EditNicknameModal
+          visible={showEditNickname}
+          onClose={() => setShowEditNickname(false)}
+          initialValue={profile?.nickname || ''}
+          cooldownDesc={cooldownDesc}
+          onSuccess={loadProfile}
+        />
+      )}
+      {showEditBio && (
+        <EditBioModal
+          visible={showEditBio}
+          onClose={() => setShowEditBio(false)}
+          initialValue={profile?.bio || ''}
+          onSuccess={loadProfile}
+        />
+      )}
+      {showEditGender && (
+        <EditGenderModal
+          visible={showEditGender}
+          onClose={() => setShowEditGender(false)}
+          current={profile?.gender || null}
+          onSuccess={loadProfile}
+        />
+      )}
+      {showEditHeight && (
+        <EditHeightModal
+          visible={showEditHeight}
+          onClose={() => setShowEditHeight(false)}
+          initialValue={profile?.height != null ? String(profile.height) : ''}
+          onSuccess={loadProfile}
+        />
+      )}
+      {showEditWeight && (
+        <EditWeightModal
+          visible={showEditWeight}
+          onClose={() => setShowEditWeight(false)}
+          initialValue={profile?.weight != null ? String(profile.weight) : ''}
+          onSuccess={loadProfile}
+        />
+      )}
     </FeatureScreenLayout>
   );
 };
@@ -453,31 +602,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.XL, paddingBottom: SPACING.XXXL * 2 },
-  avatarSection: { alignItems: 'center', marginVertical: SPACING.XXL },
-  editSection: {
-    paddingVertical: SPACING.LG,
-  },
-  editLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.SM,
-  },
   item: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: SPACING.LG,
   },
-  genderRow: {
-    flexDirection: 'row',
-    gap: SPACING.SM,
-  },
-  genderBtn: {
-    paddingHorizontal: SPACING.LG,
-    paddingVertical: SPACING.SM,
-    borderRadius: BORDER_RADIUS.MD,
-    borderWidth: 1,
-  },
-  saveBtnDisabled: { opacity: 0.5 },
 });
