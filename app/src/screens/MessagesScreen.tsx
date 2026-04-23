@@ -19,6 +19,7 @@ import {
   TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../theme';
 import { useTheme } from '../contexts/ThemeContext';
@@ -180,6 +181,13 @@ export const MessagesScreen: React.FC = () => {
       websocketService.unsubscribe('/user/queue/messages');
     };
   }, [loadConversations]);
+
+  // 每次页面获得焦点时重新从 DB 加载（处理从其他页面删除数据后返回的场景）
+  useFocusEffect(
+    useCallback(() => {
+      loadConversations();
+    }, [loadConversations]),
+  );
 
   // ---- 全局搜索 ----
   const handleGlobalSearch = useCallback(async (keyword: string) => {
@@ -564,7 +572,7 @@ export const MessagesScreen: React.FC = () => {
             <View style={styles.loadingState}>
               <ActivityIndicator color={colors.PRIMARY} />
             </View>
-          ) : loading ? (
+          ) : loading || conversations.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={[styles.iconWrap, dynamicStyles.iconWrap]}>
                 <IconChatRoundLine size={48} color={colors.TEXT.QUATERNARY} />
