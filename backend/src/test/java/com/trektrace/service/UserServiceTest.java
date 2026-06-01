@@ -37,35 +37,58 @@ class UserServiceTest {
     }
 
     @Test
-    void createOrGetUser_existingUser_returnsExisting() {
+    void registerUser_existingPhone_throws() {
         User existing = new User();
         existing.setPhone("13800138000");
-        existing.setNickname("测试用户");
-        when(userRepository.findByPhone("13800138000")).thenReturn(Optional.of(existing));
+        when(userRepository.findByIdentifier("13800138000")).thenReturn(Optional.of(existing));
 
-        User result = userService.createOrGetUser("13800138000");
-
-        assertEquals("13800138000", result.getPhone());
-        verify(userRepository, never()).save(any());
+        assertThrows(ResponseStatusException.class,
+                () -> userService.registerUser("13800138000", "Test123"));
     }
 
     @Test
-    void createOrGetUser_newUser_createsAndReturns() {
-        when(userRepository.findByPhone("13900139000")).thenReturn(Optional.empty());
+    void registerUser_newPhone_createsAndReturns() {
+        when(userRepository.findByIdentifier("13900139000")).thenReturn(Optional.empty());
 
-        User saved = new User();
-        saved.setId(1L);
-        saved.setPhone("13900139000");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             u.setId(1L);
             return u;
         });
 
-        User result = userService.createOrGetUser("13900139000");
+        User result = userService.registerUser("13900139000", "Test123");
 
         assertNotNull(result);
         assertEquals("13900139000", result.getPhone());
+        assertNotNull(result.getNickname());
+        verify(userRepository, times(2)).save(any());
+    }
+
+    @Test
+    void registerUser_existingEmail_throws() {
+        User existing = new User();
+        existing.setEmail("test@example.com");
+        when(userRepository.findByIdentifier("test@example.com")).thenReturn(Optional.of(existing));
+
+        assertThrows(ResponseStatusException.class,
+                () -> userService.registerUser("test@example.com", "Test123"));
+    }
+
+    @Test
+    void registerUser_newEmail_createsAndReturns() {
+        when(userRepository.findByIdentifier("new@example.com")).thenReturn(Optional.empty());
+
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            u.setId(2L);
+            return u;
+        });
+
+        User result = userService.registerUser("new@example.com", "Test123");
+
+        assertNotNull(result);
+        assertEquals("new@example.com", result.getEmail());
+        assertTrue(result.getEmailVerified());
         assertNotNull(result.getNickname());
         verify(userRepository, times(2)).save(any());
     }
@@ -82,7 +105,7 @@ class UserServiceTest {
         User user = new User();
         user.setPhone("13800138000");
         user.setPassword("$2a$10$dummyhash");
-        when(userRepository.findByPhone("13800138000")).thenReturn(Optional.of(user));
+        when(userRepository.findByIdentifier("13800138000")).thenReturn(Optional.of(user));
 
         assertThrows(ResponseStatusException.class,
                 () -> userService.authenticatePassword("13800138000", "wrongpass"));
