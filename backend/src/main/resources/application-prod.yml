@@ -12,3 +12,12 @@ spring:
     properties:
       hibernate:
         format_sql: false
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:465}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+mail:
+  provider: ${MAIL_PROVIDER:mock}
+  base-url: ${MAIL_BASE_URL:http://localhost:8080}
+  from: ${SMTP_FROM:noreply@trektrace.com}

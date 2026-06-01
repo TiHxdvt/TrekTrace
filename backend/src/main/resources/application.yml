@@ -105,6 +105,6 @@ jwt:
   secret: ${JWT_SECRET:dev-only-secret-key-do-not-use-in-production-!!}
   refresh-expiration: 2592000000
 mail:
-  provider: smtp
+  provider: ${MAIL_PROVIDER:mock}
   base-url: ${MAIL_BASE_URL:http://localhost:8080}
   from: ${SMTP_FROM:noreply@trektrace.com}

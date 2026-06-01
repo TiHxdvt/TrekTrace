@@ -9,6 +9,8 @@ export interface User {
   phone: string;
   nickname?: string;
   avatarUrl?: string;
+  email?: string;
+  emailVerified?: boolean;
   createdAt: string;
   updatedAt?: string;
 }
@@ -51,8 +53,8 @@ export interface ApiResponse<T = any> {
 
 // 登录请求
 export interface LoginRequest {
-  phone: string;
-  code: string;
+  identifier: string;
+  password: string;
 }
 
 // 登录响应
@@ -62,22 +64,30 @@ export interface LoginResponse {
   user: User;
 }
 
-// 密码登录请求
-export interface PasswordLoginRequest {
-  phone: string;
-  password: string;
-}
-
 // 发送验证码请求
 export interface SendCodeRequest {
-  phone: string;
+  identifier: string;
+  purpose: 'register' | 'resetPassword' | 'bind';
 }
 
 // 重置密码请求
 export interface ResetPasswordRequest {
-  phone: string;
+  identifier: string;
   code: string;
   newPassword: string;
+}
+
+// 注册请求
+export interface RegisterRequest {
+  identifier: string;
+  code: string;
+  password: string;
+}
+
+// 验证码校验请求
+export interface VerifyCodeRequest {
+  identifier: string;
+  code: string;
 }
 
 // 活动列表查询参数

@@ -4,7 +4,6 @@ import com.trektrace.dto.NearbyUserDTO;
 import com.trektrace.entity.Activity;
 import com.trektrace.entity.Friendship;
 import com.trektrace.entity.User;
-import com.trektrace.entity.VerificationCode;
 import com.trektrace.repository.ActivityRepository;
 import com.trektrace.repository.FriendshipRepository;
 import com.trektrace.repository.UserRepository;
@@ -61,6 +60,9 @@ public class UserService {
     /** 昵称修改冷却天数 */
     private static final long NICKNAME_COOLDOWN_DAYS = 7;
 
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
+
     private static String generateRandomNickname() {
         String adj = ADJECTIVES[ThreadLocalRandom.current().nextInt(ADJECTIVES.length)];
         String noun = NOUNS[ThreadLocalRandom.current().nextInt(NOUNS.length)];
@@ -88,17 +90,36 @@ public class UserService {
         this.activityRepository = activityRepository;
     }
 
-    public User createOrGetUser(String phone) {
-        Optional<User> existingUser = userRepository.findByPhone(phone);
+    /** 判断 identifier 是否为邮箱格式 */
+    public static boolean isEmail(String identifier) {
+        return EMAIL_PATTERN.matcher(identifier).matches();
+    }
 
-        if (existingUser.isPresent()) {
-            return existingUser.get();
+    /** 判断 identifier 是否为手机号格式 */
+    public static boolean isPhone(String identifier) {
+        return PHONE_PATTERN.matcher(identifier).matches();
+    }
+
+    /** 注册新用户 */
+    public User registerUser(String identifier, String rawPassword) {
+        // 检查唯一性
+        if (userRepository.findByIdentifier(identifier).isPresent()) {
+            String msg = isEmail(identifier) ? "该邮箱已被注册" : "该手机号已被注册";
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, msg);
         }
 
         User newUser = new User();
-        newUser.setPhone(phone);
+        if (isEmail(identifier)) {
+            newUser.setEmail(identifier);
+            newUser.setEmailVerified(true);
+        } else if (isPhone(identifier)) {
+            newUser.setPhone(identifier);
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请输入正确的邮箱或手机号");
+        }
         newUser.setNickname(generateRandomNickname());
-        newUser.setAvatarUrl("https://api.dicebear.com/9.x/thumbs/png?seed=" + phone);
+        newUser.setAvatarUrl("https://api.dicebear.com/9.x/thumbs/png?seed=" + identifier);
+        newUser.setPassword(passwordEncoder.encode(rawPassword));
         User saved = userRepository.save(newUser);
         saved.setAccount(100000L + saved.getId());
         return userRepository.save(saved);
@@ -197,8 +218,9 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public User authenticatePassword(String phone, String rawPassword) {
-        User user = userRepository.findByPhone(phone)
+    /** 根据 identifier（邮箱或手机号）+ 密码认证 */
+    public User authenticatePassword(String identifier, String rawPassword) {
+        User user = userRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "账号或密码错误"));
         if (user.getPassword() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "账号或密码错误");
@@ -233,22 +255,16 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public void resetPassword(String phone, String code, String newPassword) {
-        Optional<VerificationCode> vcOpt = verificationCodeRepository
-                .findTopByPhoneAndCodeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
-                        phone, code, LocalDateTime.now());
-
-        if (vcOpt.isEmpty()) {
+    /** 根据 identifier 重置密码 */
+    public void resetPassword(String identifier, String code, String newPassword) {
+        int consumed = verificationCodeRepository.consumeCode(identifier, code, LocalDateTime.now());
+        if (consumed == 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码错误或已过期");
         }
 
-        VerificationCode vc = vcOpt.get();
-        vc.setUsed(true);
-        verificationCodeRepository.save(vc);
-
         validatePasswordStrength(newPassword);
 
-        User user = userRepository.findByPhone(phone)
+        User user = userRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户不存在"));
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -259,7 +275,13 @@ public class UserService {
         tokenBlacklistService.blacklistAllUserTokens(user.getId());
     }
 
-    public void bindEmail(Long userId, String email) {
+    /** 绑定邮箱（验证码验证后直接绑定） */
+    public void bindEmail(Long userId, String email, String code) {
+        int consumed = verificationCodeRepository.consumeCode(email, code, LocalDateTime.now());
+        if (consumed == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码错误或已过期");
+        }
+
         User user = getUserById(userId);
         // 检查邮箱是否已被其他用户绑定
         userRepository.findByEmail(email).ifPresent(existing -> {
@@ -268,16 +290,8 @@ public class UserService {
             }
         });
         user.setEmail(email);
-        user.setEmailVerified(false);
+        user.setEmailVerified(true);
         userRepository.save(user);
-    }
-
-    public void verifyEmail(Long userId, String email) {
-        User user = getUserById(userId);
-        if (email.equals(user.getEmail())) {
-            user.setEmailVerified(true);
-            userRepository.save(user);
-        }
     }
 
     private void validatePasswordStrength(String password) {

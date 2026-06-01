@@ -17,7 +17,7 @@ public class User {
     @Column(unique = true)
     private Long account;
 
-    @Column(unique = true, nullable = false, length = 11)
+    @Column(unique = true, length = 11)
     private String phone;
 
     @Column(length = 50)

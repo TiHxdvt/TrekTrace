@@ -12,15 +12,15 @@ import java.util.Optional;
 @Repository
 public interface VerificationCodeRepository extends JpaRepository<VerificationCode, Long> {
 
-    Optional<VerificationCode> findTopByPhoneAndCodeAndUsedFalseOrderByCreatedAtDesc(
-        String phone, String code);
+    Optional<VerificationCode> findTopByTargetAndCodeAndUsedFalseOrderByCreatedAtDesc(
+        String target, String code);
 
-    Optional<VerificationCode> findTopByPhoneAndCodeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
-        String phone, String code, LocalDateTime expiresAt);
+    Optional<VerificationCode> findTopByTargetAndCodeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
+        String target, String code, LocalDateTime expiresAt);
 
     /**
      * Atomically consume a verification code: find an unused, non-expired code
-     * matching phone+code and mark it as used in a single native query.
+     * matching target+code and mark it as used in a single native query.
      * Uses a double-nested subquery to work around MySQL's restriction on
      * updating the same table referenced in a subquery (Error 1093).
      * Returns the number of rows affected (1 = success, 0 = invalid/expired).
@@ -30,10 +30,10 @@ public interface VerificationCodeRepository extends JpaRepository<VerificationCo
            "WHERE id = (" +
            "  SELECT id FROM (" +
            "    SELECT id FROM verification_codes " +
-           "    WHERE phone = :phone AND code = :code " +
+           "    WHERE target = :target AND code = :code " +
            "      AND used = 0 AND expires_at > :now " +
            "    ORDER BY created_at DESC LIMIT 1" +
            "  ) AS tmp" +
            ")", nativeQuery = true)
-    int consumeCode(String phone, String code, LocalDateTime now);
+    int consumeCode(String target, String code, LocalDateTime now);
 }

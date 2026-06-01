@@ -3,19 +3,23 @@ package com.trektrace.controller;
 import com.trektrace.dto.BindEmailRequest;
 import com.trektrace.dto.LoginRequest;
 import com.trektrace.dto.LoginResponse;
+import com.trektrace.dto.RefreshTokenRequest;
+import com.trektrace.dto.RegisterRequest;
 import com.trektrace.dto.ResetPasswordRequest;
-import com.trektrace.entity.EmailVerificationToken;
+import com.trektrace.dto.SendCodeRequest;
+import com.trektrace.dto.VerifyCodeRequest;
 import com.trektrace.entity.User;
 import com.trektrace.entity.VerificationCode;
-import com.trektrace.repository.EmailVerificationTokenRepository;
-import com.trektrace.repository.UserRepository;
 import com.trektrace.service.EmailService;
 import com.trektrace.service.TokenBlacklistService;
 import com.trektrace.service.UserService;
 import com.trektrace.service.SmsService;
+import com.trektrace.repository.UserRepository;
 import com.trektrace.repository.VerificationCodeRepository;
 import com.trektrace.util.JwtUtil;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -24,15 +28,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    // Simple in-memory rate limiter: phone -> last send timestamp
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+
+    // Simple in-memory rate limiter: target -> last send timestamp
     private final Map<String, Long> rateLimitMap = new ConcurrentHashMap<>();
     private static final long RATE_LIMIT_MS = 60_000; // 1 minute between sends
 
@@ -42,48 +46,58 @@ public class AuthController {
     private static final long LOGIN_LOCKOUT_MS = 15 * 60_000; // 15 minutes lockout
 
     private final UserService userService;
+    private final UserRepository userRepository;
     private final SmsService smsService;
     private final VerificationCodeRepository verificationCodeRepository;
     private final TokenBlacklistService tokenBlacklistService;
     private final EmailService emailService;
-    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
-    private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
     public AuthController(UserService userService,
+                          UserRepository userRepository,
                           SmsService smsService,
                           VerificationCodeRepository verificationCodeRepository,
                           TokenBlacklistService tokenBlacklistService,
                           EmailService emailService,
-                          EmailVerificationTokenRepository emailVerificationTokenRepository,
-                          UserRepository userRepository,
                           JwtUtil jwtUtil) {
         this.userService = userService;
+        this.userRepository = userRepository;
         this.smsService = smsService;
         this.verificationCodeRepository = verificationCodeRepository;
         this.tokenBlacklistService = tokenBlacklistService;
         this.emailService = emailService;
-        this.emailVerificationTokenRepository = emailVerificationTokenRepository;
-        this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/send-code")
-    public ResponseEntity<?> sendVerificationCode(@RequestBody LoginRequest request) {
-        String phone = request.getPhone();
+    public ResponseEntity<?> sendVerificationCode(@Valid @RequestBody SendCodeRequest request) {
+        String identifier = request.getIdentifier();
 
-        // Validate phone format
-        if (phone == null || !phone.matches("^1[3-9]\\d{9}$")) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        // Validate format: must be email or phone
+        if (!UserService.isEmail(identifier) && !UserService.isPhone(identifier)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "请输入正确的邮箱或手机号"));
         }
 
-        // Rate limit: 1 request per minute per phone
+        // Check account existence based on purpose
+        boolean exists = userRepository.findByIdentifier(identifier).isPresent();
+        String purpose = request.getPurpose();
+        if ("register".equals(purpose) && exists) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "该账号已注册，请直接登录"));
+        }
+        if ("resetPassword".equals(purpose) && !exists) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "该账号未注册"));
+        }
+
+        // Rate limit: 1 request per minute per target
         long now = System.currentTimeMillis();
-        Long lastSent = rateLimitMap.get(phone);
+        Long lastSent = rateLimitMap.get(identifier);
         if (lastSent != null && (now - lastSent) < RATE_LIMIT_MS) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
         }
-        rateLimitMap.put(phone, now);
+        rateLimitMap.put(identifier, now);
 
         // Periodically clean up old entries to prevent memory leak
         if (rateLimitMap.size() > 10000) {
@@ -96,37 +110,75 @@ public class AuthController {
         // Generate and save verification code
         String code = String.format("%06d", new java.security.SecureRandom().nextInt(1000000));
         VerificationCode vc = new VerificationCode();
-        vc.setPhone(phone);
+        vc.setTarget(identifier);
         vc.setCode(code);
         vc.setExpiresAt(LocalDateTime.now().plusMinutes(5));
         vc.setUsed(false);
 
         verificationCodeRepository.save(vc);
 
-        // Send verification code
-        smsService.sendVerificationCode(phone, code);
+        // Send verification code via appropriate channel
+        try {
+            if (UserService.isEmail(identifier)) {
+                emailService.sendVerificationCode(identifier, code);
+            } else {
+                smsService.sendVerificationCode(identifier, code);
+            }
+        } catch (Exception e) {
+            log.error("Failed to send verification code to {}: {}", identifier, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "验证码发送失败，请稍后重试"));
+        }
 
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/login")
+    @PostMapping("/verify-code")
+    public ResponseEntity<?> verifyCode(@Valid @RequestBody VerifyCodeRequest request) {
+        String identifier = request.getIdentifier();
+
+        if (!UserService.isEmail(identifier) && !UserService.isPhone(identifier)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "请输入正确的邮箱或手机号"));
+        }
+
+        boolean valid = verificationCodeRepository
+                .findTopByTargetAndCodeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
+                        identifier, request.getCode(), LocalDateTime.now())
+                .isPresent();
+
+        if (!valid) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "验证码错误或已过期"));
+        }
+
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/register")
     @Transactional
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        String phone = request.getPhone();
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+        String identifier = request.getIdentifier();
         String code = request.getCode();
 
-        // Atomically consume the verification code to prevent TOCTOU race condition
-        int consumed = verificationCodeRepository.consumeCode(phone, code, LocalDateTime.now());
+        // Validate format
+        if (!UserService.isEmail(identifier) && !UserService.isPhone(identifier)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "请输入正确的邮箱或手机号"));
+        }
+
+        // Atomically consume the verification code
+        int consumed = verificationCodeRepository.consumeCode(identifier, code, LocalDateTime.now());
 
         if (consumed == 0) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "验证码错误或已过期"));
         }
 
-        // Login or create user
-        User user = userService.createOrGetUser(phone);
+        // Register user
+        User user = userService.registerUser(identifier, request.getPassword());
 
-        // Generate token pair
+        // Generate token pair for auto-login
         String token = userService.generateToken(user.getId());
         String refreshToken = userService.generateRefreshToken(user.getId());
 
@@ -134,17 +186,12 @@ public class AuthController {
     }
 
     @PostMapping("/login-password")
-    public ResponseEntity<?> loginWithPassword(@RequestBody LoginRequest request) {
-        String phone = request.getPhone();
+    public ResponseEntity<?> loginWithPassword(@Valid @RequestBody LoginRequest request) {
+        String identifier = request.getIdentifier();
         String password = request.getPassword();
 
-        if (phone == null || password == null) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "手机号和密码不能为空"));
-        }
-
         // Login attempt rate limiting
-        String rateKey = "pwd:" + phone;
+        String rateKey = "pwd:" + identifier;
         long now = System.currentTimeMillis();
         long[] attempt = loginAttemptMap.get(rateKey);
         if (attempt != null) {
@@ -159,7 +206,7 @@ public class AuthController {
         }
 
         try {
-            User user = userService.authenticatePassword(phone, password);
+            User user = userService.authenticatePassword(identifier, password);
             loginAttemptMap.remove(rateKey);
             String token = userService.generateToken(user.getId());
             String refreshToken = userService.generateRefreshToken(user.getId());
@@ -177,13 +224,8 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refreshToken(@RequestBody LoginRequest request) {
-        String refreshToken = request.getRefreshToken();
-
-        if (refreshToken == null || refreshToken.isBlank()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "refreshToken不能为空"));
-        }
+    public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequest body) {
+        String refreshToken = body.getRefreshToken();
 
         // Validate refresh token
         if (!jwtUtil.validateToken(refreshToken)) {
@@ -225,7 +267,7 @@ public class AuthController {
     @Transactional
     public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         try {
-            userService.resetPassword(request.getPhone(), request.getCode(), request.getNewPassword());
+            userService.resetPassword(request.getIdentifier(), request.getCode(), request.getNewPassword());
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             if (e instanceof org.springframework.web.server.ResponseStatusException rse) {
@@ -246,40 +288,16 @@ public class AuthController {
         }
         Long userId = (Long) authentication.getPrincipal();
 
-        userService.bindEmail(userId, request.getEmail());
-
-        // Generate email verification token
-        String token = UUID.randomUUID().toString();
-        EmailVerificationToken evt = new EmailVerificationToken();
-        evt.setUser(userRepository.getReferenceById(userId));
-        evt.setEmail(request.getEmail());
-        evt.setToken(token);
-        evt.setExpiresAt(LocalDateTime.now().plusHours(24));
-        evt.setUsed(false);
-        emailVerificationTokenRepository.save(evt);
-
-        // Send verification email
-        emailService.sendVerificationEmail(request.getEmail(), token);
-
-        return ResponseEntity.ok().build();
-    }
-
-    @GetMapping("/verify-email")
-    public ResponseEntity<?> verifyEmail(@RequestParam String token) {
-        Optional<EmailVerificationToken> evtOpt = emailVerificationTokenRepository
-                .findByTokenAndUsedFalseAndExpiresAtAfter(token, LocalDateTime.now());
-
-        if (evtOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "验证链接无效或已过期"));
+        try {
+            userService.bindEmail(userId, request.getEmail(), request.getCode());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            if (e instanceof org.springframework.web.server.ResponseStatusException rse) {
+                return ResponseEntity.status(rse.getStatusCode())
+                        .body(Map.of("error", rse.getReason()));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "绑定邮箱失败"));
         }
-
-        EmailVerificationToken evt = evtOpt.get();
-        evt.setUsed(true);
-        emailVerificationTokenRepository.save(evt);
-
-        userService.verifyEmail(evt.getUser().getId(), evt.getEmail());
-
-        return ResponseEntity.ok(Map.of("message", "邮箱验证成功"));
     }
 }

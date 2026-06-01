@@ -7,17 +7,17 @@ import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Table(name = "verification_codes", indexes = {
-        @Index(name = "idx_vc_phone", columnList = "phone")
+        @Index(name = "idx_vc_target", columnList = "target")
 })
 @Data
 public class VerificationCode {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "phone", nullable = false, length = 11)
-    private String phone;
+    @Column(name = "target", nullable = false, length = 255)
+    private String target;
 
     @Column(name = "code", nullable = false, length = 6)
     private String code;

@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-public class ResetPasswordRequest {
+public class RegisterRequest {
 
     @NotBlank(message = "账号不能为空")
     private String identifier;
@@ -15,8 +15,8 @@ public class ResetPasswordRequest {
     @Pattern(regexp = "^\\d{6}$", message = "验证码为6位数字")
     private String code;
 
-    @NotBlank(message = "新密码不能为空")
+    @NotBlank(message = "密码不能为空")
     @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d@$!%*#?&]{6,72}$",
             message = "密码需6-72位，且包含字母和数字")
-    private String newPassword;
+    private String password;
 }

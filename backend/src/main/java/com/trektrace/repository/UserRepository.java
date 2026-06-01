@@ -18,6 +18,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByAccount(Long account);
     Optional<User> findByEmail(String email);
 
+    @Query("SELECT u FROM User u WHERE u.email = :identifier OR u.phone = :identifier")
+    Optional<User> findByIdentifier(@Param("identifier") String identifier);
+
     @Modifying
     @Query("UPDATE User u SET u.account = 100000 + u.id WHERE u.account IS NULL")
     int fixNullAccounts();
