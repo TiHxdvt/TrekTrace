@@ -162,7 +162,6 @@ const ChangePasswordModal: React.FC<{
   const { colors } = useTheme();
   const [curPwd, setCurPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
-  const [confirmPwd, setConfirmPwd] = useState('');
   const [loading, setLoading] = useState(false);
 
   const mStyles = useMemo(() => StyleSheet.create({
@@ -242,9 +241,8 @@ const ChangePasswordModal: React.FC<{
   const newPasswordValid = PASSWORD_STRENGTH_REGEX.test(newPwd);
 
   const handleSubmit = async () => {
-    if (!curPwd || !newPwd || !confirmPwd) { Toast.show('请填写所有字段'); return; }
+    if (!curPwd || !newPwd) { Toast.show('请填写所有字段'); return; }
     if (!newPasswordValid) { Toast.show('新密码需包含字母和数字，6-72位'); return; }
-    if (newPwd !== confirmPwd) { Toast.show('两次输入的新密码不一致'); return; }
     setLoading(true);
     try {
       await accountService.changePassword(curPwd, newPwd);
@@ -257,7 +255,6 @@ const ChangePasswordModal: React.FC<{
       setLoading(false);
       setCurPwd('');
       setNewPwd('');
-      setConfirmPwd('');
     }
   };
 
@@ -270,7 +267,6 @@ const ChangePasswordModal: React.FC<{
         <Text style={[mStyles.hint, newPwd && !newPasswordValid && mStyles.hintError]}>
           {newPwd ? (newPasswordValid ? '密码强度符合要求' : '需包含字母和数字，6-72位') : '需包含字母和数字，6-72位'}
         </Text>
-        <TextInput style={mStyles.input} value={confirmPwd} onChangeText={setConfirmPwd} placeholder="请再次输入新密码" placeholderTextColor={colors.TEXT.PLACEHOLDER} secureTextEntry maxLength={72} />
         <View style={mStyles.btnRow}>
           <TouchableOpacity style={[mStyles.btn, mStyles.btnCancel]} onPress={onClose}><Text style={mStyles.btnCancelText}>取消</Text></TouchableOpacity>
           <TouchableOpacity style={[mStyles.btn, mStyles.btnConfirm, loading && mStyles.btnDisabled]} onPress={handleSubmit} disabled={loading}><Text style={mStyles.btnConfirmText}>{loading ? '处理中...' : '确认修改'}</Text></TouchableOpacity>
@@ -280,7 +276,7 @@ const ChangePasswordModal: React.FC<{
   );
 };
 
-// --- 绑定邮箱弹窗 ---
+// --- 绑定邮箱弹窗（验证码模式） ---
 const BindEmailModal: React.FC<{
   visible: boolean;
   onClose: () => void;
@@ -288,7 +284,17 @@ const BindEmailModal: React.FC<{
 }> = ({ visible, onClose, onSuccess }) => {
   const { colors } = useTheme();
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [step, setStep] = useState<1 | 2>(1);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   const mStyles = useMemo(() => StyleSheet.create({
     overlay: {
@@ -325,6 +331,11 @@ const BindEmailModal: React.FC<{
       fontSize: TYPOGRAPHY.FONT_SIZE.MD,
       color: colors.TEXT.PRIMARY,
     },
+    codeRow: { flexDirection: 'row', gap: SPACING.MD, alignItems: 'center' },
+    codeInput: { flex: 1, backgroundColor: colors.OVERLAY.MEDIUM, borderWidth: 1, borderColor: colors.BORDER.MEDIUM, borderRadius: BORDER_RADIUS.MD, paddingHorizontal: SPACING.LG, paddingVertical: SPACING.MD, fontSize: TYPOGRAPHY.FONT_SIZE.MD, color: colors.TEXT.PRIMARY },
+    codeBtn: { paddingHorizontal: SPACING.MD, paddingVertical: SPACING.MD, borderRadius: BORDER_RADIUS.MD, backgroundColor: colors.OVERLAY.MEDIUM },
+    codeBtnDisabled: { opacity: 0.5 },
+    codeBtnText: { fontSize: TYPOGRAPHY.FONT_SIZE.SM, color: colors.PRIMARY, fontWeight: '500' },
     btnRow: {
       flexDirection: 'row',
       gap: SPACING.MD,
@@ -356,15 +367,35 @@ const BindEmailModal: React.FC<{
 
   if (!visible) return null;
 
-  const handleBind = async () => {
+  const handleSendCode = async () => {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       Toast.show('请输入正确的邮箱地址');
       return;
     }
+    setSending(true);
+    try {
+      await authService.sendVerificationCode(email, 'bind');
+      setCountdown(60);
+      setStep(2);
+      Toast.show('验证码已发送');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error;
+      if (msg) { Toast.show(msg); }
+      else { Toast.show('发送失败'); }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleBind = async () => {
+    if (!code || code.length !== 6) {
+      Toast.show('请输入6位验证码');
+      return;
+    }
     setLoading(true);
     try {
-      await accountService.bindEmail(email);
-      Toast.show('验证邮件已发送，请查收');
+      await accountService.bindEmail(email, code);
+      Toast.show('邮箱绑定成功');
       onSuccess();
       onClose();
     } catch (e: any) {
@@ -372,6 +403,8 @@ const BindEmailModal: React.FC<{
     } finally {
       setLoading(false);
       setEmail('');
+      setCode('');
+      setStep(1);
     }
   };
 
@@ -379,19 +412,36 @@ const BindEmailModal: React.FC<{
     <View style={mStyles.overlay}>
       <View style={mStyles.card}>
         <Text style={mStyles.title}>绑定邮箱</Text>
-        <TextInput
-          style={mStyles.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="请输入邮箱地址"
-          placeholderTextColor={colors.TEXT.PLACEHOLDER}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <View style={mStyles.btnRow}>
-          <TouchableOpacity style={[mStyles.btn, mStyles.btnCancel]} onPress={onClose}><Text style={mStyles.btnCancelText}>取消</Text></TouchableOpacity>
-          <TouchableOpacity style={[mStyles.btn, mStyles.btnConfirm, loading && mStyles.btnDisabled]} onPress={handleBind} disabled={loading}><Text style={mStyles.btnConfirmText}>{loading ? '发送中...' : '发送验证邮件'}</Text></TouchableOpacity>
-        </View>
+        {step === 1 ? (
+          <>
+            <TextInput
+              style={mStyles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="请输入邮箱地址"
+              placeholderTextColor={colors.TEXT.PLACEHOLDER}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <View style={mStyles.btnRow}>
+              <TouchableOpacity style={[mStyles.btn, mStyles.btnCancel]} onPress={onClose}><Text style={mStyles.btnCancelText}>取消</Text></TouchableOpacity>
+              <TouchableOpacity style={[mStyles.btn, mStyles.btnConfirm, sending && mStyles.btnDisabled]} onPress={handleSendCode} disabled={sending}><Text style={mStyles.btnConfirmText}>{sending ? '发送中...' : '发送验证码'}</Text></TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={mStyles.codeRow}>
+              <TextInput style={mStyles.codeInput} value={code} onChangeText={setCode} placeholder="验证码" placeholderTextColor={colors.TEXT.PLACEHOLDER} keyboardType="number-pad" maxLength={6} />
+              <TouchableOpacity style={[mStyles.codeBtn, (countdown > 0 || sending) && mStyles.codeBtnDisabled]} onPress={handleSendCode} disabled={countdown > 0 || sending}>
+                <Text style={mStyles.codeBtnText}>{countdown > 0 ? `${countdown}s` : sending ? '发送中' : '重发'}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={mStyles.btnRow}>
+              <TouchableOpacity style={[mStyles.btn, mStyles.btnCancel]} onPress={onClose}><Text style={mStyles.btnCancelText}>取消</Text></TouchableOpacity>
+              <TouchableOpacity style={[mStyles.btn, mStyles.btnConfirm, loading && mStyles.btnDisabled]} onPress={handleBind} disabled={loading}><Text style={mStyles.btnConfirmText}>{loading ? '绑定中...' : '确认绑定'}</Text></TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -441,10 +491,14 @@ const ChangePhoneModal: React.FC<{
     if (!phone || phone.length !== 11) { Toast.show('请输入正确的手机号'); return; }
     setSending(true);
     try {
-      await authService.sendVerificationCode(phone);
+      await authService.sendVerificationCode(phone, 'bind');
       setCountdown(60);
       Toast.show('验证码已发送');
-    } catch { Toast.show('发送失败'); }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error;
+      if (msg) { Toast.show(msg); }
+      else { Toast.show('发送失败'); }
+    }
     finally { setSending(false); }
   };
 
@@ -687,7 +741,7 @@ export const AccountPrivacyScreen: React.FC<{ navigation: NavProp }> = ({ naviga
           <View style={dynamicStyles.divider} />
           <SectionItem title="登录密码" value={hasPassword ? '已设置' : '未设置'} onPress={handlePasswordPress} />
           <View style={dynamicStyles.divider} />
-          <SectionItem title="绑定邮箱" value={emailDisplay} onPress={() => setShowBindEmail(true)} />
+          <SectionItem title="邮箱" value={emailDisplay} onPress={() => setShowBindEmail(true)} />
         </View>
 
         {/* 第三方账号 */}

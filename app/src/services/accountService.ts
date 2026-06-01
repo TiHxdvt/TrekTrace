@@ -32,7 +32,7 @@ export const accountService = {
     await api.put('/user/password', { oldPassword, newPassword });
   },
 
-  bindEmail: async (email: string): Promise<void> => {
-    await api.post('/auth/bind-email', { email });
+  bindEmail: async (email: string, code: string): Promise<void> => {
+    await api.post('/auth/bind-email', { email, code });
   },
 };

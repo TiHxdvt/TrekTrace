@@ -44,7 +44,7 @@ public class AccountController {
 
         // Verify SMS code (uses atomic query that checks both unused AND not expired)
         VerificationCode vc = verificationCodeRepository
-                .findTopByPhoneAndCodeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
+                .findTopByTargetAndCodeAndUsedFalseAndExpiresAtAfterOrderByCreatedAtDesc(
                         phone, code, LocalDateTime.now())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "验证码错误或已过期"));
 

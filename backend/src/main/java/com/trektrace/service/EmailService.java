@@ -48,10 +48,44 @@ public class EmailService {
         }
 
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(from);
+        if (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl impl) {
+            message.setFrom(impl.getUsername());
+        } else {
+            message.setFrom(from);
+        }
         message.setTo(to);
         message.setSubject("途迹 TrekTrace - 邮箱验证");
         message.setText("请点击以下链接验证你的邮箱：\n\n" + verificationUrl + "\n\n链接有效期为24小时。");
+        mailSender.send(message);
+    }
+
+    public void sendVerificationCode(String to, String code) {
+        if ("mock".equals(provider)) {
+            log.info("===== Mock Verification Code Email =====");
+            log.info("To: {}", to);
+            log.info("Subject: 途迹 TrekTrace - 验证码");
+            log.info("Code: {}", code);
+            log.info("Body: 你的验证码是：{}，5分钟内有效。", code);
+            log.info("======================");
+            return;
+        }
+
+        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        if (mailSender == null) {
+            log.warn("JavaMailSender not available, skipping email to {}", to);
+            return;
+        }
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        // QQ 邮箱要求 from 必须与认证用户一致
+        if (mailSender instanceof org.springframework.mail.javamail.JavaMailSenderImpl impl) {
+            message.setFrom(impl.getUsername());
+        } else {
+            message.setFrom(from);
+        }
+        message.setTo(to);
+        message.setSubject("途迹 TrekTrace - 验证码");
+        message.setText("你的验证码是：" + code + "，5分钟内有效。如非本人操作，请忽略此邮件。");
         mailSender.send(message);
     }
 }
